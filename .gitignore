@@ -7,3 +7,12 @@ result-*
 
 # Ignore NixOS interactive test driver history
 **/.nixos-test-history
+
+# Secrets staged for delivery via `nixos-anywhere --extra-files` (SSH
+# authorized_keys, the Nebula config.yaml with its embedded private key,
+# etc.) — never commit the real files. `*.example` placeholders documenting
+# expected paths/format ARE tracked (the negation patterns below re-include
+# them despite the broad ignore).
+secrets/**
+!secrets/**/
+!secrets/**/*.example
