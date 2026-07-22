@@ -8,6 +8,9 @@ result-*
 # Ignore NixOS interactive test driver history
 **/.nixos-test-history
 
+# Downloaded/built installer ISOs — never belong in the repo
+*.iso
+
 # Secrets staged for delivery via `nixos-anywhere --extra-files` (SSH
 # authorized_keys, the Nebula config.yaml with its embedded private key,
 # etc.) — never commit the real files. `*.example` placeholders documenting

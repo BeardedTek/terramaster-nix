@@ -1,11 +1,16 @@
 # Deploying `young`
 
 This flake has been validated with `nix flake check` and a full `--dry-run`
-build of both `nixosConfigurations.young` and `.installer`, using a NixOS
-26.05 environment (`wsl -d NixOS` on this machine). Both evaluate cleanly
-with zero errors. That confirms the config is internally consistent —
-it does **not** confirm the box actually boots this way; that's what the
-verification checklist at the end of this doc is for.
+build of `nixosConfigurations.young`, using a NixOS 26.05 environment
+(`wsl -d NixOS` on this machine). It evaluates cleanly with zero errors.
+That confirms the config is internally consistent — it does **not**
+confirm the box actually boots this way; that's what the verification
+checklist at the end of this doc is for.
+
+Bootstrapping uses the **stock NixOS minimal installer ISO** (no custom
+image needed) — the F4-245 has a monitor and keyboard attached for this,
+so there's no need to pre-bake an SSH key into a custom ISO just for
+headless access.
 
 ## 0. Fill in the placeholders first
 
@@ -39,40 +44,40 @@ Everything under `secrets/extra-files/` mirrors the target's filesystem
 on the deployed box). One `--extra-files` flag copies the whole tree at
 once (step 5).
 
-## 1. Build and flash the installer ISO
+## 1. Download and flash the stock installer ISO
 
-From this repo, on a machine with Nix (this machine's `wsl -d NixOS` works):
+Get the official NixOS 26.05 minimal ISO from
+https://nixos.org/download (match the `nixos-26.05` release this flake is
+pinned to — a different release can still work, but keep it close). Flash
+it to a **separate external USB drive** — not the F4-245's internal drive,
+which is the install *target*, not the boot media for this step. (Community
+reports on similar TerraMaster models say the internal USB header only
+boots TerraMaster's own TOS install stub, not a general live OS — hence
+booting the installer externally.)
 
-```sh
-INSTALLER_SSH_KEY="$(cat secrets/extra-files/home/beardedtek/.ssh/authorized_keys)" \
-  nix build --impure .#nixosConfigurations.installer.config.system.build.isoImage
-```
+## 2. Boot the box at the console, gather two facts, enable SSH access
 
-`--impure` is required: the key is read from an environment variable
-(`builtins.getEnv`) on purpose, since a gitignored file wouldn't be visible
-to a normal (pure) flake evaluation anyway.
-
-Flash `result/iso/*.iso` to a **separate external USB drive** — not the
-F4-245's internal 256GB drive, which is the install *target*, not the boot
-media for this step. (Community reports on similar TerraMaster models say
-the internal USB header only boots TerraMaster's own TOS install stub, not
-a general live OS — hence booting the installer externally.)
-
-## 2. Boot the box from the installer, gather two facts
-
-Plug the flashed USB into an external port on the F4-245 and boot from it
-(may need a one-time physical BIOS/UEFI boot-menu selection — unconfirmed
-whether this model allows a fully headless boot-order change). Once it's
-up and reachable over SSH as root:
+Plug the flashed USB into an external port on the F4-245, attach the
+monitor/keyboard, and boot from it (may need a one-time BIOS/UEFI
+boot-menu selection to pick the USB drive). Once you're at the live
+installer's console:
 
 ```sh
-ssh root@<live-ip>
-ls -la /dev/disk/by-id/     # → the internal 256GB USB drive's stable id
+# The live ISO's root account has no password set (SSH access is refused
+# until it does) — set a temporary one so nixos-anywhere can connect from
+# your workstation in step 4:
+passwd
+
+ip addr                     # → confirm it got a DHCP address; note the IP
+ls -la /dev/disk/by-id/     # → the internal USB drive's stable id
 ip link                     # → the real LAN interface name
 ```
 
 Go back and fill in the `CHANGEME` values in `hosts/young/disko.nix` and
-`modules/common.nix` with what you just found.
+`modules/common.nix` with what you just found. The temporary root password
+only matters for the SSH connections in steps 3–4 — it doesn't carry over
+to the installed system (`beardedtek`'s real key, delivered separately in
+step 4, is what you'll actually log in with afterward).
 
 ## 3. Import `rust` and create its two new datasets — before installing
 

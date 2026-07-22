@@ -31,25 +31,9 @@
         ];
       };
 
-      # Custom SSH-enabled live installer ISO used to bootstrap `young` via
-      # nixos-anywhere (see hosts/installer/configuration.nix for why this
-      # exists instead of the stock ISO).
-      #
-      # The authorizing SSH key is read from $INSTALLER_SSH_KEY at build
-      # time via builtins.getEnv (requires `nix build --impure`), rather
-      # than being committed to this file or read from a gitignored path
-      # inside the flake — the latter wouldn't work anyway, since a local
-      # flake's source is filtered to git-tracked files, silently omitting
-      # anything gitignored. Build with:
-      #   INSTALLER_SSH_KEY="$(cat secrets/extra-files/home/beardedtek/.ssh/authorized_keys)" \
-      #     nix build --impure .#nixosConfigurations.installer.config.system.build.isoImage
-      nixosConfigurations.installer = nixpkgs.lib.nixosSystem {
-        inherit system;
-        specialArgs = { installerSshKey = builtins.getEnv "INSTALLER_SSH_KEY"; };
-        modules = [
-          "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
-          ./hosts/installer/configuration.nix
-        ];
-      };
+      # No custom installer output: bootstrapping uses the stock NixOS
+      # minimal installer ISO (nixos.org) instead — the box has a monitor
+      # and keyboard attached, so a pre-baked SSH key for headless access
+      # isn't needed. See docs/DEPLOYMENT.md.
     };
 }
