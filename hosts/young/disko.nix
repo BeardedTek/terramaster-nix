@@ -9,7 +9,7 @@
   # on the actual hardware (see docs/DEPLOYMENT.md). Never use /dev/sdX —
   # enumeration order isn't guaranteed across reboots/USB re-enumeration.
   disko.devices.disk.usb = {
-    device = "/dev/disk/by-id/CHANGEME-usb-boot-drive";
+    device = "/dev/disk/by-id/usb-_USB_DISK_3.0_070D55621A83CB64-0:0";
     type = "disk";
     content = {
       type = "gpt";

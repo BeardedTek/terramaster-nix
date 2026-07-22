@@ -3,7 +3,7 @@
 {
   options.mySystem.lanInterface = lib.mkOption {
     type = lib.types.str;
-    default = "CHANGEME-lan-if";
+    default = "enp1s0";
     description = ''
       Name of the physical LAN interface (find with `ip link` on the live
       installer, e.g. eno1/enp1s0). Single source of truth, used by
@@ -14,7 +14,7 @@
   };
 
   config = {
-    time.timeZone = "America/Chicago";
+    time.timeZone = "America/Anchorage";
     i18n.defaultLocale = "en_US.UTF-8";
 
     nix.settings.experimental-features = [ "nix-command" "flakes" ];
