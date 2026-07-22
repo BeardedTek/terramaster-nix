@@ -86,7 +86,7 @@ config declares `/nix`, `/persist`, `/home`, etc. as ZFS datasets on `rust`.
 The standard install-time mount step that `nixos-anywhere` relies on will
 try to mount all of them, and that fails if `rust` isn't imported yet.
 
-Still on the live installer, over SSH:
+Still on the live installer, over SSH (or at the console):
 
 ```sh
 # rust was last imported under a different host's ZFS hostid. Stamp this
@@ -97,30 +97,69 @@ zgenhostid 975edc0d
 zpool import -f rust
 
 # The only two new datasets this setup needs — everything else already
-# exists in `rust` and must not be touched:
-zfs create rust/nix
-zfs create rust/persist
+# exists in `rust` and must not be touched. -o mountpoint=legacy is
+# required: ZFS refuses to mount a native-mountpoint dataset at any path
+# other than the one recorded in its own mountpoint property (a freshly
+# created dataset inherits /rust/nix and /rust/persist from the parent
+# `rust` dataset's own mountpoint=/rust — not /nix or /persist, which is
+# what fileSystems."/nix"/"/persist" actually need). Skipping this is a
+# guaranteed unbootable system: confirmed the hard way once already.
+zfs create -o mountpoint=legacy rust/nix
+zfs create -o mountpoint=legacy rust/persist
 ```
 
-## 4. Run nixos-anywhere
+## 4. Mount everything `nixos-anywhere` needs under /mnt, then install
 
-From your workstation (not the live installer), with the `CHANGEME` values
-from step 2 already filled in:
+`nixos-anywhere`'s automatic disko-driven install only knows how to mount
+what's declared in `disko.nix` — i.e. just the USB drive's ESP. It has no
+idea `rust/nix`, `rust/persist`, or `rust/home` exist, so left to its own
+devices it silently writes the entire system (and the `--extra-files`
+payload) onto whatever ephemeral storage backs `/mnt` in the live
+environment instead of onto the pool. Split the run into phases and mount
+these by hand in between so the install actually lands somewhere
+persistent.
+
+**4a. Partition just the USB drive** (from your workstation, `CHANGEME`
+values from step 2 already filled in):
 
 ```sh
 nix run github:nix-community/nixos-anywhere -- \
+  --phases disko \
+  --flake .#young \
+  root@<live-ip>
+```
+
+**4b. Mount the ZFS targets under /mnt** (back on the live installer):
+
+```sh
+mkdir -p /mnt/nix /mnt/persist /mnt/home
+mount -t zfs rust/nix /mnt/nix
+mount -t zfs rust/persist /mnt/persist
+
+# rust/home is a pre-existing, native-mountpoint dataset (mountpoint=/home)
+# with real data already on it — leave its property alone and bind-mount
+# instead of remounting, so the beardedtek SSH key delivered via
+# --extra-files in the next step lands on real, persistent storage rather
+# than disappearing on reboot:
+zfs mount rust/home 2>/dev/null || true
+mount --bind /home /mnt/home
+```
+
+**4c. Install** (from your workstation again):
+
+```sh
+nix run github:nix-community/nixos-anywhere -- \
+  --phases install,reboot \
   --flake .#young \
   --extra-files ./secrets/extra-files \
   root@<live-ip>
 ```
 
-This partitions **only** the USB drive per `disko.nix` (the 4 HDDs are
-untouched), mounts every declared filesystem — `rust`'s datasets included,
-already imported in step 3 — installs the system, and copies
-`secrets/extra-files/*` onto the mounted target: the Nebula config lands on
-`/etc/nebula` (`rust/persist`, survives the tmpfs root) and the SSH key
-lands on `/home/beardedtek/.ssh/authorized_keys` (`rust/home`, a real
-persistent mount).
+This installs against the filesystems mounted in 4b, copies
+`secrets/extra-files/*` onto them (the Nebula config lands on `/etc/nebula`
+→ `rust/persist`, the SSH key on `/home/beardedtek/.ssh/authorized_keys` →
+`rust/home` — both real, persistent mounts now), then its `reboot` phase
+unmounts everything and exports `rust` cleanly before rebooting.
 
 ## 5. First reboot onto the internal drive
 

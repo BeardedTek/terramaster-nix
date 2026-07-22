@@ -19,6 +19,14 @@
 
     nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
+    # users.mutableUsers = false with no root password means root has no
+    # valid credentials anywhere, including the initrd's own emergency
+    # shell — a failed early-boot mount (e.g. a ZFS import hiccup) becomes
+    # completely unrecoverable without physical installer media. This
+    # grants an unauthenticated emergency shell in the initrd specifically
+    # so that kind of failure is debuggable from the box itself.
+    boot.initrd.systemd.emergencyAccess = true;
+
     networking.firewall.enable = true;
 
     services.openssh = {
