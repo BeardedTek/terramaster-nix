@@ -112,7 +112,8 @@ let
       service_json() {
         local name="$1" port="$2" up="false"
         nc -z -w2 127.0.0.1 "$port" >/dev/null 2>&1 && up="true"
-        jq -n --arg name "$name" --argjson up "$up" '{name:$name, up:$up}'
+        jq -n --arg name "$name" --argjson up "$up" --argjson port "$port" \
+          '{name:$name, up:$up, port:$port}'
       }
       services=$(jq -s '.' \
         ${lib.concatStringsSep " \\\n        " (

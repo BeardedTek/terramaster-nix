@@ -181,7 +181,7 @@ directly-managed systemd unit.
 | Seerr (Jellyseerr) | `modules/media-stack.nix` | 5055 | open |
 | qBittorrent | `modules/media-stack.nix` | 8080 (webUI) | open |
 | Nebula | `modules/nebula.nix` | 4242/udp | — (this *is* the mesh) |
-| Traefik (proxy) | `modules/traefik.nix` | 80/443/8099 | LAN + nebula1 |
+| Traefik (proxy) | `modules/traefik.nix` | 80/443/8099/8090 | LAN + nebula1 (8090: LAN only) |
 | Dashboard (nginx) | `modules/dashboard.nix` | 8097 | LAN + nebula1 |
 | Frigate (via its own nginx vhost) | `modules/frigate.nix` | 8098 | LAN + nebula1 |
 | Home Assistant | `modules/home-assistant.nix` | 8123 | LAN + nebula1 |
@@ -398,6 +398,66 @@ socket/provider here, dynamic routing is declared directly via
   needs to resolve to young's Nebula address and `*.young.beardedtek.com`
   to young's LAN address, both managed separately wherever the rest of
   `beardedtek.com`'s DNS lives.
+
+### Local-IP access (`lan-local`, port 8090)
+
+A third way to reach the dashboard, alongside the two domain-based schemes
+above: plain `http://<young's LAN IP>:8090/` — no DNS, no TLS, just the
+box's bare LAN IP. Useful when DNS is unavailable/misconfigured or it's
+just more convenient to type an IP than remember a domain.
+
+- **New entrypoint**, `lan-local`, bound to `:8090` on all interfaces but
+  **firewalled to `config.mySystem.lanInterface` only** — deliberately not
+  opened on `nebula1`. Nebula already has its own encrypted tunnel and its
+  own domain-based routes; this port exists purely for convenient
+  unencrypted LAN access, so there's no reason to also expose it over the
+  mesh.
+- **Why a dedicated port instead of reusing `:80`**: the existing `http`
+  entrypoint already binds `:80` on every interface and immediately
+  redirects everything to HTTPS. A second entrypoint can't also bind
+  `:80` scoped to just the LAN IP (Linux won't allow two listeners on the
+  same port), so reworking the existing `:80` entrypoint's redirect
+  behavior would've been required instead of just adding a new one — a
+  bigger, riskier change for a "nice to have" access path. `8090` was
+  chosen as an unused, easy-to-remember port next to Traefik's own 8099.
+- **Routing**: a single catch-all router, `local-dashboard`, pointing at
+  the same `dashboard` backend service the domain-based `young-nebula`/
+  `young-lan` routers use.
+- **Per-service tiles on the dashboard link straight to each service's own
+  `IP:port`** (e.g. `http://192.168.3.181:8123/` for Home Assistant),
+  bypassing Traefik entirely for that hop, rather than routing back through
+  a `/<name>/` subpath on port 8090. An earlier version of this feature
+  did exactly that — a `PathPrefix(`/<name>`)` router plus a
+  `redirectRegex`/`stripPrefix` middleware pair per backend, matching
+  qBittorrent's own documented Traefik pattern
+  ([qBittorrent wiki](https://github.com/qbittorrent/qBittorrent/wiki/Traefik-Reverse-Proxy-for-Web-UI))
+  — but it was dropped in favor of direct `IP:port` links: Home Assistant
+  and Frigate have no equivalent to Sonarr/Radarr/Jackett/qBittorrent's
+  "URL Base"/strip-prefix support, so they rendered with broken asset
+  paths under a subpath, and direct `IP:port` sidesteps that class of
+  problem entirely for every backend, not just those two.
+- **The dashboard gets each service's port from `metrics.json`**
+  (`modules/dashboard.nix`'s `dashboard-metrics` timer already TCP-checks
+  every backend's port for its up/down status; the same script now also
+  includes the port itself in each service's JSON entry), not a
+  hardcoded copy in the Hugo site — `modules/traefik.nix`'s `backends`
+  attrset stays the one source of truth. The client-side JS in
+  `dashboard/content/services.md` only builds `IP:port` links when it
+  detects it was loaded from port `8090`; otherwise tiles link to the
+  normal HTTPS domains as before.
+- **No "blessed" (browser-trusted) TLS cert is possible for bare-IP
+  access.** Publicly-trusted CAs (including Let's Encrypt) only issue
+  certs for DNS names or, in very limited/expensive cases, *fixed public*
+  IPs — never for private LAN IPs like `192.168.x.x`, since anyone on any
+  network could hold the same address and there'd be no way for a CA to
+  verify ownership of it. The existing wildcard certs
+  (`*.nebula.beardedtek.com`, `*.young.beardedtek.com`) are DNS-name certs
+  and can't cover a bare IP either. Practical options if this ever needs
+  to be encrypted: keep using the DNS-based HTTPS routes instead of the
+  bare IP, or accept a self-signed cert (which still shows a browser
+  warning — the "blessed" part of the ask isn't achievable that way). This
+  path is deliberately plain HTTP, scoped to the trusted LAN only, on the
+  same trust basis as Samba/NFS/Jellyfin/etc. elsewhere in this repo.
 
 ## Deploying and updating
 
