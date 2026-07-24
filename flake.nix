@@ -17,6 +17,11 @@
     {
       nixosConfigurations.young = nixpkgs.lib.nixosSystem {
         inherit system;
+        specialArgs = {
+          beardedtekInitialHash = builtins.getEnv "BEARDEDTEK_INITIAL_HASH";
+          dyoungInitialHash = builtins.getEnv "DYOUNG_INITIAL_HASH";
+          rootInitialHash = builtins.getEnv "ROOT_INITIAL_HASH";
+        };
         modules = [
           disko.nixosModules.disko
           impermanence.nixosModules.impermanence
@@ -28,12 +33,8 @@
           ./modules/nfs.nix
           ./modules/media-stack.nix
           ./modules/nebula.nix
+          ./modules/traefik.nix
         ];
       };
-
-      # No custom installer output: bootstrapping uses the stock NixOS
-      # minimal installer ISO (nixos.org) instead — the box has a monitor
-      # and keyboard attached, so a pre-baked SSH key for headless access
-      # isn't needed. See docs/DEPLOYMENT.md.
     };
 }

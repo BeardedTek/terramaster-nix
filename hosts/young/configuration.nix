@@ -1,32 +1,19 @@
-{ ... }:
+{ beardedtekInitialHash, dyoungInitialHash, rootInitialHash, ... }:
 
 {
-  # Fresh install on nixos-26.05 — do not bump this on later upgrades, per
-  # the standard NixOS stateVersion guidance (it pins on-disk data format
-  # compatibility, not "which release am I running").
   system.stateVersion = "26.05";
 
   networking.hostName = "young";
-
-  # Generated once for this repo with `head -c4 /dev/urandom | od -A n -t x1`.
-  # Must stay stable across reinstalls of this specific host — do not
-  # regenerate, and never reuse across other machines.
   networking.hostId = "975edc0d";
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  # Root lives in RAM: nothing routine gets written to the USB flash drive.
-  # /nix and /persist (below) carry everything that must survive a reboot.
   fileSystems."/" = {
     fsType = "tmpfs";
     options = [ "size=2G" "mode=755" ];
   };
 
-  # --- `rust` pool datasets (imported, not created — see modules/zfs.nix
-  # and docs/DEPLOYMENT.md for the one-time `zpool import -f rust`) ---
-
-  # New datasets created for this install:
   fileSystems."/nix" = {
     device = "rust/nix";
     fsType = "zfs";
@@ -38,7 +25,11 @@
     neededForBoot = true;
   };
 
-  # Pre-existing datasets, preserved at their current mountpoints:
+  fileSystems."/rust" = {
+    device = "rust";
+    fsType = "zfs";
+  };
+
   fileSystems."/home" = {
     device = "rust/home";
     fsType = "zfs";
@@ -68,51 +59,59 @@
     fsType = "zfs";
   };
 
-  # Files/dirs that must survive the tmpfs root across reboots.
   environment.persistence."/persist" = {
     hideMounts = true;
     directories = [
-      "/var/lib/nixos" # NixOS's dynamic uid/gid allocation state for
-                        # normal users + system users (jellyfin, sshd,
-                        # seerr, etc.) — without this, every reboot would
-                        # reassign UIDs/GIDs, silently breaking ownership
-                        # on every ZFS-backed path (/home, /rust/*, ...).
+      "/var/lib/nixos"
       "/etc/nebula"
+      "/etc/traefik"
       "/var/lib/samba"
-      "/etc/ssh"
       "/var/lib/jellyfin"
       "/var/lib/sonarr"
       "/var/lib/radarr"
       "/var/lib/jackett"
       "/var/lib/seerr"
+      "/var/lib/qBittorrent"
+      "/var/lib/traefik"
     ];
     files = [
       "/etc/machine-id"
+      "/etc/ssh/ssh_host_rsa_key"
+      "/etc/ssh/ssh_host_rsa_key.pub"
+      "/etc/ssh/ssh_host_ed25519_key"
+      "/etc/ssh/ssh_host_ed25519_key.pub"
     ];
   };
 
-  users.mutableUsers = false;
+  users.mutableUsers = true;
 
-  # NixOS's build-time "you'll be locked out" assertion can't see the real
-  # SSH key (it's delivered out-of-band, not through this config — see
-  # below), so it needs to be told explicitly that this is intentional.
-  users.allowNoPasswordLogin = true;
+  assertions = [
+    {
+      assertion = beardedtekInitialHash != "";
+      message = "BEARDEDTEK_INITIAL_HASH is empty — source secrets/initial-passwords.env before building";
+    }
+    {
+      assertion = dyoungInitialHash != "";
+      message = "DYOUNG_INITIAL_HASH is empty — source secrets/initial-passwords.env before building";
+    }
+    {
+      assertion = rootInitialHash != "";
+      message = "ROOT_INITIAL_HASH is empty — source secrets/initial-passwords.env before building";
+    }
+  ];
 
-  # No openssh.authorizedKeys.keys here on purpose: the real public key
-  # isn't committed to this repo at all. It's delivered straight to
-  # /home/beardedtek/.ssh/authorized_keys via
-  # `nixos-anywhere --extra-files ./secrets/extra-files` (see
-  # docs/DEPLOYMENT.md) — /home is the real rust/home ZFS dataset, not the
-  # tmpfs root, so it persists across reboots without needing an
-  # environment.persistence entry.
+  users.users.root.initialHashedPassword = rootInitialHash;
+
   users.users.beardedtek = {
     isNormalUser = true;
     extraGroups = [ "wheel" ];
+    initialHashedPassword = beardedtekInitialHash;
   };
 
   users.users.dyoung = {
     isNormalUser = true;
-    # No `wheel` — share access only, no sudo.
+    extraGroups = [ "wheel" ];
+    initialHashedPassword = dyoungInitialHash;
   };
 
   security.sudo.wheelNeedsPassword = true;

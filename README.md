@@ -6,3 +6,9 @@ Deployed via disko + nixos-anywhere.
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the full install workflow
 and a list of `CHANGEME` placeholders that need real values before deploying.
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — design rationale: storage
+  layout, persistence strategy, users, networking, and what each service
+  module does and why.
+- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — known failure modes
+  and their fixes, organized by symptom.

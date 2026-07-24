@@ -1,16 +1,10 @@
-{ lib, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
 {
   options.mySystem.lanInterface = lib.mkOption {
     type = lib.types.str;
     default = "enp1s0";
-    description = ''
-      Name of the physical LAN interface (find with `ip link` on the live
-      installer, e.g. eno1/enp1s0). Single source of truth, used by
-      modules/samba.nix and modules/nfs.nix for firewall scoping, and by
-      modules/nfs.nix to auto-detect the currently-live LAN subnet for NFS
-      exports.
-    '';
+    description = "Name of the physical LAN interface";
   };
 
   config = {
@@ -19,12 +13,8 @@
 
     nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-    # users.mutableUsers = false with no root password means root has no
-    # valid credentials anywhere, including the initrd's own emergency
-    # shell — a failed early-boot mount (e.g. a ZFS import hiccup) becomes
-    # completely unrecoverable without physical installer media. This
-    # grants an unauthenticated emergency shell in the initrd specifically
-    # so that kind of failure is debuggable from the box itself.
+    nix.settings.trusted-users = [ "@wheel" ];
+
     boot.initrd.systemd.emergencyAccess = true;
 
     networking.firewall.enable = true;
@@ -36,10 +26,9 @@
         PermitRootLogin = "no";
       };
     };
+    networking.firewall.interfaces.${config.mySystem.lanInterface}.allowedTCPPorts = [ 22 ];
+    networking.firewall.interfaces."nebula1".allowedTCPPorts = [ 22 ];
 
-    # No auto-reboot: an unexpected reboot mid-scrub/mid-resilver on a NAS
-    # is worse than a delayed update. Rebuild/reboot manually on your own
-    # schedule.
     system.autoUpgrade.enable = false;
 
     environment.systemPackages = with pkgs; [

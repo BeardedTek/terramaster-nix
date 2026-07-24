@@ -36,13 +36,41 @@ never show these as trackable):**
 
 | Path | What goes here |
 |---|---|
-| `secrets/extra-files/etc/nebula/config.yaml` | already in place — your real Nebula config, CA/cert/key embedded |
+| `secrets/extra-files/persist/etc/nebula/config.yaml` | already in place — your real Nebula config, CA/cert/key embedded. Lives under `persist/` (not `etc/`) because `--extra-files` writes directly onto whatever's mounted under `/mnt` during install (step 4b) — `/mnt/persist` is the real `rust/persist` dataset at that point, `/mnt/etc` is not (it's ephemeral install-scratch space, gone by first boot, well before impermanence's `/etc/nebula` bind-mount from `/persist/etc/nebula` even exists to shadow it) |
 | `secrets/extra-files/home/beardedtek/.ssh/authorized_keys` | copy `authorized_keys.example` in the same folder, drop in your real public key, drop the `.example` suffix |
+| `secrets/initial-passwords.env` | copy `initial-passwords.env.example`, fill in real `mkpasswd -m sha-512` output for `BEARDEDTEK_INITIAL_HASH`, `DYOUNG_INITIAL_HASH`, `ROOT_INITIAL_HASH` |
+| `secrets/extra-files/persist/etc/traefik/traefik.env` | copy `traefik.env.example` in the same folder, fill in the real Linode API token as `LINODE_TOKEN` — used for the DNS-01 challenge in `modules/traefik.nix` |
 
 Everything under `secrets/extra-files/` mirrors the target's filesystem
 1:1 (e.g. `secrets/extra-files/etc/nebula/config.yaml` → `/etc/nebula/config.yaml`
 on the deployed box). One `--extra-files` flag copies the whole tree at
-once (step 5).
+once (step 5). `secrets/initial-passwords.env` is different — it's read
+locally at *build* time (`builtins.getEnv`, via `flake.nix`'s
+`specialArgs`), not delivered to the target at all, so **every** command
+that builds or deploys `young` (steps 4c below, and any later
+`nixos-rebuild switch --target-host ...`) needs both of:
+
+```sh
+set -a; source secrets/initial-passwords.env; set +a
+```
+
+and impure evaluation enabled on the command itself — `--impure` for a
+plain `nix build`/`nixos-rebuild switch`, but **not** for `nixos-anywhere`:
+everything after its own `--` is parsed by nixos-anywhere's own argument
+parser, which doesn't recognize `--impure` and errors out. For
+`nixos-anywhere` specifically, use `--option pure-eval false` instead
+(its own `--option <key> <value>` flag forwards a real nix setting to its
+internal build invocations — confirmed this achieves the same effect as
+`--impure` and that the assertions below still fire correctly if the env
+vars aren't set). `beardedtek`/`dyoung`/`root` all use
+`initialHashedPassword` with `users.mutableUsers = true` — applied only
+once, when each account is first created; after that, whatever the user
+sets via `passwd` persists across every future rebuild untouched (verified
+against NixOS's actual activation script, not just the docs). The
+tradeoff: you can't force-rotate a password later by editing this file —
+once an account exists, its value here is permanently inert for that
+account. Rotating means logging in and running `passwd`/`chpasswd`
+directly.
 
 ## 1. Download and flash the stock installer ISO
 
@@ -79,7 +107,7 @@ only matters for the SSH connections in steps 3–4 — it doesn't carry over
 to the installed system (`beardedtek`'s real key, delivered separately in
 step 4, is what you'll actually log in with afterward).
 
-## 3. Import `rust` and create its two new datasets — before installing
+## 3. Import `rust` and fix every dataset's mountpoint property — before installing
 
 **This has to happen now, before `nixos-anywhere` runs — not after.** The
 config declares `/nix`, `/persist`, `/home`, etc. as ZFS datasets on `rust`.
@@ -95,29 +123,52 @@ Still on the live installer, over SSH (or at the console):
 # otherwise it comes up mismatched again on first real boot too.
 zgenhostid 975edc0d
 zpool import -f rust
+```
 
-# The only two new datasets this setup needs — everything else already
-# exists in `rust` and must not be touched. -o mountpoint=legacy is
-# required: ZFS refuses to mount a native-mountpoint dataset at any path
-# other than the one recorded in its own mountpoint property (a freshly
-# created dataset inherits /rust/nix and /rust/persist from the parent
-# `rust` dataset's own mountpoint=/rust — not /nix or /persist, which is
-# what fileSystems."/nix"/"/persist" actually need). Skipping this is a
-# guaranteed unbootable system: confirmed the hard way once already.
+**Every** dataset referenced by a `fileSystems.*` entry in this config
+needs `mountpoint=legacy` — not just the two new ones. This isn't optional
+and isn't just about path mismatches: `zpool import` auto-mounts any
+dataset with a *native* (non-legacy) mountpoint and `canmount=on` as part
+of the import itself, inside the initrd's own mount namespace. NixOS's
+own systemd-generated `sysroot-*.mount` units then try to mount that same
+already-mounted dataset again at `/sysroot/...`, and that conflict fails
+outright — confirmed the hard way, on both a freshly-created dataset with
+a mismatched path (`rust/nix`) *and* a pre-existing one with a matching
+path (`rust/home`). Legacy datasets are never auto-mounted by ZFS, only
+ever mounted explicitly — which is exactly what NixOS's units do.
+
+```sh
+# New datasets this setup needs — everything else already exists in
+# `rust` and isn't being created, just having its mountpoint property
+# changed (metadata-only, doesn't touch/move/delete any data):
 zfs create -o mountpoint=legacy rust/nix
 zfs create -o mountpoint=legacy rust/persist
+
+# Pre-existing datasets — same fix, for the same reason. Includes the
+# pool's own top-level dataset ("rust" itself, mountpoint=/rust) — easy to
+# miss since it's not a `fileSystems.*` entry you'd naturally think to
+# check, but it's just as native-mountpoint/canmount=on as its children by
+# default, and gets auto-mounted (then can get silently re-mounted later,
+# orphaning everything nested under it) exactly the same way if left alone:
+zfs set mountpoint=legacy rust
+zfs set mountpoint=legacy rust/home
+zfs set mountpoint=legacy rust/libdocker
+zfs set mountpoint=legacy rust/media
+zfs set mountpoint=legacy rust/data
+zfs set mountpoint=legacy rust/config
+zfs set mountpoint=legacy rust/backups
+zfs set mountpoint=legacy rust/docker
 ```
 
 ## 4. Mount everything `nixos-anywhere` needs under /mnt, then install
 
 `nixos-anywhere`'s automatic disko-driven install only knows how to mount
 what's declared in `disko.nix` — i.e. just the USB drive's ESP. It has no
-idea `rust/nix`, `rust/persist`, or `rust/home` exist, so left to its own
-devices it silently writes the entire system (and the `--extra-files`
-payload) onto whatever ephemeral storage backs `/mnt` in the live
-environment instead of onto the pool. Split the run into phases and mount
-these by hand in between so the install actually lands somewhere
-persistent.
+idea any of `rust`'s datasets exist, so left to its own devices it
+silently writes the entire system (and the `--extra-files` payload) onto
+whatever ephemeral storage backs `/mnt` in the live environment instead of
+onto the pool. Split the run into phases and mount these by hand in
+between so the install actually lands somewhere persistent.
 
 **4a. Partition just the USB drive** (from your workstation, `CHANGEME`
 values from step 2 already filled in):
@@ -129,26 +180,35 @@ nix run github:nix-community/nixos-anywhere -- \
   root@<live-ip>
 ```
 
-**4b. Mount the ZFS targets under /mnt** (back on the live installer):
+**4b. Mount the ZFS targets under /mnt** (back on the live installer — now
+that everything is `legacy`, this is a plain explicit mount for all of
+them, no bind-mount workaround needed):
 
 ```sh
-mkdir -p /mnt/nix /mnt/persist /mnt/home
+mkdir -p /mnt/nix /mnt/persist /mnt/home /mnt/var/lib/docker /mnt/rust
 mount -t zfs rust/nix /mnt/nix
 mount -t zfs rust/persist /mnt/persist
-
-# rust/home is a pre-existing, native-mountpoint dataset (mountpoint=/home)
-# with real data already on it — leave its property alone and bind-mount
-# instead of remounting, so the beardedtek SSH key delivered via
-# --extra-files in the next step lands on real, persistent storage rather
-# than disappearing on reboot:
-zfs mount rust/home 2>/dev/null || true
-mount --bind /home /mnt/home
+mount -t zfs rust/home /mnt/home
+mount -t zfs rust/libdocker /mnt/var/lib/docker
+# Mount the pool's own top-level dataset before its children — same
+# reasoning as everywhere else here, it's just as real a managed mount now:
+mount -t zfs rust /mnt/rust
+mkdir -p /mnt/rust/media /mnt/rust/data /mnt/rust/config /mnt/rust/backups /mnt/rust/docker
+mount -t zfs rust/media /mnt/rust/media
+mount -t zfs rust/data /mnt/rust/data
+mount -t zfs rust/config /mnt/rust/config
+mount -t zfs rust/backups /mnt/rust/backups
+mount -t zfs rust/docker /mnt/rust/docker
 ```
 
-**4c. Install** (from your workstation again):
+**4c. Install** (from your workstation again — note `--option pure-eval
+false`, *not* `--impure`: nixos-anywhere's own argument parser doesn't
+recognize `--impure` and will just dump its usage text if you pass it):
 
 ```sh
+set -a; source secrets/initial-passwords.env; set +a
 nix run github:nix-community/nixos-anywhere -- \
+  --option pure-eval false \
   --phases install,reboot \
   --flake .#young \
   --extra-files ./secrets/extra-files \
@@ -156,10 +216,11 @@ nix run github:nix-community/nixos-anywhere -- \
 ```
 
 This installs against the filesystems mounted in 4b, copies
-`secrets/extra-files/*` onto them (the Nebula config lands on `/etc/nebula`
-→ `rust/persist`, the SSH key on `/home/beardedtek/.ssh/authorized_keys` →
-`rust/home` — both real, persistent mounts now), then its `reboot` phase
-unmounts everything and exports `rust` cleanly before rebooting.
+`secrets/extra-files/*` onto them (the Nebula config lands on
+`/persist/etc/nebula` → `rust/persist`, the SSH key on
+`/home/beardedtek/.ssh/authorized_keys` → `rust/home` — both real,
+persistent mounts now), then its `reboot` phase unmounts everything and
+exports `rust` cleanly before rebooting.
 
 ## 5. First reboot onto the internal drive
 
@@ -180,6 +241,15 @@ chmod 600 /home/beardedtek/.ssh/authorized_keys
 # Samba has its own password database, separate from Unix login:
 sudo smbpasswd -a beardedtek
 sudo smbpasswd -a dyoung
+
+# One-time: let jellyfin/sonarr/radarr/qbittorrent/seerr (each its own
+# user/group) share access to the existing /rust/media library and
+# /rust/data downloads directory via mediagroup, without loosening either
+# to world-readable/writable. Safe to re-run; only needed once per fresh
+# dataset, not on every rebuild.
+sudo chgrp -R mediagroup /rust/media /rust/data
+sudo chmod -R g+rwX /rust/media /rust/data
+sudo find /rust/media /rust/data -type d -exec chmod g+s {} +
 ```
 
 ## 7. Verify
