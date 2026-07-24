@@ -248,6 +248,45 @@ to get routine remote updates working at all, beyond the initial
   confirmed it achieves the same effect (and that the config's assertions
   still correctly fire if the secret env vars aren't set).
 
+## Stray `_acme-challenge.*` CNAME breaks DNS-01 for that domain
+
+**Symptom:** `traefik.log` shows real ACME/DNS-01 activity (unlike the
+entrypoint-level `tls.domains` issue above — this is a config problem in
+the DNS zone itself, not in Traefik), but validation fails. Two variants
+hit in practice:
+
+- `No TXT record found at _acme-challenge.<domain>` after lego repeatedly
+  reports `Found CNAME entry` and waits for propagation that never
+  resolves — happened for `nebula.beardedtek.com`, where
+  `_acme-challenge.nebula.beardedtek.com` had a CNAME pointing at
+  `nebula.beardedtek.com` itself (a self-referential loop: nothing is ever
+  actually there to find).
+- `no subdomain because the domain and the zone are identical:
+  <zone>.` — happened for `young.beardedtek.com`, where
+  `_acme-challenge.young.beardedtek.com` had a CNAME pointing straight at
+  the zone apex (`beardedtek.com`), which the Linode API can't accept a
+  record "under" since it's not a subdomain of itself.
+
+**Cause:** a leftover `_acme-challenge.<domain>` CNAME record already
+existed in the Linode zone for both domains used by `modules/traefik.nix`,
+predating this setup. Per the DNS-01 spec, lego (correctly) follows a
+CNAME at the challenge FQDN instead of writing a TXT record there directly
+— so a stray CNAME left over from unrelated/earlier configuration silently
+hijacks every future ACME validation for that name, no matter how correct
+the Traefik/NixOS config is.
+
+**Fix:** in Linode's DNS Manager, delete the specific
+`_acme-challenge.<domain>` CNAME record for whichever domain is failing.
+Nothing in this repo creates or needs one — lego creates its own TXT
+record directly once the CNAME is gone. Then `sudo systemctl restart
+traefik` and watch `traefik.log` again.
+
+**Given this has now happened for every wildcard domain added to this
+setup so far:** before adding a *new* wildcard domain to
+`modules/traefik.nix`, check the Linode zone for an existing
+`_acme-challenge.<new-domain>` record first, rather than debugging it
+after the fact.
+
 ## Traefik/qBittorrent port collision
 
 **Symptom:** would manifest as one of the two services failing to bind
