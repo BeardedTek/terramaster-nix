@@ -29,6 +29,15 @@
   services.qbittorrent.enable = true;
   services.qbittorrent.openFirewall = true;
   users.users.qbittorrent.extraGroups = [ "mediagroup" ];
+  # Deliberately NOT using services.qbittorrent.serverConfig for anything —
+  # the module's ExecStartPre unconditionally overwrites the *entire*
+  # qBittorrent.conf from the Nix-declared value on every service restart
+  # once serverConfig is non-empty, discarding anything qBittorrent itself
+  # had written since (WebUI password changes, other settings) — confirmed
+  # the hard way: a password set via the WebUI got silently reverted on the
+  # next `nixos-rebuild switch`. Its Host-header validation (the reason
+  # serverConfig was tried here) is worked around instead on the Traefik
+  # side — see modules/traefik.nix.
 
   services.seerr = {
     enable = true;

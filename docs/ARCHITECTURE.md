@@ -182,6 +182,7 @@ directly-managed systemd unit.
 | qBittorrent | `modules/media-stack.nix` | 8080 (webUI) | open |
 | Nebula | `modules/nebula.nix` | 4242/udp | — (this *is* the mesh) |
 | Traefik (proxy) | `modules/traefik.nix` | 80/443/8099 | LAN + nebula1 |
+| Dashboard (nginx) | `modules/dashboard.nix` | 8097 | LAN + nebula1 |
 
 ### Jellyfin
 
@@ -222,6 +223,64 @@ set once so that group can read/write them. Since both already hold real,
 existing data (not a fresh service state dir Nix creates itself), that
 one-time ownership fix is a manual operational step, not a NixOS activation
 script — see `docs/DEPLOYMENT.md`.
+
+### Dashboard
+
+A small Hugo-built static site (`dashboard/` at the repo root) served by
+nginx on port 8097, proxied by Traefik at `young.nebula.beardedtek.com`
+(mesh) and `young.beardedtek.com` (LAN) — the box's own landing page,
+separate from the `<name>-young`/`<name>.young` pattern every other
+backend uses.
+
+- **Theme**: styled to match beardedtek.com, using vendored (pre-built,
+  not recompiled) CSS/JS bundles from
+  [flowbite-beardedtek.com](https://github.com/beardedtek/flowbite-beardedtek.com)
+  under `dashboard/static/`. Deliberately **not** running that repo's own
+  npm/webpack/Tailwind build pipeline here — vendoring the already-compiled
+  output keeps the Nix derivation a single lightweight `hugo` invocation
+  (no Node toolchain at all), matching the "very minimal overhead" the
+  live-metrics requirement was built around. Tradeoff: any Tailwind
+  utility class not already present in the vendored CSS won't be styled —
+  layouts here deliberately stick to common Flowbite component classes
+  known to already be in that build.
+- **Pages**: Home (live metrics), Services (button grid to every proxied
+  backend), Samba, NFS, and Troubleshooting — content lives as plain
+  Markdown/HTML under `dashboard/content/` (`unsafe = true` in
+  `hugo.toml`'s goldmark config allows raw HTML directly in the Markdown,
+  avoiding a pile of one-off Hugo layout templates for simple pages).
+- **Live metrics, without a metrics stack**: `systemd.timers.dashboard-metrics`
+  regenerates `/var/lib/dashboard/metrics.json` every 30s via a single `jq`
+  + `df`/`/proc` shell script (`modules/dashboard.nix`) — no Prometheus,
+  no historical data, current readings only, exactly as asked for. The
+  dashboard homepage's `dashboard.js` just does a client-side `fetch()` of
+  that file on the same 30s interval. Never added to
+  `environment.persistence` — it fully regenerates within 30s of every
+  boot, so there's nothing worth carrying across the tmpfs root, and one
+  less path to get the impermanence-bind-mount-timing bug wrong on (see
+  `docs/TROUBLESHOOTING.md`).
+- **Services page links are domain-aware at runtime**: a small inline
+  script checks `location.hostname` for `.nebula.` and builds each
+  service's link as either the Nebula or LAN domain accordingly — so the
+  same static HTML works correctly whichever network you're actually
+  browsing from, without server-side logic.
+- **Per-service up/down status**: the same `dashboard-metrics` run above
+  also does a plain TCP connect check against each backend's local port
+  and includes the result in `metrics.json` — not a separate polling
+  system. The Services page greys out (and badges "DOWN") any tile whose
+  service isn't reachable. The port list itself isn't duplicated between
+  modules: `options.mySystem.serviceBackends` (`modules/common.nix`) is
+  set once in `modules/traefik.nix` (where the name→port map already
+  existed for routing) and read back in `modules/dashboard.nix` — same
+  pattern as `mySystem.lanInterface`.
+- **Admin contact info** (`options.mySystem.contactInfo`, `modules/common.nix`):
+  a list of `{ label, email, phone }` entries, set per-host in
+  `hosts/young/configuration.nix` rather than hardcoded into the Hugo
+  content. `modules/dashboard.nix` serializes it to `data/contact.json`
+  and copies it into the Hugo source tree at build time (Hugo auto-loads
+  any `data/*.json` as `.Site.Data.contact`), read by
+  `dashboard/layouts/partials/contact-info.html` — shared by the footer
+  (every page) and the Help page's `{{< contact >}}` shortcode, so there's
+  one source of truth instead of duplicating the list in two templates.
 
 ### qBittorrent
 
@@ -266,11 +325,14 @@ socket/provider here, dynamic routing is declared directly via
   Nebula's config — see `docs/DEPLOYMENT.md`'s secrets table. Traefik's
   Linode DNS provider reads it straight from the process environment; no
   templating needed in the static config.
-- **Dashboard port is 8099, not Traefik's default 8080** — 8080 is
-  qBittorrent's default webUI port, and both would otherwise try to bind
-  the same port. 8099 also matches the original compose's external
-  host-port mapping, so it's the same port already familiar from that
-  setup.
+- **Traefik's own admin dashboard port is 8099, not Traefik's default
+  8080** — 8080 is qBittorrent's default webUI port, and both would
+  otherwise try to bind the same port. 8099 also matches the original
+  compose's external host-port mapping, so it's the same port already
+  familiar from that setup. Not to be confused with the *NAS's own*
+  status dashboard (the Hugo site, `modules/dashboard.nix`, port 8097,
+  routed at `young.nebula.beardedtek.com`/`young.beardedtek.com`) — same
+  word, two different things.
 - **DNS is out of scope for this repo.** Traefik only handles TLS and
   routing once a request actually arrives — `*.nebula.beardedtek.com`
   needs to resolve to young's Nebula address and `*.young.beardedtek.com`

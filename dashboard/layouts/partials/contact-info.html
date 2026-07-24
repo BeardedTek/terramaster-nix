@@ -1,0 +1,13 @@
+{{ $contacts := .Site.Data.contact }}
+{{ if $contacts }}
+<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-500 dark:text-gray-400">
+  {{ range $contacts }}
+  <span>
+    <strong class="text-gray-700 dark:text-gray-300">{{ .label }}:</strong>
+    {{ if .email }}<a href="mailto:{{ .email }}" class="hover:underline">{{ .email }}</a>{{ end }}
+    {{ if (and .email .phone) }} &middot; {{ end }}
+    {{ if .phone }}<a href="tel:{{ .phone }}" class="hover:underline">{{ .phone }}</a>{{ end }}
+  </span>
+  {{ end }}
+</div>
+{{ end }}

@@ -1,0 +1,19 @@
+languageCode = "en"
+title = "young | Bearded NAS"
+baseURL = "/"
+canonifyURLs = false
+
+[params]
+  logo_text = "Bearded NAS"
+  hostname = "young"
+
+[markup.goldmark.renderer]
+  unsafe = true
+
+buildDrafts = false
+buildFuture = false
+enableRobotsTXT = false
+metaDataFormat = "yaml"
+disableKinds = ["404", "taxonomy", "taxonomyTerm", "RSS", "sitemap"]
+
+publishDir = "public"

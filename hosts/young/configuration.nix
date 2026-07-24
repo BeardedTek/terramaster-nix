@@ -6,6 +6,24 @@
   networking.hostName = "young";
   networking.hostId = "975edc0d";
 
+  mySystem.contactInfo = [
+    {
+      label = "Tech Support";
+      email = "support@beardedtek.com";
+      phone = "9075198577";
+    }
+    {
+      label = "Sales";
+      email = "sales@beardedtek.com";
+      phone = "9075198577";
+    }
+    {
+      label = "Customer Support";
+      email = "help@beardedtek.com";
+      phone = "9075198577";
+    }
+  ];
+
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 

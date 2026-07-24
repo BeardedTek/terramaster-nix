@@ -1,0 +1,50 @@
+{{ define "main" }}
+<main class="max-w-screen-xl mx-auto px-4 py-8 pt-24">
+    <div class="flex flex-wrap justify-between items-baseline mb-6">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ .Site.Params.hostname }}</h1>
+        <span class="text-sm text-gray-500 dark:text-gray-400">Last update: <span id="metrics-updated">loading&hellip;</span></span>
+    </div>
+
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Storage</h2>
+    <div id="disk-cards" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        {{ range (slice "rust" "rust/media" "rust/data") }}
+        <div class="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm" data-disk="{{ . }}">
+            <div class="flex justify-between items-baseline mb-2">
+                <span class="font-medium text-gray-900 dark:text-white">{{ . }}</span>
+                <span class="text-sm text-gray-500 dark:text-gray-400 disk-pct">&mdash;</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
+                <div class="disk-bar bg-primary-600 h-2.5 rounded-full" style="width: 0%"></div>
+            </div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 disk-detail">&mdash;</div>
+        </div>
+        {{ end }}
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <div class="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">CPU Load</h2>
+            <div id="load-widget" class="text-gray-700 dark:text-gray-300">&mdash;</div>
+        </div>
+        <div class="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Memory</h2>
+            <div id="memory-widget" class="text-gray-700 dark:text-gray-300">&mdash;</div>
+        </div>
+    </div>
+
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Network</h2>
+    <div id="network-cards" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        {{ range (slice (dict "iface" "nebula" "label" "Nebula") (dict "iface" "lan" "label" "Local Ethernet")) }}
+        <div class="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm" data-iface="{{ .iface }}">
+            <div class="flex justify-between items-baseline mb-1">
+                <span class="font-medium text-gray-900 dark:text-white">{{ .label }}</span>
+                <span class="net-status text-sm px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">&mdash;</span>
+            </div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 net-ip">&mdash;</div>
+        </div>
+        {{ end }}
+    </div>
+
+</main>
+<script src="{{ "js/dashboard.js" | relURL }}"></script>
+{{ end }}

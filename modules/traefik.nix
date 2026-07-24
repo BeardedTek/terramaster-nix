@@ -36,19 +36,19 @@ let
     ];
   };
 
-  routersFor = name: {
+  routersFor = name: extraMiddlewares: {
     "${name}-young-nebula" = {
       rule = "Host(`${name}-young.nebula.beardedtek.com`)";
       service = "${name}-young";
       entryPoints = [ "https" ];
       tls = nebulaTls;
-    };
+    } // (lib.optionalAttrs (extraMiddlewares != [ ]) { middlewares = extraMiddlewares; });
     "${name}-young-lan" = {
       rule = "Host(`${name}.young.beardedtek.com`)";
       service = "${name}-young";
       entryPoints = [ "https" ];
       tls = lanTls;
-    };
+    } // (lib.optionalAttrs (extraMiddlewares != [ ]) { middlewares = extraMiddlewares; });
   };
 in
 {
@@ -127,19 +127,72 @@ in
     # tls.domains was added — matching the original docker-compose's
     # proven-working "wildcard" router pattern.
     dynamicConfigOptions = {
-      http.routers = lib.foldl' (acc: name: acc // (routersFor name)) { } (
-        builtins.attrNames backends
-      );
+      http.routers = (lib.foldl' (
+        acc: name:
+        acc // (routersFor name (lib.optionals (name == "qbittorrent") [ "qb-headers" ]))
+      ) { } (builtins.attrNames backends)) // {
+        # The NAS dashboard itself lives at the bare "young" host, not the
+        # <name>-young/<name>.young pattern every other backend uses — it's
+        # the box's own landing page, not one more proxied service.
+        young-nebula = {
+          rule = "Host(`young.nebula.beardedtek.com`)";
+          service = "dashboard";
+          entryPoints = [ "https" ];
+          tls = nebulaTls;
+        };
+        young-lan = {
+          rule = "Host(`young.beardedtek.com`)";
+          service = "dashboard";
+          entryPoints = [ "https" ];
+          tls = lanTls;
+        };
+      };
 
-      http.services = lib.mapAttrs' (
+      http.services = (lib.mapAttrs' (
         name: port:
         lib.nameValuePair "${name}-young" {
           loadBalancer.servers = [ { url = "http://127.0.0.1:${toString port}"; } ];
         }
-      ) backends;
+      ) backends) // {
+        dashboard.loadBalancer.servers = [ { url = "http://127.0.0.1:8097"; } ];
+        # qBittorrent's WebUI validates the Host header against its own bind
+        # address by default and rejects anything else with 401 — Traefik
+        # normally forwards the real client-requested hostname through
+        # (passHostHeader, true everywhere else), which is exactly what
+        # trips that check. Rather than touch qBittorrent's own config to
+        # work around it (its NixOS module fully overwrites qBittorrent.conf
+        # on every restart once any serverConfig key is set, discarding
+        # runtime changes like a WebUI password reset — confirmed the hard
+        # way), just don't forward the real Host header for this one
+        # service: qBittorrent then sees "Host: 127.0.0.1:8080", which its
+        # validation already accepts natively.
+        qbittorrent-young.loadBalancer = {
+          servers = [ { url = "http://127.0.0.1:${toString backends.qbittorrent}"; } ];
+          passHostHeader = false;
+        };
+      };
+
+      # passHostHeader=false alone isn't enough for qBittorrent: it also
+      # has a separate CSRF/cross-site check comparing Origin/Referer
+      # against the Host header, and the browser's real Origin/Referer
+      # still say the actual domain regardless of what Host Traefik
+      # forwards — so the mismatch just moves from one check to the other,
+      # still 401. Matches qBittorrent's own documented Traefik setup
+      # (https://github.com/qbittorrent/qBittorrent/wiki/Traefik-Reverse-Proxy-for-Web-UI):
+      # strip Origin/Referer entirely so there's nothing to mismatch.
+      http.middlewares.qb-headers.headers.customRequestHeaders = {
+        X-Frame-Options = "SAMEORIGIN";
+        Referer = "";
+        Origin = "";
+      };
     };
   };
 
   networking.firewall.interfaces."nebula1".allowedTCPPorts = [ 80 443 8099 ];
   networking.firewall.interfaces.${lanIf}.allowedTCPPorts = [ 80 443 8099 ];
+
+  # Exposes `backends` (above) to other modules — modules/dashboard.nix
+  # reads this for its per-service up/down checks, so there's one list of
+  # services/ports instead of two copies drifting apart.
+  mySystem.serviceBackends = backends;
 }

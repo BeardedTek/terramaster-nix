@@ -1,0 +1,9 @@
+links:
+  - name: Services
+    href: "/services/"
+  - name: Samba
+    href: "/samba/"
+  - name: NFS
+    href: "/nfs/"
+  - name: Help
+    href: "/troubleshooting/"

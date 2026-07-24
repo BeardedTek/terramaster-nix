@@ -34,6 +34,7 @@
           ./modules/media-stack.nix
           ./modules/nebula.nix
           ./modules/traefik.nix
+          ./modules/dashboard.nix
         ];
       };
     };

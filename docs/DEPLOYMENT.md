@@ -270,3 +270,7 @@ sudo find /rust/media /rust/data -type d -exec chmod g+s {} +
 - Jellyseerr/Seerr (`http://young:5055`) reachable — `systemctl status seerr.service`.
 - `systemctl status nebula`, then ping the lighthouse over the mesh and
   confirm SSH still works over the Nebula IP as a second path in.
+- Dashboard (`http://young:8097`, or via Traefik once DNS is set up):
+  confirm the live metrics on the home page actually update (disk/CPU/
+  memory/network), and that `systemctl status dashboard-metrics.timer` is
+  active.
