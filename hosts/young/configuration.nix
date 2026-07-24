@@ -91,6 +91,9 @@
       "/var/lib/seerr"
       "/var/lib/qBittorrent"
       "/var/lib/traefik"
+      "/var/lib/frigate"
+      "/var/lib/hass"
+      "/var/lib/mosquitto"
     ];
     files = [
       "/etc/machine-id"

@@ -14,6 +14,8 @@ let
     jackett = 9117;
     seerr = 5055;
     qbittorrent = 8080;
+    frigate = 8098; # modules/frigate.nix — nginx vhost fronting frigate, not frigate's raw process
+    hass = 8123; # modules/home-assistant.nix
   };
 
   nebulaTls = {

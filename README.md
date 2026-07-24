@@ -12,3 +12,6 @@ and a list of `CHANGEME` placeholders that need real values before deploying.
   module does and why.
 - [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — known failure modes
   and their fixes, organized by symptom.
+- [docs/HOME-ASSISTANT.md](docs/HOME-ASSISTANT.md) — Home Assistant setup:
+  HACS, Z-Wave JS, Mosquitto, the config-directory Samba share, and how to
+  extend it further.

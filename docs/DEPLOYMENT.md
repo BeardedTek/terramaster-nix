@@ -274,3 +274,14 @@ sudo find /rust/media /rust/data -type d -exec chmod g+s {} +
   confirm the live metrics on the home page actually update (disk/CPU/
   memory/network), and that `systemctl status dashboard-metrics.timer` is
   active.
+- Frigate (`http://young:8098` locally, or via Traefik):
+  `sudo journalctl -u frigate | grep -i password` for the auto-generated
+  admin login on first boot.
+- Home Assistant (`http://young:8123` locally, or via Traefik): complete
+  the onboarding wizard, then confirm `systemctl status
+  hass-install-hacs.service` ran successfully and
+  `/var/lib/hass/custom_components/hacs` exists before trying to enable
+  HACS from Settings → Devices & Services.
+- `systemctl status mosquitto` active; `mosquitto_sub -h young -t '#' -v`
+  from another machine on the LAN/mesh to confirm the broker accepts
+  anonymous connections.

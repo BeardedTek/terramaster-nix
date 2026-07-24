@@ -99,30 +99,55 @@ has booted at least once with the persistence entry active — deliver the
 file directly there (`ssh ... 'cat > /tmp/x' < localfile`, then
 `sudo install -m 600 /tmp/x /etc/nebula/config.yaml`), no rebuild needed.
 
-## `systemd-tmpfiles` rules never applied after a live `nixos-rebuild switch` (not a reboot)
+## Freshly-created persistence bind-mounts get the wrong ownership (general pattern)
 
-**Symptom:** a service crashes because a directory it expects
-(`Profile::ensureDirectoryExists`-style fatal errors, or similar) simply
-doesn't exist, even though its NixOS module declares a
-`systemd.tmpfiles.settings`/`.rules` entry that should create it.
+**The general shape of this bug, seen three times now under three
+different mechanisms:** the first time `environment.persistence` creates
+a brand-new source directory under `/persist` for a service's
+`/var/lib/<name>` (i.e. the very first activation after adding a new
+persisted path that has no prior data on `rust/persist`), something
+*else* that's also supposed to set that directory's ownership/contents
+races against — or simply never re-runs against — the freshly-created
+bind mount. The fix is always the same shape: re-run whatever step was
+supposed to set things up, *now that the bind mount already exists*, one
+time. After that first correct pass, it's fine on every future boot,
+since the directory already has real content/ownership on `rust/persist`
+and nothing about it is "fresh" anymore.
 
-**Cause:** on the *same* `nixos-rebuild switch` that (a) introduces a new
-service's tmpfiles rules and (b) creates a brand new
-`environment.persistence` bind-mount for that service's `/var/lib/<name>`
-directory, the ordering between the two isn't guaranteed. If the tmpfiles
-rule application happens before the bind-mount is fully in place, the
-directories get created on the wrong (pre-bind-mount) instance of the
-path and are then shadowed once the real bind-mount activates. Confirmed
-for qBittorrent (`systemd.tmpfiles.settings` in its NixOS module, entirely
-independent of the `qbittorrent.service` unit's own dependency chain,
-unlike a service using `StateDirectory=` — see below for why that
-distinction matters).
+Three confirmed instances, three different underlying mechanisms:
 
-**Fix, live and immediate, no reboot needed:** `sudo systemd-tmpfiles
---create` after the switch, then restart the affected service. Only
-needed once — after the persistence bind-mount and the tmpfiles rule have
-both run *in the right order* a single time, the directories exist for
-good.
+- **`systemd.tmpfiles.settings`-declared directories** (qBittorrent): a
+  service crashes because a directory it expects
+  (`Profile::ensureDirectoryExists`-style fatal errors, or similar) simply
+  doesn't exist, even though its NixOS module declares a
+  `systemd.tmpfiles.settings`/`.rules` entry that should create it. On
+  the *same* `nixos-rebuild switch` that (a) introduces the new tmpfiles
+  rules and (b) creates the brand-new persistence bind-mount, the
+  ordering between the two isn't guaranteed — the directories can get
+  created on the wrong (pre-bind-mount) instance of the path and then get
+  shadowed once the real bind-mount activates. **Fix:** `sudo
+  systemd-tmpfiles --create`, then restart the affected service.
+- **`users.users.<name>.createHome`** (Home Assistant's `hass` user):
+  NixOS's user-activation logic creates a system user's home directory
+  with correct ownership *only when it doesn't already exist* — it won't
+  retroactively `chown` a directory that's already there. If
+  `environment.persistence` gets to create the (empty, `root:root`,
+  mode `0755`) bind-mount source first, user-activation sees "the
+  directory already exists" and never fixes its ownership. Symptom:
+  `mkdir: cannot create directory '/var/lib/<name>/...': Permission
+  denied` from a systemd service running as that user. **Fix:** `sudo
+  chown -R <user>:<group> /var/lib/<name>`, then restart the affected
+  service(s).
+- **ZFS's own auto-mount vs. NixOS's explicit mounts** (the `rust`
+  dataset and its children — see above): same underlying "which one gets
+  there first" shape, just at the filesystem-mount level instead of a
+  directory-ownership level.
+
+**When adding any new service with a `/var/lib/<name>` (or similar)
+persistence entry that didn't exist before:** after the first deploy,
+check `journalctl`/`systemctl status` for exactly this pattern before
+assuming something is actually broken — a one-time ownership/tmpfiles
+fixup is very likely all that's needed, not a config bug.
 
 ## `DynamicUser=true` + `StateDirectory=` + impermanence: "Device or resource busy"
 

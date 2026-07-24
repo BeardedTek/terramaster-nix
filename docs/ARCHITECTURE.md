@@ -183,6 +183,9 @@ directly-managed systemd unit.
 | Nebula | `modules/nebula.nix` | 4242/udp | — (this *is* the mesh) |
 | Traefik (proxy) | `modules/traefik.nix` | 80/443/8099 | LAN + nebula1 |
 | Dashboard (nginx) | `modules/dashboard.nix` | 8097 | LAN + nebula1 |
+| Frigate (via its own nginx vhost) | `modules/frigate.nix` | 8098 | LAN + nebula1 |
+| Home Assistant | `modules/home-assistant.nix` | 8123 | LAN + nebula1 |
+| Mosquitto (MQTT) | `modules/home-assistant.nix` | 1883 | LAN + nebula1 |
 
 ### Jellyfin
 
@@ -288,6 +291,63 @@ backend uses.
 `/var/lib/qBittorrent` (capital Q — matches the module's actual default
 `profileDir` exactly; this has to match verbatim in the persistence
 `directories` list).
+
+### Frigate
+
+`modules/frigate.nix` — NVR/object detection. Deliberately minimal for
+now: `settings.cameras = { }` (no cameras yet) and a single CPU detector
+(`detectors.cpu1.type = "cpu"`), just enough to confirm the service comes
+up correctly. A Coral USB TPU is planned but not physically attached yet;
+swap the CPU detector for an `edgetpu` one once it is.
+
+Frigate doesn't fit the generic `backends`-port pattern the same way as
+everything else here:
+
+- **It ships its own full nginx reverse-proxy vhost** (`services.frigate`
+  sets up `services.nginx.virtualHosts.${hostname}` itself, including its
+  own `/auth` `auth_request` flow, go2rtc/vod/jsmpeg proxying). Left at
+  its defaults, that vhost binds the standard `:80` on every interface —
+  which would fight Traefik for the same port, since Traefik is the sole
+  owner of `:80`/`:443` everywhere else in this config. `modules/frigate.nix`
+  rebinds that same vhost to `127.0.0.1:8098` and adds the Nebula domain
+  as a `serverAlias` on the same vhost (rather than a second vhost), so it
+  fits the same "Traefik → 127.0.0.1:&lt;port&gt;" shape as every other
+  backend despite the nginx layer in between.
+- **Auth is Frigate's own built-in login, unchanged** — no attempt to
+  unify it with system accounts. Frigate has no PAM/Linux-account
+  integration at all; its only alternative is "proxy" mode, which
+  delegates trust to an *already-authenticating* upstream (Authelia,
+  Authentik, oauth2-proxy, traefik-forward-auth) rather than checking any
+  password itself — none of those check Linux system accounts either,
+  so it wouldn't actually have been "the same users as the system" in any
+  real sense. Genuinely reusing system accounts would require nginx's PAM
+  auth module (`pkgs.nginxModules.pam` exists) validating credentials and
+  injecting trusted headers into Frigate's proxy mode — a materially
+  bigger integration (overriding several of Frigate's own generated nginx
+  locations, coupled to that module's internals) that wasn't taken on
+  here. First login uses the admin account Frigate auto-generates and
+  prints to its own log on first start (`journalctl -u frigate`),
+  manageable afterward under its own Settings → Users.
+- **Frigate's config gets validated at build time** — `checkConfig`
+  (default `true`) runs Frigate's own `python -m frigate --validate-config`
+  against the generated YAML as part of the Nix build, the same kind of
+  safety net `writeShellApplication`'s shellcheck integration provides
+  elsewhere in this repo. Confirmed directly: an empty `cameras = { }` is
+  accepted by Frigate's own validator, not just by the NixOS module.
+
+### Home Assistant
+
+`modules/home-assistant.nix` — `services.home-assistant`, reachable at
+`hass.young.beardedtek.com` / `hass-young.nebula.beardedtek.com` via the
+generic `backends`-map pattern (no special-casing needed, unlike Frigate
+or qBittorrent — HA doesn't validate the Host header itself). Native
+NixOS services stand in for what would be HAOS/Supervisor "add-ons" on a
+normal HA install — HACS (fetched directly, no nixpkgs package exists),
+Z-Wave JS (`services.zwave-js`, currently disabled — no dongle attached
+yet), Mosquitto (`services.mosquitto`), and a Samba share for the config
+directory. Full writeup, including the reverse-proxy `trusted_proxies`
+requirement and how to enable Z-Wave once the dongle arrives, is in
+**`docs/HOME-ASSISTANT.md`**.
 
 ### Traefik
 

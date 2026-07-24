@@ -28,6 +28,22 @@
         "valid users" = "beardedtek dyoung";
         "admin users" = "beardedtek";
       };
+
+      # modules/home-assistant.nix's config dir (/var/lib/hass, owned by
+      # the "hass" system user) — "force user"/"force group" so file
+      # operations through this share happen as "hass" regardless of
+      # which Samba user connected, rather than needing beardedtek/dyoung
+      # added to that system user's group just to edit configuration.yaml
+      # from a PC.
+      hass = {
+        path = "/var/lib/hass";
+        browseable = "yes";
+        "read only" = "no";
+        "valid users" = "beardedtek dyoung";
+        "admin users" = "beardedtek";
+        "force user" = "hass";
+        "force group" = "hass";
+      };
     };
   };
 

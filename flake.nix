@@ -35,6 +35,8 @@
           ./modules/nebula.nix
           ./modules/traefik.nix
           ./modules/dashboard.nix
+          ./modules/frigate.nix
+          ./modules/home-assistant.nix
         ];
       };
     };
