@@ -181,7 +181,7 @@ directly-managed systemd unit.
 | Seerr (Jellyseerr) | `modules/media-stack.nix` | 5055 | open |
 | qBittorrent | `modules/media-stack.nix` | 8080 (webUI) | open |
 | Nebula | `modules/nebula.nix` | 4242/udp | — (this *is* the mesh) |
-| Traefik (proxy) | `modules/traefik.nix` | 80/443/8099 | nebula1 only |
+| Traefik (proxy) | `modules/traefik.nix` | 80/443/8099 | LAN + nebula1 |
 
 ### Jellyfin
 
@@ -232,20 +232,35 @@ script — see `docs/DEPLOYMENT.md`.
 
 ### Traefik
 
-Reverse-proxies every web service behind `<name>-young.nebula.beardedtek.com`,
-reachable only over the Nebula mesh — every entrypoint in
-`modules/traefik.nix` binds specifically to `10.100.0.17` (young's own
-`nebula1` address), never `0.0.0.0`. Translated from the user's existing
-`traefik:v3` docker-compose setup: since there's no docker socket/provider
-here, dynamic routing is declared directly via `dynamicConfigOptions`
-(file provider, wired automatically by the `services.traefik` module)
-instead of container labels.
+Reverse-proxies every web service behind **two** domain schemes at once,
+generated programmatically in `modules/traefik.nix` from a single
+`backends = { name = port; ... }` attrset (one source of truth, instead of
+hand-duplicating six services across two domains):
 
-- **Cert**: a single wildcard cert for `*.nebula.beardedtek.com` via
-  DNS-01 (Linode provider), configured once at the `https` entrypoint's
-  default TLS options (`entryPoints.https.http.tls.domains`) rather than
-  the original compose's dummy "wildcard" router hack — functionally
-  equivalent, applies to every router on that entrypoint automatically.
+- Over the Nebula mesh: `<name>-young.nebula.beardedtek.com`
+- Over the LAN: `<name>.young.beardedtek.com`
+
+Every entrypoint binds to **all interfaces** (`:80`/`:443`/`:8099`, no
+hardcoded IP) — same convention as every other service in this repo
+(Samba, NFS, SSH). Reachability is controlled entirely by the
+per-interface firewall rules, which open these ports on both
+`config.mySystem.lanInterface` and `"nebula1"`. Translated from the user's
+existing `traefik:v3` docker-compose setup: since there's no docker
+socket/provider here, dynamic routing is declared directly via
+`dynamicConfigOptions` (file provider, wired automatically by the
+`services.traefik` module) instead of container labels.
+
+- **Certs**: two separate wildcard certs via DNS-01 (Linode provider) —
+  `*.nebula.beardedtek.com` and `*.young.beardedtek.com` — each pinned
+  explicitly via `tls.domains` on every router for that domain scheme
+  (**not** the entrypoint-level default `tls.domains`, which was tried
+  first and doesn't work: it only propagates as something routers
+  *inherit*, it doesn't by itself cause Traefik to proactively request a
+  cert — confirmed the hard way, `acme.json` stayed empty with zero ACME
+  log activity even under real traffic with the correct SNI, until
+  explicit per-router `tls.domains` was added). Each backend therefore
+  gets two routers (e.g. `jellyfin-young-nebula` and `jellyfin-young-lan`),
+  sharing the same backend service.
 - **Secret**: `LINODE_TOKEN` comes from `/etc/traefik/traefik.env`
   (`environmentFiles`), an out-of-repo secret delivered the same way as
   Nebula's config — see `docs/DEPLOYMENT.md`'s secrets table. Traefik's
@@ -253,15 +268,14 @@ instead of container labels.
   templating needed in the static config.
 - **Dashboard port is 8099, not Traefik's default 8080** — 8080 is
   qBittorrent's default webUI port, and both would otherwise try to bind
-  the same port on the same Nebula IP. 8099 also matches the original
-  compose's external host-port mapping, so it's the same port already
-  familiar from that setup.
-- **Domain naming convention**: `<service>-young.nebula.beardedtek.com`
-  for every proxied service (the `-young` suffix disambiguates this host
-  if another machine is ever added to the mesh later). Traefik itself
-  doesn't create DNS records — `*.nebula.beardedtek.com` needs to actually
-  resolve to `10.100.0.17` for mesh clients, managed separately wherever
-  the rest of `beardedtek.com`'s DNS lives.
+  the same port. 8099 also matches the original compose's external
+  host-port mapping, so it's the same port already familiar from that
+  setup.
+- **DNS is out of scope for this repo.** Traefik only handles TLS and
+  routing once a request actually arrives — `*.nebula.beardedtek.com`
+  needs to resolve to young's Nebula address and `*.young.beardedtek.com`
+  to young's LAN address, both managed separately wherever the rest of
+  `beardedtek.com`'s DNS lives.
 
 ## Deploying and updating
 
