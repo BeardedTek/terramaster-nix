@@ -1,9 +1,15 @@
-# Architecture: `young`
+---
+title: Architecture
+linkTitle: Architecture
+weight: 10
+description: Design rationale for the Bearded NAS flake — what each piece is for and why it's built this way.
+---
 
 Design rationale for this flake — what each piece is for and why it's built
-this way. `docs/DEPLOYMENT.md` is the step-by-step install procedure;
-`docs/TROUBLESHOOTING.md` is the catalog of failure modes hit (and fixed)
-while bringing this box up. This doc is the "why" in between.
+this way. The [deployment doc](/docs/deployment/) is the step-by-step install
+procedure; the [troubleshooting doc](/docs/troubleshooting/) is the catalog of
+failure modes hit (and fixed) while bringing this box up. This doc is the
+"why" in between.
 
 ## `variables.nix`
 
@@ -158,9 +164,10 @@ mount shadows/orphans whatever was already nested inside the first one.
 Every dataset this config references via `fileSystems.*` — including the
 pool's own top-level `rust` dataset (`fileSystems."/rust"` in
 `hosts/terramaster/young/configuration.nix`), not just its children — must be
-`mountpoint=legacy`. See `docs/TROUBLESHOOTING.md` for the exact failure
-signatures this produces when missed, and `docs/DEPLOYMENT.md` step 3 for
-the one-time `zfs set` commands.
+`mountpoint=legacy`. See the [troubleshooting doc](/docs/troubleshooting/)
+for the exact failure signatures this produces when missed, and the
+[deployment doc](/docs/deployment/) step 3 for the one-time `zfs set`
+commands.
 
 ### ZFS dataset map
 
@@ -265,7 +272,8 @@ Seerr, qBittorrent, Traefik), plus:
 - `/etc/machine-id`
 - The four SSH host key files (`ssh_host_rsa_key`/`.pub`,
   `ssh_host_ed25519_key`/`.pub`) — deliberately **not** the whole `/etc/ssh`
-  directory. See `docs/TROUBLESHOOTING.md` for why that distinction matters.
+  directory. See the [troubleshooting doc](/docs/troubleshooting/) for why
+  that distinction matters.
 
 ## Users and passwords
 
@@ -309,7 +317,8 @@ automatically — adding a user to the list needs no matching edit anywhere
 else) — sourced from `secrets/initial-passwords.env`, never committed, and
 only readable under impure evaluation. `modules/users.nix` also generates
 one assertion per account (including `root`) that fails the build early
-with a clear message if its hash is empty. See `docs/DEPLOYMENT.md`.
+with a clear message if its hash is empty. See the
+[deployment doc](/docs/deployment/).
 
 `beardedtek`'s real SSH public key is likewise never committed — delivered
 straight to `/home/beardedtek/.ssh/authorized_keys` via
@@ -328,8 +337,13 @@ blanket `networking.firewall.allowedTCPPorts`:
 - `"nebula1"` — the Nebula mesh interface, opened alongside LAN for every
   service that should also be reachable remotely over the mesh.
 
-SSH: key-only (`PasswordAuthentication = false`), root login disabled
-(`PermitRootLogin = "no"`) — meaning any `nixos-rebuild --target-host`
+SSH: key-only by default (`PasswordAuthentication` follows
+`mySystem.security.sshPasswordAuth`, `false` unless a host's
+`variables.nix` opts in — `young` doesn't), root login disabled
+unconditionally (`PermitRootLogin = "no"`). The [installer doc](/docs/installer/)'s
+Secrets step can set `mySystem.security.sshPasswordAuth = true;` for a
+new instance provisioned without an SSH key on hand, but it's off
+everywhere else — meaning any `nixos-rebuild --target-host`
 push has to authenticate as `beardedtek` (or `dyoung`) with `--sudo`, not
 `root@`. `boot.initrd.systemd.emergencyAccess = true` grants an
 unauthenticated shell in the *initrd* specifically (a separate, minimal
@@ -382,18 +396,19 @@ device — that's app config, not a Nix option.
 
 `cacheDir` is redirected to `/var/lib/jellyfin/cache` instead of the
 module's default `/var/cache/jellyfin`, which lives on the 2GB tmpfs root.
-See `docs/TROUBLESHOOTING.md` — Jellyfin refuses to start at all if its
-cache-dir free-space check fails, and transcode/image cache can easily
-exceed what's safe to keep in RAM anyway.
+See the [troubleshooting doc](/docs/troubleshooting/) — Jellyfin refuses
+to start at all if its cache-dir free-space check fails, and
+transcode/image cache can easily exceed what's safe to keep in RAM
+anyway.
 
 ### Seerr (Jellyseerr)
 
 Jellyseerr's upstream project renamed to "Seerr" and merged with Overseerr;
 nixpkgs 26.05 ships a native `services.seerr` module (auto-aliased from
 the old `services.jellyseerr` name). The module's `DynamicUser = true`
-default is overridden to a fixed `seerr` system user — see
-`docs/TROUBLESHOOTING.md` for why that combination breaks under
-impermanence specifically.
+default is overridden to a fixed `seerr` system user — see the
+[troubleshooting doc](/docs/troubleshooting/) for why that combination
+breaks under impermanence specifically.
 
 ### Shared `/rust/media` and `/rust/data` access
 
@@ -408,7 +423,7 @@ added to a shared `mediagroup` group (`users.groups.mediagroup` in
 set once so that group can read/write them. Since both already hold real,
 existing data (not a fresh service state dir Nix creates itself), that
 one-time ownership fix is a manual operational step, not a NixOS activation
-script — see `docs/DEPLOYMENT.md`.
+script — see the [deployment doc](/docs/deployment/).
 
 ### Dashboard
 
@@ -443,7 +458,7 @@ backend uses.
   `environment.persistence` — it fully regenerates within 30s of every
   boot, so there's nothing worth carrying across the tmpfs root, and one
   less path to get the impermanence-bind-mount-timing bug wrong on (see
-  `docs/TROUBLESHOOTING.md`).
+  the [troubleshooting doc](/docs/troubleshooting/)).
 - **Services page links are domain-aware at runtime**: a small inline
   script checks `location.hostname` for `.nebula.` and builds each
   service's link as either the Nebula or LAN domain accordingly — so the
@@ -465,7 +480,7 @@ backend uses.
   and copies it into the Hugo source tree at build time (Hugo auto-loads
   any `data/*.json` as `.Site.Data.contact`), read by
   `dashboard/layouts/partials/contact-info.html` — shared by the footer
-  (every page) and the Help page's `{{< contact >}}` shortcode, so there's
+  (every page) and the Help page's `contact` shortcode, so there's
   one source of truth instead of duplicating the list in two templates.
 
 ### qBittorrent
@@ -529,8 +544,8 @@ normal HA install — HACS (fetched directly, no nixpkgs package exists),
 Z-Wave JS (`services.zwave-js`, currently disabled — no dongle attached
 yet), Mosquitto (`services.mosquitto`), and a Samba share for the config
 directory. Full writeup, including the reverse-proxy `trusted_proxies`
-requirement and how to enable Z-Wave once the dongle arrives, is in
-**`docs/HOME-ASSISTANT.md`**.
+requirement and how to enable Z-Wave once the dongle arrives, is in the
+[Home Assistant doc](/docs/home-assistant/).
 
 ### Traefik
 
@@ -565,9 +580,9 @@ socket/provider here, dynamic routing is declared directly via
   sharing the same backend service.
 - **Secret**: `LINODE_TOKEN` comes from `/etc/traefik/traefik.env`
   (`environmentFiles`), an out-of-repo secret delivered the same way as
-  Nebula's config — see `docs/DEPLOYMENT.md`'s secrets table. Traefik's
-  Linode DNS provider reads it straight from the process environment; no
-  templating needed in the static config.
+  Nebula's config — see the [deployment doc](/docs/deployment/)'s secrets
+  table. Traefik's Linode DNS provider reads it straight from the process
+  environment; no templating needed in the static config.
 - **Traefik's own admin dashboard port is 8099, not Traefik's default
   8080** — 8080 is qBittorrent's default webUI port, and both would
   otherwise try to bind the same port. 8099 also matches the original
@@ -644,11 +659,12 @@ just more convenient to type an IP than remember a domain.
 
 ## Deploying and updating
 
-Full procedure in `docs/DEPLOYMENT.md`. The short version for routine
-updates once the box is already installed: `nixos-rebuild switch --flake
-.#young --target-host beardedtek@<ip> --sudo --impure` from a machine with
-`secrets/initial-passwords.env` sourced. Several non-obvious requirements
-for that command to work at all are documented in
-`docs/TROUBLESHOOTING.md`'s "Remote deployment" section — trusted-users,
-sudo's environment stripping, and the `--impure`/`--option pure-eval
-false` split between `nixos-rebuild` and `nixos-anywhere`.
+Full procedure in the [deployment doc](/docs/deployment/). The short
+version for routine updates once the box is already installed:
+`nixos-rebuild switch --flake .#young --target-host beardedtek@<ip> --sudo
+--impure` from a machine with `secrets/initial-passwords.env` sourced.
+Several non-obvious requirements for that command to work at all are
+documented in the [troubleshooting doc](/docs/troubleshooting/)'s "Remote
+deployment" section — trusted-users, sudo's environment stripping, and
+the `--impure`/`--option pure-eval false` split between `nixos-rebuild`
+and `nixos-anywhere`.

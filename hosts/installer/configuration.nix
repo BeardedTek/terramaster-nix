@@ -34,6 +34,7 @@ in
     pkgs.git
     pkgs.jq
     pkgs.zfs
+    pkgs.curl # wizard's secrets stage: fetching a user's key from github.com/<user>.keys
     disko.packages.x86_64-linux.disko
   ];
 

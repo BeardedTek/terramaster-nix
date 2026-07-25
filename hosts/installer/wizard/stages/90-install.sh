@@ -67,10 +67,12 @@ stage_90_install() {
 
   local first_user
   first_user=$(wiz_get user_list | head -n1)
-  mkdir -p "/mnt/home/$first_user/.ssh"
-  wiz_get ssh_pubkey > "/mnt/home/$first_user/.ssh/authorized_keys"
-  chmod 700 "/mnt/home/$first_user/.ssh"
-  chmod 600 "/mnt/home/$first_user/.ssh/authorized_keys"
+  if [ -n "$(wiz_get ssh_pubkey)" ]; then
+    mkdir -p "/mnt/home/$first_user/.ssh"
+    wiz_get ssh_pubkey > "/mnt/home/$first_user/.ssh/authorized_keys"
+    chmod 700 "/mnt/home/$first_user/.ssh"
+    chmod 600 "/mnt/home/$first_user/.ssh/authorized_keys"
+  fi
 
   local secrets_usb
   secrets_usb=$(wiz_get secrets_usb)

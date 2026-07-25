@@ -1,5 +1,5 @@
 {
-  description = "NixOS configuration for young (TerraMaster F4-245 NAS)";
+  description = "Bearded NAS — NixOS configuration for young (TerraMaster F4-245 NAS)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";

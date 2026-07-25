@@ -1,12 +1,17 @@
-# Installer ISO
+---
+title: Installer ISO
+linkTitle: Installer
+weight: 30
+description: A self-contained, bootable installer with a TUI wizard for provisioning a new NAS.
+---
 
 A self-contained, bootable installer for provisioning a new NAS under
 this flake — a TUI wizard walks through networking, storage, users, and
 which services to enable, then installs NixOS itself. No separate
-workstation orchestration needed (unlike `docs/DEPLOYMENT.md`'s
-`nixos-anywhere`-driven flow, which remains the documented path for
-`young` specifically, and as the manual reference for what this wizard
-automates).
+workstation orchestration needed (unlike the
+[deployment doc](/docs/deployment/)'s `nixos-anywhere`-driven flow, which
+remains the documented path for `young` specifically, and as the manual
+reference for what this wizard automates).
 
 ## Building the ISO
 
@@ -19,8 +24,8 @@ of build time — see "Repo freshness" below for what that means in
 practice. If `secrets/extra-files/home/beardedtek/.ssh/authorized_keys`
 exists locally when you build, it's baked into the ISO's `root` account
 too, for convenience; if not, the wizard falls back to the same
-`passwd`-then-SSH dance `docs/DEPLOYMENT.md` step 2 already documents for
-the stock ISO.
+`passwd`-then-SSH dance the [deployment doc](/docs/deployment/) step 2
+already documents for the stock ISO.
 
 Flash the result to a USB drive the same way as any NixOS ISO
 (`dd if=result/iso/*.iso of=/dev/sdX bs=4M status=progress` from another
@@ -41,12 +46,13 @@ or temporary password per above) that walks through, in order:
 4. **Storage** — the one genuinely consequential choice:
    - **Adopt an existing pool**: non-destructive. Imports the pool,
      fixes every existing dataset's `mountpoint` property to `legacy`
-     (metadata-only — see `docs/ARCHITECTURE.md`'s "every dataset must be
-     `mountpoint=legacy`" explanation), creates `nix`/`persist` datasets
-     if they're missing, and asks which existing datasets to use for
-     `home`/`media`/`data`. This is exactly `docs/DEPLOYMENT.md` step 3,
-     automated and generalized to any pool's actual dataset list instead
-     of a hardcoded one.
+     (metadata-only — see the [architecture doc](/docs/architecture/)'s
+     "every dataset must be `mountpoint=legacy`" explanation), creates
+     `nix`/`persist` datasets if they're missing, and asks which existing
+     datasets to use for `home`/`media`/`data`. This is exactly the
+     [deployment doc](/docs/deployment/) step 3, automated and
+     generalized to any pool's actual dataset list instead of a
+     hardcoded one.
    - **Create a new pool**: destructive. Disk discovery flags any disk
      with an existing filesystem/RAID/ZFS signature and excludes it from
      the pool by default — including one requires an explicit
@@ -58,16 +64,33 @@ or temporary password per above) that walks through, in order:
    locally with `mkpasswd -m sha-512`; plaintext never touches disk).
 6. **Services** — a checklist matching `mySystem.features`' exact shape
    (`modules/common.nix`).
-7. **Secrets** — an SSH public key is required (no password-based SSH on
-   the *installed* system). Looks for a USB drive labeled `NAS-SECRETS`
-   (its own flat layout — `authorized_keys`, `etc/nebula/config.yaml`,
-   `etc/traefik/traefik.env` — not `docs/DEPLOYMENT.md`'s
-   `secrets/extra-files/` tree, which is nested under a hardcoded
-   `beardedtek` username that doesn't generalize to a wizard-chosen admin
-   user) for `authorized_keys` and (optionally) Nebula/Traefik secrets; falls
-   back to pasting the SSH key directly and skipping Nebula/Traefik for
-   now (those just need manual setup post-install, same as leaving
-   `CHANGEME` placeholders unfilled today).
+7. **Secrets** — SSH access for the first user. Looks for a USB drive
+   labeled `NAS-SECRETS` first (its own flat layout —
+   `authorized_keys`, `etc/nebula/config.yaml`, `etc/traefik/traefik.env` —
+   not the [deployment doc](/docs/deployment/)'s `secrets/extra-files/`
+   tree, which is nested under a hardcoded `beardedtek` username that
+   doesn't generalize to a wizard-chosen admin user) for `authorized_keys`
+   and (optionally) Nebula/Traefik secrets. If no USB key is found, offers
+   three ways to set up SSH access instead of demanding a key be pasted by
+   hand — unrealistic from a TUI on a box that may not even be near a
+   keyboard with the key on it:
+   - **Fetch from a GitHub username** — pulls `https://github.com/<user>.keys`
+     (that endpoint is a plain-text list of every public key attached to
+     the account, no auth needed). Needs network access, same as every
+     other step from here on.
+   - **Paste an SSH public key directly** — the original flow, still
+     available.
+   - **Use a password instead** — skips requiring a key entirely and sets
+     `mySystem.security.sshPasswordAuth = true;` in the generated
+     `variables.nix`, so the installed system accepts the password set in
+     the Users step over SSH. Off by default everywhere else in this flake
+     (see the [architecture doc](/docs/architecture/)'s "Network and
+     firewall model" section) — the wizard warns before enabling it, and
+     root login stays disabled regardless of which option is picked.
+
+   Nebula/Traefik secrets are optional either way; skipping them just
+   means configuring those services manually post-install, same as
+   leaving `CHANGEME` placeholders unfilled today.
 8. **Review** — full summary, then the destructive-path confirmation
    described above (new pool) or a plain yes/no (existing pool, since
    nothing on that path deletes data).
@@ -83,8 +106,8 @@ commit them into your own git checkout of this repo. The wizard never
 pushes to git itself. `secrets/initial-passwords.env` is deliberately
 *not* included in that copy (it only mattered for this one install);
 recreate it locally from `secrets/initial-passwords.env.example` if
-you'll be rebuilding this box from a workstation later, per
-`docs/DEPLOYMENT.md`.
+you'll be rebuilding this box from a workstation later, per the
+[deployment doc](/docs/deployment/).
 
 ## What this doesn't do (yet)
 

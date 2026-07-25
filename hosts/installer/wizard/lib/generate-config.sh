@@ -28,6 +28,8 @@ ${users_nix}  ];
 
   mySystem.contactInfo = [ ];
 
+  mySystem.security.sshPasswordAuth = $(wiz_get use_password_auth);
+
   mySystem.features = {
     jellyfin.enable = $(f jellyfin);
     frigate.enable = $(f frigate);

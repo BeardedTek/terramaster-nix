@@ -1,0 +1,109 @@
+baseURL: https://beardedtek.github.io/terramaster-nix/
+canonifyURLs: true
+title: Bearded NAS
+
+contentDir: content/en
+defaultContentLanguage: en
+defaultContentLanguageInSubdir: false
+enableMissingTranslationPlaceholders: true
+enableRobotsTXT: true
+enableGitInfo: false
+
+taxonomies:
+  tag: tags
+  category: categories
+
+pygmentsCodeFences: true
+pygmentsUseClasses: false
+pygmentsUseClassic: false
+pygmentsStyle: monokai
+
+mediaTypes:
+  text/redirects:
+    delimiter: ''
+
+outputFormats:
+  redirects:
+    baseName: _redirects
+    isPlainText: true
+    mediaType: text/redirects
+    root: true
+
+permalinks:
+  blog: /:section/:year/:month/:day/:slugorcontentbasename
+
+imaging:
+  resampleFilter: CatmullRom
+  quality: 75
+  anchor: smart
+
+languages:
+  en:
+    label: English
+    title: Bearded NAS
+    params:
+      description: A self-hosted NixOS flake for TerraMaster-family NAS hardware — declarative storage, media stack, and a self-contained installer wizard.
+
+markup:
+  goldmark:
+    parser:
+      attribute:
+        block: true
+    renderer:
+      unsafe: true
+    highlight:
+      style: monokai
+      noClasses: false
+
+outputs:
+  home: [HTML, print, RSS, redirects]
+  section: [HTML, print, RSS]
+
+params:
+  taxonomy:
+    taxonomyCloud: [tags, categories]
+    taxonomyCloudTitle: [Tag Cloud, Categories]
+    taxonomyPageHeader: [tags, categories]
+
+  github_repo: https://github.com/BeardedTek/terramaster-nix
+  github_project_repo: https://github.com/BeardedTek/terramaster-nix
+  github_branch: main
+
+  offlineSearch: false
+  prism_syntax_highlighting: false
+
+  copyright:
+    authors: "The Bearded Tek"
+    from_year: 2025
+    to_year: present
+
+  version: 0.1
+  archived_version: false
+
+  ui:
+    breadcrumb_disable: false
+    navbar_logo: true
+    navbar_translucent_over_cover_disable: false
+    sidebar_menu_foldable: true
+    sidebar_menu_compact: false
+    sidebar_search_disable: false
+    showLightDarkModeMenu: true
+    feedback:
+      enable: false
+    readingtime:
+      enable: false
+
+  links:
+    user:
+      - name: GitHub
+        url: https://github.com/BeardedTek/terramaster-nix
+        icon: fab fa-github
+        desc: Source code and issues
+
+module:
+  hugoVersion:
+    extended: true
+    min: "0.110.0"
+  imports:
+    - path: github.com/google/docsy
+      disable: false

@@ -25,16 +25,59 @@ stage_70_secrets() {
     fi
   fi
 
+  wiz_set use_password_auth "false"
+
   local pubkey=""
   if [ -n "$(wiz_get secrets_usb)" ] && [ -f "$(wiz_get secrets_usb)/authorized_keys" ]; then
     pubkey=$(cat "$(wiz_get secrets_usb)/authorized_keys")
   fi
+
+  # No USB key found — ask how to get one, rather than demanding it be
+  # pasted (unrealistic from a TUI on a box that may not even be online
+  # yet at this point, if it's being typed by hand off a phone screen).
   if [ -z "$pubkey" ]; then
-    pubkey=$(wiz_input "SSH public key" \
-      "Paste the SSH public key for the first admin user ($(wiz_get user_list | head -n1)). This is what you'll actually log in with — required.")
+    local first_user
+    first_user=$(wiz_get user_list | head -n1)
+
+    while [ -z "$pubkey" ]; do
+      local choice
+      choice=$(wiz_menu "SSH access for $first_user" \
+        "No SSH key found on a NAS-SECRETS USB drive. How should $first_user log in over SSH?" \
+        "github" "Fetch public key(s) from a GitHub username" \
+        "paste" "Paste an SSH public key directly" \
+        "password" "Skip — use a password instead (less secure)")
+
+      case "$choice" in
+        github)
+          local gh_user
+          gh_user=$(wiz_input "GitHub username" "Fetch public key(s) from https://github.com/<username>.keys. Requires network access.")
+          [ -z "$gh_user" ] && continue
+          local fetched
+          fetched=$(curl -fsSL "https://github.com/${gh_user}.keys" 2>/dev/null || true)
+          if [ -z "$fetched" ]; then
+            wiz_msgbox "No keys found" "Couldn't fetch any keys for \"$gh_user\" (no network, wrong username, or that account has no public keys attached). Try again."
+            continue
+          fi
+          pubkey="$fetched"
+          wiz_msgbox "Key(s) fetched" "$(printf '%s' "$fetched" | wc -l) public key(s) fetched from github.com/$gh_user and will be installed for $first_user."
+          ;;
+        paste)
+          pubkey=$(wiz_input "SSH public key" "Paste the SSH public key for $first_user.")
+          [ -z "$pubkey" ] && wiz_msgbox "Empty" "That was empty — try again, or pick a different option."
+          ;;
+        password)
+          wiz_yesno "Use password login?" "$first_user will log in over SSH with the password set earlier instead of a key. This is less secure than key-only auth (the default for every other instance this flake provisions) — recommended only when no key is available right now. Continue?" \
+            && { wiz_set use_password_auth "true"; pubkey="-"; } \
+            || true
+          ;;
+      esac
+    done
   fi
-  if [ -z "$pubkey" ]; then
-    wiz_die "An SSH public key is required (there's no password-based SSH login in this config)."
+
+  # "-" is the password-only sentinel from above — never written as key
+  # material, just breaks the outer while-loop cleanly.
+  if [ "$pubkey" = "-" ]; then
+    pubkey=""
   fi
   wiz_set ssh_pubkey "$pubkey"
 

@@ -7,7 +7,7 @@
 stage_10_repo_update() {
   local use_fresh=false
 
-  if wiz_yesno "Check for updates?" "This ISO has a snapshot of terramaster-nix baked in from when it was built.
+  if wiz_yesno "Check for updates?" "This ISO has a snapshot of Bearded NAS baked in from when it was built.
 
 Check for a newer version now? Requires network access. If this fails or you say no, the baked-in copy is used instead — nothing is lost either way."; then
     use_fresh=true

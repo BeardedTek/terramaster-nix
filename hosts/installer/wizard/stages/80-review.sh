@@ -15,6 +15,13 @@ $(wiz_get pool_disks | sed 's/^/    /')
   THIS WILL DESTROY EVERYTHING CURRENTLY ON THOSE DISKS"
   fi
 
+  local ssh_summary
+  if [ "$(wiz_get use_password_auth)" = "true" ]; then
+    ssh_summary="password login (no SSH key set — less secure than key-only)"
+  else
+    ssh_summary="SSH key only"
+  fi
+
   wiz_msgbox "Review" "manufacturer/instance: $(wiz_get manufacturer)/$(wiz_get instance)
 hostname: $(wiz_get hostname)
 LAN interface: $(wiz_get lan_if)
@@ -25,6 +32,8 @@ $storage_summary
 
 USERS:
 $(wiz_get user_list | sed 's/^/  /')
+
+SSH ACCESS: $ssh_summary
 
 Next screen asks for final confirmation."
 

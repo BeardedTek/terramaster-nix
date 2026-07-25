@@ -10,6 +10,13 @@ result-*
 
 # Downloaded/built installer ISOs — never belong in the repo
 *.iso
+/build/
+
+# Hugo + npm build artifacts for docs/ (the documentation site)
+docs/public/
+docs/resources/
+docs/node_modules/
+docs/.hugo_build.lock
 
 # Secrets staged for delivery via `nixos-anywhere --extra-files` (SSH
 # authorized_keys, the Nebula config.yaml with its embedded private key,

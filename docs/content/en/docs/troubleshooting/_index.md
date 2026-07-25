@@ -1,9 +1,14 @@
-# Troubleshooting and known gotchas
+---
+title: Troubleshooting
+linkTitle: Troubleshooting
+weight: 50
+description: Failure modes actually hit while building and operating Bearded NAS, organized by symptom.
+---
 
 Failure modes actually hit while building and operating this system, kept
 here so they don't get rediscovered the hard way a second time. Organized
-by symptom. See `docs/ARCHITECTURE.md` for the design context these
-mostly stem from.
+by symptom. See the [architecture doc](/docs/architecture/) for the design
+context these mostly stem from.
 
 ## "Failed to mount /sysroot/nix" (or any `rust/*` dataset) at boot
 
@@ -31,10 +36,10 @@ rather than just "the parent path everything else lives under."
 
 **Fix:** `zfs set mountpoint=legacy <dataset>` for *every* dataset
 referenced by a `fileSystems.*` entry — including the pool's own top-level
-dataset, not just its children. See `docs/DEPLOYMENT.md` step 3 for the
-full command list. Legacy-mountpoint datasets are never auto-mounted by
-ZFS, only ever mounted explicitly — which is exactly what NixOS's
-systemd-generated units do.
+dataset, not just its children. See the [deployment doc](/docs/deployment/)
+step 3 for the full command list. Legacy-mountpoint datasets are never
+auto-mounted by ZFS, only ever mounted explicitly — which is exactly what
+NixOS's systemd-generated units do.
 
 **Diagnosis tip:** if `mount | grep <path>` shows something mounted but
 `ls`/`stat` on that exact path fail, check `journalctl -b | grep -iE
@@ -88,10 +93,11 @@ installer wrote to the now-irrelevant ephemeral copy.
 actually needs to land at install time, not where it ends up after
 boot — i.e. `secrets/extra-files/persist/etc/nebula/config.yaml`, which
 `nixos-anywhere` writes to `/mnt/persist/etc/nebula/config.yaml` (a real,
-already-mounted `rust/persist` dataset per `docs/DEPLOYMENT.md` step 4b).
-Contrast with the SSH key under `secrets/extra-files/home/...` — that one
-never had this problem, because `/home` is a real ZFS-backed mount during
-install already, not indirected through `/persist`.
+already-mounted `rust/persist` dataset per the
+[deployment doc](/docs/deployment/) step 4b). Contrast with the SSH key
+under `secrets/extra-files/home/...` — that one never had this problem,
+because `/home` is a real ZFS-backed mount during install already, not
+indirected through `/persist`.
 
 **Live unblock on an already-running box:** the target path (e.g.
 `/etc/nebula/config.yaml`) really is the persistent one once the system
@@ -198,11 +204,12 @@ you go check.
 
 **Cause:** `modules/nfs.nix` generates `/etc/exports` dynamically in a
 `preStart` script (needed since the export subnet is auto-detected, not
-static — see `docs/ARCHITECTURE.md`). Because that script's filesystem
-references live inside a shell script, not a declarative NixOS option,
-nothing automatically wires up an ordering dependency on the ZFS mount
-units it reads from — `nfs-server.service` can start, and its `preStart`
-can run `exportfs`, before those mounts are actually up.
+static — see the [architecture doc](/docs/architecture/)). Because that
+script's filesystem references live inside a shell script, not a
+declarative NixOS option, nothing automatically wires up an ordering
+dependency on the ZFS mount units it reads from — `nfs-server.service`
+can start, and its `preStart` can run `exportfs`, before those mounts are
+actually up.
 
 **Fix:** explicit `RequiresMountsFor`, since there's no `requiresMountsFor`
 shorthand for `systemd.services.*` in NixOS — it has to go through
@@ -242,10 +249,10 @@ to get routine remote updates working at all, beyond the initial
 `nixos-anywhere` install:
 
 - **`root@` doesn't work as the target-host user.** `PermitRootLogin =
-  "no"` (see `docs/ARCHITECTURE.md`) blocks it entirely, on purpose.
-  Target as `beardedtek@<host>` (or `dyoung@`) with `--sudo` (formerly
-  `--use-remote-sudo`) instead — it prompts interactively for that user's
-  sudo password over the SSH session.
+  "no"` (see the [architecture doc](/docs/architecture/)) blocks it
+  entirely, on purpose. Target as `beardedtek@<host>` (or `dyoung@`) with
+  `--sudo` (formerly `--use-remote-sudo`) instead — it prompts
+  interactively for that user's sudo password over the SSH session.
 - **`nix.settings.trusted-users` must include the deploying user** (this
   repo uses `[ "@wheel" ]`). Without it, the target's Nix daemon refuses
   unsigned store paths pushed from a non-root, non-trusted user with

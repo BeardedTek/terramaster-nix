@@ -9,7 +9,8 @@
       "Bash(git add *)",
       "WebFetch(domain:doc.traefik.io)",
       "Bash(wsl -d NixOS -- bash -lc \"cd /mnt/c/Users/Willi/github/terramaster-nix && set -a; source secrets/initial-passwords.env; set +a; nix shell nixpkgs#git --extra-experimental-features 'nix-command flakes' --command git add -A && nix shell nixpkgs#git --extra-experimental-features 'nix-command flakes' --command nix --extra-experimental-features 'nix-command flakes' flake check --option pure-eval false 2>&1 | tail -40\")",
-      "Bash(gh api *)"
+      "Bash(gh api *)",
+      "Bash(wsl -d NixOS -- bash -lc \"which hugo go node npm 2>&1; hugo version 2>&1 | head -2\")"
     ]
   }
 }

@@ -1,4 +1,9 @@
-# Deploying `young`
+---
+title: Deployment
+linkTitle: Deployment
+weight: 20
+description: Step-by-step procedure for installing Bearded NAS onto young from a blank machine.
+---
 
 This flake has been validated with `nix flake check` and a full `--dry-run`
 build of `nixosConfigurations.young`, using a NixOS 26.05 environment

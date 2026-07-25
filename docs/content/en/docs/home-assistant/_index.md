@@ -1,4 +1,9 @@
-# Home Assistant
+---
+title: Home Assistant
+linkTitle: Home Assistant
+weight: 40
+description: How Home Assistant, HACS, Z-Wave JS, and Mosquitto are wired up as native NixOS services.
+---
 
 Native `services.home-assistant` (no Docker, no HA Supervisor/HAOS) —
 consistent with how everything else in this repo runs. This means the
@@ -9,13 +14,13 @@ plumbing around `services.home-assistant`, in `modules/home-assistant.nix`
 (plus one line in `modules/samba.nix` for the share).
 
 The whole group (Home Assistant + Mosquitto + the Samba share), plus HACS
-and Z-Wave individually, are on/off switches in `variables.nix` — see
-`docs/ARCHITECTURE.md`'s "`variables.nix`" section.
+and Z-Wave individually, are on/off switches in `variables.nix` — see the
+[architecture doc](/docs/architecture/)'s "`variables.nix`" section.
 
 - **Nebula**: `https://hass-young.nebula.beardedtek.com`
 - **LAN**: `https://hass.young.beardedtek.com`
   (`young` here is `networking.hostName`, set once in `variables.nix` —
-  see `docs/ARCHITECTURE.md`'s "`variables.nix`" section)
+  see the [architecture doc](/docs/architecture/)'s "`variables.nix`" section)
 - Direct, without Traefik: `http://192.168.3.181:8123` (LAN) or
   `http://10.100.0.17:8123` (Nebula) — opened on both interfaces
   alongside the proxied domains above, same posture as Jellyfin/Sonarr
@@ -23,18 +28,20 @@ and Z-Wave individually, are on/off switches in `variables.nix` — see
 
 Both proxied domains come for free from the same generic
 `backends`-map/`routersFor` pattern every other service in this repo
-uses (see `docs/ARCHITECTURE.md`'s Traefik section) — Home Assistant
-needed no special-casing there, unlike Frigate or qBittorrent.
+uses (see the [architecture doc](/docs/architecture/)'s Traefik section) —
+Home Assistant needed no special-casing there, unlike Frigate or
+qBittorrent.
 
 ## First boot
 
 Home Assistant runs its own onboarding wizard on first visit — create
 your own admin account there. This is entirely separate from the NixOS
 `beardedtek`/`dyoung` system accounts; there's no unification between the
-two here (see `docs/TROUBLESHOOTING.md` if you're looking for the same
-discussion in Frigate's context — the short version is that neither
-project has real Linux/PAM account integration, so there's no clean way
-to share credentials without a much bigger identity-provider setup).
+two here (see the [troubleshooting doc](/docs/troubleshooting/) if you're
+looking for the same discussion in Frigate's context — the short version
+is that neither project has real Linux/PAM account integration, so
+there's no clean way to share credentials without a much bigger
+identity-provider setup).
 
 ## Reverse-proxy config (already handled, informational)
 
@@ -139,8 +146,9 @@ written through this share ends up owned correctly by `hass` regardless
 of which Samba user connected, so Home Assistant can still read/write it
 normally afterward.
 
-Connect the same way as the other shares — see `docs/DEPLOYMENT.md`'s
-Samba section — just pick `hass` instead of `media`/`data`.
+Connect the same way as the other shares — see the
+[deployment doc](/docs/deployment/)'s Samba section — just pick `hass`
+instead of `media`/`data`.
 
 ## Persistence
 

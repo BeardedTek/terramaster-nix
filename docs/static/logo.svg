@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Bearded NAS logo">
+  <title>Bearded NAS</title>
+  <!-- NAS body -->
+  <rect x="24" y="16" width="80" height="64" rx="10" fill="#2563eb"/>
+  <!-- Drive bays (2x2, echoing the F4-245's 4-bay front panel) -->
+  <rect x="32" y="24" width="30" height="22" rx="3" fill="#1d4ed8"/>
+  <rect x="66" y="24" width="30" height="22" rx="3" fill="#1d4ed8"/>
+  <rect x="32" y="50" width="30" height="22" rx="3" fill="#1d4ed8"/>
+  <rect x="66" y="50" width="30" height="22" rx="3" fill="#1d4ed8"/>
+  <!-- Drive activity LEDs -->
+  <circle cx="58" cy="42" r="2.2" fill="#93c5fd"/>
+  <circle cx="92" cy="42" r="2.2" fill="#93c5fd"/>
+  <circle cx="58" cy="68" r="2.2" fill="#93c5fd"/>
+  <circle cx="92" cy="68" r="2.2" fill="#93c5fd"/>
+  <!-- Beard -->
+  <path d="M43,79 L54,79 Q64,86 74,79 L85,79 C86,90 82,101 74,107 Q64,113 54,107 C46,101 42,90 43,79 Z" fill="#d97706"/>
+</svg>

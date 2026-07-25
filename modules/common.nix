@@ -7,6 +7,19 @@
     description = "Name of the physical LAN interface";
   };
 
+  options.mySystem.security.sshPasswordAuth = lib.mkOption {
+    type = lib.types.bool;
+    default = false;
+    description = ''
+      Allow password-based SSH login. Defaults to false (key-only,
+      young's own posture — see docs/ARCHITECTURE.md's "Network and
+      firewall model" section). The installer wizard offers turning this
+      on as a fallback for instances provisioned without an SSH public
+      key on hand (no GitHub username to fetch from, no USB drive with
+      one staged) — root login stays disabled either way.
+    '';
+  };
+
   options.mySystem.manufacturer = lib.mkOption {
     type = lib.types.str;
     description = ''
@@ -148,7 +161,7 @@
     services.openssh = {
       enable = true;
       settings = {
-        PasswordAuthentication = false;
+        PasswordAuthentication = config.mySystem.security.sshPasswordAuth;
         PermitRootLogin = "no";
       };
     };
