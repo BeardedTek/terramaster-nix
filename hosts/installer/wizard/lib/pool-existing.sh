@@ -24,7 +24,7 @@ pool_existing_import() {
     echo "[dry-run] zgenhostid -f $host_id; zpool import -N -f $pool"
     return 0
   fi
-  zgenhostid -f "$host_id"
+  wiz_set_hostid "$host_id"
   zpool import -N -f "$pool"
 }
 

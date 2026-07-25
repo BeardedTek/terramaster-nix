@@ -71,6 +71,23 @@ wiz_die() {
   wiz_abort "$1"
 }
 
+# /etc/hostid is a NixOS-managed symlink into the read-only Nix store on
+# this live ISO (hosts/installer/configuration.nix sets networking.hostId
+# = "00000000", which makes NixOS manage /etc/hostid the same way it
+# manages every other environment.etc entry) — confirmed the hard way
+# that `zgenhostid -f` fails against it directly ("Read-only file
+# system") even running as root, since that's a property of the
+# underlying Nix store mount, not a permission-bits issue. Removing the
+# symlink first lets zgenhostid write a real, regular file in its place.
+# Every caller that needs the live session's hostid to match a target
+# system's configured hostid (both storage paths, at different points)
+# should go through this rather than calling zgenhostid directly.
+wiz_set_hostid() {
+  local host_id="$1"
+  rm -f /etc/hostid
+  zgenhostid -f "$host_id"
+}
+
 # Requires the user to type $2 verbatim to continue. Used for destructive
 # confirmations — a yes/no dialog is too easy to reflexively click through.
 wiz_type_to_confirm() {

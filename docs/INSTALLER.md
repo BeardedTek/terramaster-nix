@@ -91,7 +91,64 @@ you'll be rebuilding this box from a workstation later, per
 - No unattended/non-interactive mode — every run is interactive.
 - Pasting a full Nebula config through the wizard isn't implemented; use
   a `NAS-SECRETS` USB drive or configure it manually after first boot.
-- Only tested by generating config against fake wizard state and
-  validating the result with `nix eval`/`nix build` (see this repo's
-  session history) plus a `qemu` boot smoke test — not yet run against
-  real hardware. Treat the first real run as a trial, not a guarantee.
+
+## Resource requirements for the install step itself
+
+Unlike `nixos-anywhere` (which builds on your workstation and only copies
+the result to the target), this wizard builds the *entire* target system
+— Traefik, the media stack, Home Assistant, Frigate, etc. — locally, on
+whatever hardware it's running on. That means:
+
+- **Network access is required** during the install step, even though
+  the wizard's own UI/tooling is fully baked into the ISO — `disko` and
+  `nixos-install` both need to fetch `nixpkgs`/`disko`/`impermanence` and
+  every package the enabled services pull in (several GB, depending on
+  which services you leave checked in the features step).
+- **Budget real RAM for the build.** Validated end-to-end in a VirtualBox
+  VM: 3GB RAM was not enough — the build was OOM-killed partway through
+  compiling Home Assistant's Python dependencies. 8GB completed the full
+  build (Traefik, the whole media stack, Home Assistant, Frigate)
+  without issue. The F4-245's 16GB should have ample headroom; a
+  lower-RAM target might need fewer services enabled for the initial
+  install.
+
+## Validation status
+
+Verified with a full, real end-to-end run in a VirtualBox VM (EFI
+firmware, 4 blank virtual disks + 1 boot disk, 8GB RAM): booted the ISO,
+drove the wizard through the *new pool* (destructive) path, confirmed
+`disko` actually partitioned/created the pool and `nixos-install`
+completed successfully, then rebooted into the newly installed system
+and confirmed the ZFS pool imported cleanly (`ONLINE`, 0 errors) and the
+created user could log in. Several real bugs were only found this way
+(not by static `nix eval`/`nix build` checks) and are now fixed:
+
+- The console's autologin user is `nixos` (unprivileged), not `root` —
+  the wizard now always runs itself via `sudo`.
+- `cp -r` on `/etc/nas-installer-repo` (a symlink into the read-only Nix
+  store) recreated the symlink instead of copying real content — fixed
+  with `cp -rL`.
+- `/dev/disk/by-id/` also lists the optical drive holding the ISO itself
+  (and, on real hardware, would list whatever USB stick the ISO was
+  booted from) — both are now excluded from disk-selection lists.
+- `disko` has its own separate "type yes" confirmation that would hang
+  waiting for input the wizard never prompted for — skipped with
+  `--yes-wipe-all-disks`, since the wizard's own typed-`DESTROY` gate
+  already covers that consent.
+- disko's auto-generated `/persist` filesystem entry doesn't set
+  `neededForBoot`, which impermanence requires — now set explicitly for
+  the new-pool path.
+- **The most important one**: a freshly-created pool gets stamped with
+  the *live installer's own* hostid (hardcoded, not the target's), so
+  the target's first real boot would fail to auto-import it. The wizard
+  now stamps the live session's hostid to match the target's *before*
+  creating the pool — and since `/etc/hostid` is itself a Nix-store
+  symlink on this ISO, doing that requires removing the symlink first
+  (same class of bug as the `cp -r` one above).
+- `umount -R /mnt` fails ("not mounted") since `/mnt` itself is never a
+  mountpoint, only its children are — replaced with an explicit
+  deepest-first unmount of everything actually mounted under it.
+
+Not yet run against real hardware — treat the first real F4-245 run as a
+trial, not a guarantee, and keep a way to reach the console (monitor/
+keyboard, or SSH per above) in case something needs a closer look.

@@ -35,6 +35,15 @@ stage_90_install() {
 
   if [ "$(wiz_get storage_path)" = "new" ]; then
     wiz_msgbox "Running disko" "About to format and mount every disk selected earlier. This is the point of no return."
+    # Stamp the live session's hostid to match the target BEFORE disko
+    # creates the pool — otherwise `zpool create` stamps it with this
+    # live ISO's own hostid (hardcoded "00000000"), and the target
+    # system's first real boot fails to auto-import it (hostid
+    # mismatch, same class of problem docs/DEPLOYMENT.md step 3 already
+    # solves for the existing-pool path — confirmed the hard way that
+    # the new-pool path needed the exact same fix, just applied earlier,
+    # before creation instead of before import).
+    wiz_set_hostid "$(wiz_get hostid)"
     pool_new_run_disko "$WIZ_REPO_WORKDIR" "$(wiz_get hostname)"
   else
     # Boot drive only — disko doesn't know about the adopted pool.
@@ -92,8 +101,16 @@ Generated config was left at /persist/nixos-installer-output/ on the new system 
 secrets/initial-passwords.env was NOT copied there (it only ever mattered for this install) — recreate it in your own checkout from secrets/initial-passwords.env.example if you'll be rebuilding this box from your workstation later."
 
   if wiz_yesno "Reboot now?" "Unmount and reboot into the new system?"; then
-    umount -R /mnt
-    [ "$(wiz_get storage_path)" != "new" ] && zpool export "$(wiz_get pool_name)"
+    # `umount -R /mnt` alone isn't reliable here — confirmed the hard way
+    # that it fails with "not mounted" when /mnt itself was never a
+    # mountpoint (only its children are, e.g. /mnt/nix, /mnt/persist,
+    # /mnt/boot from disko), leaving everything still mounted. Enumerate
+    # every actual mount under /mnt and unmount deepest-first instead.
+    local mnt
+    for mnt in $(findmnt -R -o TARGET -n /mnt 2>/dev/null | sort -r); do
+      umount "$mnt" 2>/dev/null || umount -l "$mnt" 2>/dev/null
+    done
+    zpool export "$(wiz_get pool_name)" 2>/dev/null
     reboot
   fi
 }
