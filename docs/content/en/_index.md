@@ -25,7 +25,7 @@ params:
 
 {{% blocks/lead color="white" %}}
 
-**Bearded NAS** turns a TerraMaster-family NAS into a fully declarative
+**Bearded NAS** turns a Low Powered NAS appliance into a fully declarative
 NixOS box: ZFS storage (adopt an existing pool or create a new one),
 Samba/NFS file sharing, a Jellyfin + \*arr media stack, Home Assistant,
 Frigate NVR, and Traefik-fronted access over both the LAN and a Nebula

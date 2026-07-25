@@ -28,6 +28,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: docs/go.mod
+          cache-dependency-path: docs/go.sum
 
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v3
@@ -38,7 +39,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: docs/package-lock.json
 

@@ -107,3 +107,14 @@ module:
   imports:
     - path: github.com/google/docsy
       disable: false
+
+# Hugo 0.161+ sandboxes PostCSS's node invocation with node's own
+# --permission flag. On the GitHub Actions runner (Node 20.20.2) that
+# flag itself fails ("bad option: --permission") rather than just
+# restricting access, breaking the build outright — not a real security
+# posture regression to disable here, since this is a static build step
+# with no untrusted input, only the local package.json's postcss config.
+security:
+  node:
+    permissions:
+      disable: true
