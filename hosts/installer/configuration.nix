@@ -39,8 +39,15 @@ in
 
   # Runs on every login (console autologin, or SSH) — see
   # hosts/installer/wizard/lib/common.sh for what it actually does.
+  # Always via sudo: installation-cd-minimal.nix's console autologin is
+  # the unprivileged "nixos" user (wheel, passwordless sudo), not root —
+  # confirmed the hard way (the wizard needs root for /root, mount,
+  # disko, and nixos-install; running unprivileged failed on the very
+  # first `rm -rf "$WIZ_REPO_WORKDIR"`, since a non-root user can't
+  # even traverse into /root). A no-op when already root (SSH as root
+  # via the baked-in key).
   environment.loginShellInit = ''
-    bash /etc/nas-installer-repo/hosts/installer/wizard/run.sh
+    sudo bash /etc/nas-installer-repo/hosts/installer/wizard/run.sh
   '';
 
   image.baseName = lib.mkForce "terramaster-nix-installer";
