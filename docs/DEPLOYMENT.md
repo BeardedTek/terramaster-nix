@@ -20,7 +20,7 @@ Nothing below will work until these are real values.
 
 | File | Placeholder | Replace with |
 |---|---|---|
-| `hosts/terramaster/f4-245/disko.nix` | `CHANGEME-usb-boot-drive` | the USB drive's `/dev/disk/by-id/...` path — you can't know this until step 2 |
+| `hosts/terramaster/young/disko.nix` | `CHANGEME-usb-boot-drive` | the USB drive's `/dev/disk/by-id/...` path — you can't know this until step 2 |
 | `modules/common.nix` | `mySystem.lanInterface` default, `"CHANGEME-lan-if"` | your LAN interface name, e.g. `eno1` — found in step 2. Single source of truth: both `samba.nix` and `nfs.nix` read it from here. |
 
 There's no LAN CIDR to fill in for NFS — `nfs.nix` detects whatever
@@ -101,7 +101,7 @@ ls -la /dev/disk/by-id/     # → the internal USB drive's stable id
 ip link                     # → the real LAN interface name
 ```
 
-Go back and fill in the `CHANGEME` values in `hosts/terramaster/f4-245/disko.nix` and
+Go back and fill in the `CHANGEME` values in `hosts/terramaster/young/disko.nix` and
 `modules/common.nix` with what you just found. The temporary root password
 only matters for the SSH connections in steps 3–4 — it doesn't carry over
 to the installed system (`beardedtek`'s real key, delivered separately in
@@ -119,7 +119,7 @@ Still on the live installer, over SSH (or at the console):
 ```sh
 # rust was last imported under a different host's ZFS hostid. Stamp this
 # session's hostid to match what `young` will use (networking.hostId in
-# hosts/terramaster/f4-245/configuration.nix) BEFORE importing, so the import "sticks" —
+# hosts/terramaster/young/configuration.nix) BEFORE importing, so the import "sticks" —
 # otherwise it comes up mismatched again on first real boot too.
 zgenhostid 975edc0d
 zpool import -f rust

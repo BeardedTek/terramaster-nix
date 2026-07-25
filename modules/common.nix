@@ -7,6 +7,21 @@
     description = "Name of the physical LAN interface";
   };
 
+  options.mySystem.manufacturer = lib.mkOption {
+    type = lib.types.str;
+    description = ''
+      Set in variables.nix. Together with mySystem.model, selects
+      hosts/<manufacturer>/<model>/ as the hardware profile (disko.nix,
+      configuration.nix) flake.nix imports for this box — see
+      docs/ARCHITECTURE.md's "variables.nix" section.
+    '';
+  };
+
+  options.mySystem.model = lib.mkOption {
+    type = lib.types.str;
+    description = "Set in variables.nix, alongside mySystem.manufacturer.";
+  };
+
   options.mySystem.serviceBackends = lib.mkOption {
     type = lib.types.attrsOf lib.types.port;
     default = { };

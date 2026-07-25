@@ -7,10 +7,46 @@ while bringing this box up. This doc is the "why" in between.
 
 ## `variables.nix`
 
-The one file to edit for host-level tuning — hostname, contact info, and
-which service groups/services are enabled. Imported as a plain module in
-`flake.nix`, same as any other file under `modules/`.
+The one file to edit for host-level tuning — hostname, contact info,
+which service groups/services are enabled, and which hardware profile
+this instance uses. Imported two ways by `flake.nix`: once as a plain
+`import` (evaluated *before* `nixosSystem` is even called, purely to read
+`mySystem.manufacturer`/`mySystem.model` — see below) and once as an
+ordinary module in the `modules` list, same as any file under `modules/`.
+Both reads see the exact same file, so there's no risk of the two
+disagreeing.
 
+- **`mySystem.manufacturer` / `mySystem.model`**: selects which
+  `hosts/<manufacturer>/<model>/` directory supplies this instance's
+  hardware profile (`disko.nix` — disk partitioning — and
+  `configuration.nix` — filesystems, `hostId`, persistence list).
+  `flake.nix` builds the path as
+  `./hosts + "/${manufacturer}/${model}"` and imports
+  `<that>/disko.nix` and `<that>/configuration.nix` directly, instead of
+  those paths being hardcoded in `flake.nix` itself. A typo or nonexistent
+  pair fails loudly at eval time (`path does not exist`), pointing at the
+  exact directory that wasn't found.
+  Currently `"terramaster"` / `"young"`, pointing at
+  `hosts/terramaster/young/` — the real, deployed configuration for this
+  specific physical box (its actual `hostId`, its actual USB drive's
+  `by-id` path, both already filled in, not placeholders). The second
+  path segment doesn't have to be a hardware model name; it's just
+  whichever directory identifies *this instance*. `hosts/terramaster/`
+  also has `f4-245/`, a separate, generic **template** for provisioning a
+  *different, blank* TerraMaster F4-245 — `CHANGEME` placeholders instead
+  of real device paths, no real `hostId`, and (see "Automated ZFS pool
+  creation" below) a from-scratch ZFS pool instead of the
+  manually-imported one `young` already has. Nothing in `variables.nix`
+  points at `f4-245/` today; it exists to be copied to a new
+  `hosts/<manufacturer>/<new-instance-name>/` and filled in when a second
+  box shows up, not to be run as-is.
+  **Not yet built**: multiple *simultaneous* `nixosConfigurations` in this
+  one flake (today there's still only `nixosConfigurations.young`). Adding
+  a genuinely second NAS alongside this one would mean giving it its own
+  variables file and its own `nixosConfigurations.<name>` entry in
+  `flake.nix`, each pointing at whichever `hosts/<manufacturer>/<model>/`
+  fits its hardware — this change makes that a small, mechanical addition
+  rather than a restructuring, but doesn't do it preemptively.
 - **`networking.hostName`**: the single source of truth for the box's
   name. `modules/traefik.nix`, `modules/frigate.nix`, and
   `modules/samba.nix` all read `config.networking.hostName` rather than
@@ -60,7 +96,7 @@ which service groups/services are enabled. Imported as a plain module in
   share (`modules/samba.nix`) and the Mosquitto broker, since both exist
   only to support it. Persistence directories
   (`environment.persistence."/persist".directories` in
-  `hosts/terramaster/f4-245/configuration.nix`) are left listed regardless of any
+  `hosts/terramaster/young/configuration.nix`) are left listed regardless of any
   toggle — harmless if the directory never gets created, and one less
   thing to keep in sync by hand.
   Every module implements this the same way: gate the whole file's
@@ -80,7 +116,7 @@ internal USB slot used as the boot/system drive.
 ### The `rust` pool is pre-existing and untouched by disko
 
 `rust` (RAIDZ1 across the 4 HDDs) already existed before this flake, with
-data already on it. `hosts/terramaster/f4-245/disko.nix` only ever partitions the
+data already on it. `hosts/terramaster/young/disko.nix` only ever partitions the
 **256GB USB drive** (a single ESP, vfat, mounted `/boot`) — there is no
 disko config for the 4 HDDs at all, on purpose. `rust` is *imported*, never
 created or formatted. If disko ever grows a config block referencing any
@@ -99,7 +135,7 @@ Two new ZFS datasets carry everything else:
 
 The [`nix-community/impermanence`](https://github.com/nix-community/impermanence)
 module (`environment.persistence."/persist"` in
-`hosts/terramaster/f4-245/configuration.nix`) bind-mounts specific paths from `/persist`
+`hosts/terramaster/young/configuration.nix`) bind-mounts specific paths from `/persist`
 back onto the tmpfs root at boot. Anything not explicitly listed there is
 gone on every reboot.
 
@@ -121,7 +157,7 @@ mount shadows/orphans whatever was already nested inside the first one.
 
 Every dataset this config references via `fileSystems.*` — including the
 pool's own top-level `rust` dataset (`fileSystems."/rust"` in
-`hosts/terramaster/f4-245/configuration.nix`), not just its children — must be
+`hosts/terramaster/young/configuration.nix`), not just its children — must be
 `mountpoint=legacy`. See `docs/TROUBLESHOOTING.md` for the exact failure
 signatures this produces when missed, and `docs/DEPLOYMENT.md` step 3 for
 the one-time `zfs set` commands.
@@ -143,9 +179,76 @@ the one-time `zfs set` commands.
 
 All mounted `fsType = "zfs"`, all `mountpoint=legacy` on the pool side.
 
+### Automated ZFS pool creation for a new, blank NAS
+
+`young`'s `rust` pool predates this flake and is deliberately never touched
+by disko (previous section) — but that rule exists specifically because
+`rust` already had real data on it. A *different*, genuinely blank NAS
+doesn't have that constraint, and for that case `lib/zfs-pool.nix` can
+have disko create the pool and every dataset from scratch, instead of
+requiring a manual `zpool create` + `zfs create` walkthrough before every
+new install.
+
+`lib/zfs-pool.nix` is a plain function, not a NixOS module — call it from
+a host's `disko.nix` with the pool's shape:
+
+```nix
+{ lib, ... }:
+import ../../../lib/zfs-pool.nix {
+  inherit lib;
+  poolName = "rust";
+  raidLevel = "raidz1"; # or "mirror", "raidz2", ""  (stripe)
+  disks = [
+    "/dev/disk/by-id/..."
+    "/dev/disk/by-id/..."
+    # one entry per member disk
+  ];
+  datasets = [
+    { name = "nix"; mountpoint = "/nix"; }
+    { name = "persist"; mountpoint = "/persist"; }
+    { name = "home"; mountpoint = "/home"; }
+    { name = "media"; mountpoint = "/rust/media"; }
+    { name = "data"; mountpoint = "/rust/data"; }
+  ];
+}
+```
+
+It returns a `disko.devices` fragment: one `disk.<n>` entry per drive (a
+single GPT partition, `content.type = "zfs"`, feeding into the named
+pool) and one `zpool.<poolName>` entry with the given topology, `ashift =
+"12"`, and each dataset set to `options.mountpoint = "legacy"` — the same
+hard-won "every dataset must be legacy-mounted" rule from the previous
+section, just applied automatically instead of by hand. disko's own
+module then derives real `fileSystems.*` entries from this — `/nix`,
+`/persist`, `/home`, `/rust/media`, `/rust/data`, and `/rust` itself —
+so, unlike `young`'s `configuration.nix`, a host using this doesn't
+hand-write any `fileSystems.*` entries for its pool at all. Verified with
+a standalone `nix eval` against placeholder disk paths: produces exactly
+that `fileSystems` set, correct `mountpoint=legacy` on every dataset.
+
+`hosts/terramaster/f4-245/` is this pattern's concrete template — see the
+`variables.nix` section above for how it relates to `hosts/terramaster/young/`.
+
+**This is unconditionally destructive, same as every other disko-managed
+device in this repo (the USB boot drive included).** disko formats
+whatever it's told to, every time it runs — there's no "only if the pool
+doesn't already exist yet" check. Only ever point `disks` at drives you
+know are blank. This is *why* `young`'s own pool is handled the opposite
+way (manually pre-created, manually imported, never declared to disko) —
+automating creation is only safe for hardware that doesn't have anything
+on it yet.
+
+**Dataset names and `poolName` aren't fully free-form in this repo**:
+`modules/media-stack.nix`, `modules/samba.nix`, and `modules/nfs.nix` all
+hardcode absolute paths like `/rust/media` and `/rust/data` rather than
+reading the pool name from anywhere — so a new host that wants to reuse
+those modules as-is needs `poolName = "rust";` and the same `media`/`data`
+mountpoints shown above. Parameterizing those modules' paths would be a
+separate, larger change, not done here.
+
 ## What's persisted, and why
 
-`environment.persistence."/persist"` in `hosts/terramaster/f4-245/configuration.nix`
+`environment.persistence."/persist"` in `hosts/terramaster/young/configuration.nix`
 lists two kinds of paths:
 
 **Whole directories** (`directories = [...]`): each service's state dir

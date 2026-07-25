@@ -1,6 +1,9 @@
 {
   networking.hostName = "young";
 
+  mySystem.manufacturer = "terramaster";
+  mySystem.model = "young";
+
   mySystem.users = [
     { name = "beardedtek"; wheel = true; }
     { name = "dyoung"; wheel = true; }

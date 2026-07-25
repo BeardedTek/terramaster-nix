@@ -62,7 +62,7 @@ created that symlink inside the *persisted* copy of the directory.
 **Fix:** persist only the specific files that actually need to survive a
 reboot (the SSH host keys, so `known_hosts` doesn't break on clients every
 time) under `files = [...]`, not the whole directory. See
-`hosts/terramaster/f4-245/configuration.nix`'s `environment.persistence` block and
+`hosts/terramaster/young/configuration.nix`'s `environment.persistence` block and
 `services.openssh.hostKeys`' actual default (`rsa` + `ed25519`) for which
 files that is.
 

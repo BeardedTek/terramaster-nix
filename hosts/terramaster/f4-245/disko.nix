@@ -1,21 +1,46 @@
-{
-  disko.devices.disk.usb = {
-    device = "/dev/disk/by-id/usb-_USB_DISK_3.0_070D55621A83CB64-0:0";
-    type = "disk";
-    content = {
-      type = "gpt";
-      partitions = {
-        ESP = {
-          size = "512M";
-          type = "EF00";
-          content = {
-            type = "filesystem";
-            format = "vfat";
-            mountpoint = "/boot";
-            mountOptions = [ "umask=0077" ];
+{ lib, ... }:
+
+let
+  zfsPool = import ../../../lib/zfs-pool.nix {
+    inherit lib;
+    poolName = "rust";
+    raidLevel = "raidz1";
+    disks = [
+      "/dev/disk/by-id/CHANGEME-hdd-bay-1"
+      "/dev/disk/by-id/CHANGEME-hdd-bay-2"
+      "/dev/disk/by-id/CHANGEME-hdd-bay-3"
+      "/dev/disk/by-id/CHANGEME-hdd-bay-4"
+    ];
+    datasets = [
+      { name = "nix"; mountpoint = "/nix"; }
+      { name = "persist"; mountpoint = "/persist"; }
+      { name = "home"; mountpoint = "/home"; }
+      { name = "media"; mountpoint = "/rust/media"; }
+      { name = "data"; mountpoint = "/rust/data"; }
+    ];
+  };
+in
+lib.mkMerge [
+  zfsPool
+  {
+    disko.devices.disk.usb = {
+      device = "/dev/disk/by-id/CHANGEME-usb-boot-drive";
+      type = "disk";
+      content = {
+        type = "gpt";
+        partitions = {
+          ESP = {
+            size = "512M";
+            type = "EF00";
+            content = {
+              type = "filesystem";
+              format = "vfat";
+              mountpoint = "/boot";
+              mountOptions = [ "umask=0077" ];
+            };
           };
         };
       };
     };
-  };
-}
+  }
+]

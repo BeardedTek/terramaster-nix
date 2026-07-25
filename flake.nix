@@ -13,6 +13,8 @@
   outputs = { self, nixpkgs, disko, impermanence, ... }:
     let
       system = "x86_64-linux";
+      vars = import ./variables.nix;
+      hostDir = ./hosts + "/${vars.mySystem.manufacturer}/${vars.mySystem.model}";
     in
     {
       nixosConfigurations.young = nixpkgs.lib.nixosSystem {
@@ -20,8 +22,8 @@
         modules = [
           disko.nixosModules.disko
           impermanence.nixosModules.impermanence
-          ./hosts/terramaster/f4-245/disko.nix
-          ./hosts/terramaster/f4-245/configuration.nix
+          (hostDir + "/disko.nix")
+          (hostDir + "/configuration.nix")
           ./variables.nix
           ./modules/common.nix
           ./modules/users.nix

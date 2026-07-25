@@ -91,7 +91,7 @@ when this was set up.
 1. On the box: `ls /dev/serial/by-id/` — find its stable device path
    (don't use a bare `/dev/ttyUSB0`-style path; USB enumeration order
    isn't guaranteed across reboots, same reasoning as the boot drive's
-   `by-id` path in `hosts/terramaster/f4-245/disko.nix`).
+   `by-id` path in `hosts/terramaster/young/disko.nix`).
 2. In `modules/home-assistant.nix`, replace the placeholder
    `serialPort = "/dev/ttyUSB0";` with the real `by-id` path.
 3. In `variables.nix`, set `mySystem.features.homeAssistant.zwave.enable
@@ -149,7 +149,7 @@ Samba section — just pick `hass` instead of `media`/`data`.
 state, `custom_components/`, its own SQLite recorder database, etc.) and
 `/var/lib/mosquitto` (retained messages, its persistence database) are
 both in `environment.persistence."/persist".directories`
-(`hosts/terramaster/f4-245/configuration.nix`) — full state survives every reboot
+(`hosts/terramaster/young/configuration.nix`) — full state survives every reboot
 despite the tmpfs root, same as every other stateful service here.
 
 ## No build-time config validator
