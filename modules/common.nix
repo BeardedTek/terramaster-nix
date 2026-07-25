@@ -60,6 +60,24 @@
       default = false;
       description = "S3-compatible object storage (MinIO) — see modules/minio.nix.";
     };
+    filebrowser.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Web-based file browser (FileBrowser Quantum) over /rust/media and
+        /rust/data — see modules/filebrowser.nix. Exposed as the "files"
+        Traefik backend.
+      '';
+    };
+    selfUpdate.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Dashboard-triggered self-update: checks GitHub Releases hourly,
+        and a password-gated button on the dashboard fetches the latest
+        tag and runs nixos-rebuild switch — see modules/self-update.nix.
+      '';
+    };
     homeAssistant = {
       enable = lib.mkOption {
         type = lib.types.bool;

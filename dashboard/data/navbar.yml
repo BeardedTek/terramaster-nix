@@ -7,5 +7,7 @@ links:
     link: /samba/
   - name: NFS
     link: /nfs/
+  - name: Update
+    link: /update/
   - name: Help
     link: /troubleshooting/

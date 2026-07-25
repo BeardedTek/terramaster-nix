@@ -16,6 +16,7 @@ let
     hass = 8123;
     minio = 9000;
     "minio-console" = 9001;
+    files = 8095;
   };
 
   backendEnabled = {
@@ -29,6 +30,7 @@ let
     qbittorrent = f.mediaAcquisition.enable && f.mediaAcquisition.qbittorrent.enable;
     minio = f.minio.enable;
     "minio-console" = f.minio.enable;
+    files = f.filebrowser.enable;
   };
 
   enabledBackends = lib.filterAttrs (name: _: backendEnabled.${name}) backends;

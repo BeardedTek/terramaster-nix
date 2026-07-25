@@ -34,8 +34,10 @@
       "/var/lib/frigate"
       "/var/lib/hass"
       "/var/lib/mosquitto"
-      "/var/lib/minio"
       "/etc/minio"
+      "/var/lib/filebrowser"
+      "/etc/filebrowser"
+      "/etc/nas-update"
     ];
     files = [
       "/etc/machine-id"

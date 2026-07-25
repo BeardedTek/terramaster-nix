@@ -77,6 +77,7 @@ disagreeing.
     jellyfin.enable = true;
     frigate.enable = true;
     minio.enable = false; # S3-compatible object storage, off by default
+    filebrowser.enable = false; # web file browser over /rust/media and /rust/data
     homeAssistant = {
       enable = true;       # Home Assistant + its Mosquitto broker + its Samba share
       zwave.enable = false; # no dongle attached yet
@@ -184,6 +185,7 @@ commands.
 | `rust/config` | `/rust/config` | pre-existing, currently unused |
 | `rust/backups` | `/rust/backups` | pre-existing, reserved for future manual `zfs send`/`snapshot` use — no automated backup tooling (sanoid/syncoid) by design, kept simple |
 | `rust/docker` | `/rust/docker` | pre-existing |
+| `rust/minio` | `/rust/minio` | new — MinIO's data/config, see the "MinIO" section below |
 
 All mounted `fsType = "zfs"`, all `mountpoint=legacy` on the pool side.
 
@@ -386,6 +388,7 @@ directly-managed systemd unit.
 | Mosquitto (MQTT) | `modules/home-assistant.nix` | 1883 | LAN + nebula1 |
 | MinIO (S3 API) | `modules/minio.nix` | 9000 | LAN + nebula1 |
 | MinIO (console) | `modules/minio.nix` | 9001 | LAN + nebula1 |
+| FileBrowser (Quantum) | `modules/filebrowser.nix` | 8095 | LAN + nebula1 |
 
 ### Jellyfin
 
@@ -582,12 +585,96 @@ here does — no special-casing needed, unlike Frigate or qBittorrent.
   [deployment doc](/docs/deployment/)'s secrets table. Missing the file is
   a clean no-start (nixpkgs' module sets `ConditionPathExists` on it), not
   a crash loop — same posture as Z-Wave without a dongle.
-- **Storage**: left at the module's own default, `/var/lib/minio/data` —
-  a single-path, non-erasure-coded data dir, persisted like every other
-  service's `/var/lib/<name>` state. Deliberately not routed onto the
-  `rust/media`/`rust/data` datasets, which already have their own
-  established meaning (media library, download landing zone) that this
-  would muddy.
+- **Storage**: a dedicated `rust/minio` dataset (`mountpoint=legacy`,
+  same rule as every other dataset — see the ZFS dataset map above),
+  mounted at `/rust/minio` — `dataDir = [ "/rust/minio/data" ];` and
+  `configDir = "/rust/minio/config";`, overriding the module's own
+  `/var/lib/minio` default. Two reasons, one conceptual and one a real
+  bug hit on first deploy:
+  - Object storage is bulk data — the same category as `rust/media` and
+    `rust/data` — not small app config/state like every other
+    `/var/lib/<name>` entry in `environment.persistence`.
+  - **The `/var/lib/minio` default failed outright the first time this
+    was deployed**: `minio.service` exited immediately with `"file
+    access denied"`. Cause: the exact "freshly-created persistence
+    bind-mount gets the wrong ownership" race the
+    [troubleshooting doc](/docs/troubleshooting/) already documents for
+    qBittorrent and Home Assistant, just under a third mechanism —
+    nixpkgs' `services.minio` module creates `dataDir`/`configDir` via
+    `systemd.tmpfiles.rules`, and on the same activation that both
+    introduces those rules *and* creates the brand-new `/persist`
+    bind-mount for `/var/lib/minio`, the ordering between the two isn't
+    guaranteed. A real ZFS `fileSystems` entry doesn't have this
+    failure mode at all — it's mounted directly at boot, no bind-mount
+    indirection to race against. `systemd.services.minio.unitConfig.RequiresMountsFor
+    = [ "/rust/minio" ];` covers the (separate, smaller) risk of the
+    service starting before that mount is up.
+  - Not part of `disko.nix` for `young` (created manually, same as
+    `rust/nix`/`rust/persist` were — see the
+    [deployment doc](/docs/deployment/)); `hosts/terramaster/f4-245/disko.nix`'s
+    `zfs-pool.nix` call includes it for future from-scratch installs.
+    The installer wizard's "adopt an existing pool" path doesn't
+    currently offer creating this dataset — a known gap, not yet hit
+    since MinIO defaults off.
+
+### FileBrowser
+
+`modules/filebrowser.nix` — a web file browser over the existing
+`/rust/media` and `/rust/data` datasets, off by default
+(`mySystem.features.filebrowser.enable = false;`). Registered with
+Traefik as `files` (not `filebrowser`) — deliberately named after what a
+user is trying to do, not the specific software providing it, since the
+underlying tool is exactly the kind of thing that could get swapped out
+later without the URL people actually bookmark needing to change.
+
+- **[FileBrowser Quantum](https://github.com/gtsteffaniak/filebrowser)**
+  (`gtsteffaniak/filebrowser`, package name `filebrowser-quantum` in
+  nixpkgs), not the older `filebrowser/filebrowser` project nixpkgs also
+  ships (`pkgs.filebrowser`, with its own `services.filebrowser` module).
+  Chosen specifically because it supports multiple independently-named
+  *sources* — classic FileBrowser only serves one `root` directory, which
+  would have meant either exposing all of `/rust` (pulling in `config`,
+  `backups`, `docker`, `home`, `nix`, `persist` — none of which should be
+  browsable) or bind-mounting media/data under one aggregate root as a
+  workaround. Quantum's config just lists both directly:
+  ```nix
+  server.sources = [
+    { path = "/rust/media"; name = "Media"; }
+    { path = "/rust/data"; name = "Data"; }
+  ];
+  ```
+  Verified directly (built the package, wrote a matching config, ran it
+  against real Media/Data test directories) before wiring this module up
+  — confirmed both sources index and show up as separate top-level
+  sections, not merged.
+- **No existing NixOS module** (classic FileBrowser's `services.filebrowser`
+  doesn't apply — Quantum is a different config format/CLI, not a
+  drop-in `package` override the way MinIO's package swap was), so this
+  module hand-writes the systemd unit directly, config generated via
+  `pkgs.formats.yaml`.
+- **Admin account bootstrap**: Quantum has no default login — `filebrowser-setup`,
+  a one-shot systemd service modeled on `modules/home-assistant.nix`'s
+  `hass-install-hacs` pattern, runs `filebrowser-quantum set -u
+  "$FILEBROWSER_ADMIN_USER,$FILEBROWSER_ADMIN_PASSWORD" -a` exactly once
+  — gated on `ConditionPathExists = "!/var/lib/filebrowser/filebrowser.db"`,
+  so a password changed later through the UI is never stomped back to the
+  initial value on a later rebuild. Credentials are out-of-repo, same
+  pattern as Traefik's `LINODE_TOKEN` — see
+  `secrets/extra-files/persist/etc/filebrowser/admin.env.example`.
+- **`StateDirectory = "filebrowser";`, not `systemd.tmpfiles.rules`** —
+  deliberately the same "directory creation tied to this unit's own
+  startup, not an independently-scheduled tmpfiles pass" shape the
+  [troubleshooting doc](/docs/troubleshooting/) recommends, after nixpkgs'
+  own `services.minio` module hit exactly that race using tmpfiles rules
+  (see the MinIO section above). `/var/lib/filebrowser` and `/etc/filebrowser`
+  are still both regular `environment.persistence` entries — `StateDirectory`
+  only fixes the ownership-timing race, actual durability across reboots
+  still comes from persistence like everything else here.
+- **`RequiresMountsFor = [ "/rust/media" "/rust/data" ];`** on the main
+  service — same ordering gap `modules/nfs.nix` already covers for its
+  own exports file (the [troubleshooting doc](/docs/troubleshooting/)'s
+  "NFS export script racing its own ZFS mounts"), just for indexed
+  sources instead.
 
 ### Traefik
 

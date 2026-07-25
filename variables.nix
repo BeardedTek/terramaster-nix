@@ -31,6 +31,7 @@
     jellyfin.enable = true;
     frigate.enable = true;
     minio.enable = true;
+    filebrowser.enable = true;
 
     homeAssistant = {
       enable = true;

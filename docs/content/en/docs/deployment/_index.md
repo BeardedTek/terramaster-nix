@@ -46,6 +46,7 @@ never show these as trackable):**
 | `secrets/initial-passwords.env` | copy `initial-passwords.env.example`, fill in real `mkpasswd -m sha-512` output for `ROOT_INITIAL_HASH` plus one `<NAME_UPPERCASE>_INITIAL_HASH` per entry in `variables.nix`'s `mySystem.users` (currently `BEARDEDTEK_INITIAL_HASH`, `DYOUNG_INITIAL_HASH`) |
 | `secrets/extra-files/persist/etc/traefik/traefik.env` | copy `traefik.env.example` in the same folder, fill in the real Linode API token as `LINODE_TOKEN` — used for the DNS-01 challenge in `modules/traefik.nix` |
 | `secrets/extra-files/persist/etc/minio/minio.env` | only if `mySystem.features.minio.enable = true;` — copy `minio.env.example` in the same folder, fill in real `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` values. Without it, MinIO just doesn't start (see `modules/minio.nix`) — nothing else depends on it |
+| `secrets/extra-files/persist/etc/filebrowser/admin.env` | only if `mySystem.features.filebrowser.enable = true;` — copy `admin.env.example` in the same folder, fill in real `FILEBROWSER_ADMIN_USER`/`FILEBROWSER_ADMIN_PASSWORD` values. Only read once, to create the initial admin account (see `modules/filebrowser.nix`) — a password changed later through FileBrowser's own UI is never overwritten by this file again |
 
 Everything under `secrets/extra-files/` mirrors the target's filesystem
 1:1 (e.g. `secrets/extra-files/etc/nebula/config.yaml` → `/etc/nebula/config.yaml`

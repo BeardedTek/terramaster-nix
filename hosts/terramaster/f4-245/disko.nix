@@ -17,6 +17,7 @@ let
       { name = "home"; mountpoint = "/home"; }
       { name = "media"; mountpoint = "/rust/media"; }
       { name = "data"; mountpoint = "/rust/data"; }
+      { name = "minio"; mountpoint = "/rust/minio"; }
     ];
   };
 in

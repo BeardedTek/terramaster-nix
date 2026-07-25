@@ -34,6 +34,7 @@ ${users_nix}  ];
     jellyfin.enable = $(f jellyfin);
     frigate.enable = $(f frigate);
     minio.enable = $(f minio);
+    filebrowser.enable = $(f filebrowser);
 
     homeAssistant = {
       enable = $(f homeassistant);
@@ -76,8 +77,10 @@ _gen_persistence_block() {
       "/var/lib/frigate"
       "/var/lib/hass"
       "/var/lib/mosquitto"
-      "/var/lib/minio"
       "/etc/minio"
+      "/var/lib/filebrowser"
+      "/etc/filebrowser"
+      "/etc/nas-update"
     ];
     files = [
       "/etc/machine-id"

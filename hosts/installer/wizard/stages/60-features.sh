@@ -9,6 +9,7 @@ stage_60_features() {
     "jellyfin"            "Jellyfin (media server)"                    "ON" \
     "frigate"             "Frigate (NVR)"                              "ON" \
     "minio"               "MinIO (S3-compatible object storage)"       "OFF" \
+    "filebrowser"         "FileBrowser (web file browser for media/data)" "OFF" \
     "homeassistant"       "Home Assistant + Mosquitto + Samba share"   "ON" \
     "homeassistant_hacs"  "  -> HACS"                                  "ON" \
     "homeassistant_zwave" "  -> Z-Wave JS (only if a dongle is attached)" "OFF" \
@@ -21,7 +22,7 @@ stage_60_features() {
   )
 
   local flag
-  for flag in jellyfin frigate minio homeassistant homeassistant_hacs homeassistant_zwave \
+  for flag in jellyfin frigate minio filebrowser homeassistant homeassistant_hacs homeassistant_zwave \
               mediaacq mediaacq_seerr mediaacq_radarr mediaacq_sonarr mediaacq_jackett mediaacq_qbittorrent; do
     if [[ " $selected " == *"\"$flag\""* ]]; then
       wiz_set "feature_$flag" "true"

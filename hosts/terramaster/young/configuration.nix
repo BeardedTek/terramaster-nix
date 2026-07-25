@@ -47,6 +47,10 @@
     device = "rust/config";
     fsType = "zfs";
   };
+  fileSystems."/rust/minio" = {
+    device = "rust/minio";
+    fsType = "zfs";
+  };
   fileSystems."/rust/backups" = {
     device = "rust/backups";
     fsType = "zfs";
@@ -73,8 +77,10 @@
       "/var/lib/frigate"
       "/var/lib/hass"
       "/var/lib/mosquitto"
-      "/var/lib/minio"
       "/etc/minio"
+      "/var/lib/filebrowser"
+      "/etc/filebrowser"
+      "/etc/nas-update"
     ];
     files = [
       "/etc/machine-id"
