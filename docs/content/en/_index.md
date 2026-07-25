@@ -15,6 +15,9 @@ params:
 <a class="btn btn-lg btn-primary me-3 mb-4" href="/docs/">
   Documentation <i class="fa-solid fa-book ms-2"></i>
 </a>
+<a class="btn btn-lg btn-primary me-3 mb-4" href="https://github.com/BeardedTek/terramaster-nix/releases">
+  Download installer ISO <i class="fa-solid fa-compact-disc ms-2"></i>
+</a>
 <a class="btn btn-lg btn-secondary me-3 mb-4" href="https://github.com/BeardedTek/terramaster-nix">
   Get the code <i class="fab fa-github ms-2"></i>
 </a>
@@ -48,7 +51,9 @@ ZFS pool creation or adoption, tmpfs root to spare the boot drive, and
 
 A bootable ISO with a TUI wizard that partitions disks, collects users
 and settings, and runs `nixos-install` itself — no separate workstation
-required. [See the docs](/docs/installer/).
+required. Pre-built for every
+[release](https://github.com/BeardedTek/terramaster-nix/releases), or
+[see the docs](/docs/installer/) to build your own.
 
 {{% /blocks/feature %}}
 

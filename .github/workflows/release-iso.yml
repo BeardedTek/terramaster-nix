@@ -1,0 +1,42 @@
+name: Build and release installer ISO
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Build installer ISO
+        # --impure: hosts/installer/configuration.nix checks for a local
+        # secrets/extra-files/.../authorized_keys to bake in (see its own
+        # comment) — that path is gitignored and won't exist on this
+        # runner, so bakedInKey just evaluates to [] here. Every ISO built
+        # by this workflow ships with no baked-in key, same as the stock
+        # NixOS ISO: passwd-then-SSH at the console, or one of the
+        # wizard's own Secrets-step options (GitHub username, paste,
+        # password) once it's running.
+        run: nix build --impure --print-build-logs '.#nixosConfigurations.installer.config.system.build.isoImage'
+
+      - name: Stage release asset
+        run: |
+          iso=$(find result/iso -name '*.iso' | head -n1)
+          cp "$iso" "beardednas-installer-${GITHUB_REF_NAME}.iso"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: beardednas-installer-*.iso
+          generate_release_notes: true

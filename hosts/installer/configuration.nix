@@ -51,5 +51,5 @@ in
     sudo bash /etc/nas-installer-repo/hosts/installer/wizard/run.sh
   '';
 
-  image.baseName = lib.mkForce "terramaster-nix-installer";
+  image.baseName = lib.mkForce "beardednas-installer";
 }

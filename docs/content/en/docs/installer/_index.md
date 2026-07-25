@@ -13,6 +13,17 @@ workstation orchestration needed (unlike the
 remains the documented path for `young` specifically, and as the manual
 reference for what this wizard automates).
 
+## Download
+
+Every tagged release publishes a ready-to-flash ISO — grab the latest
+from [GitHub Releases](https://github.com/BeardedTek/terramaster-nix/releases),
+no build step required. It's built straight from that tag by
+[`.github/workflows/release-iso.yml`](https://github.com/BeardedTek/terramaster-nix/blob/main/.github/workflows/release-iso.yml),
+so it always matches a real, published state of the flake rather than
+whatever happens to be on someone's local checkout.
+
+Prefer to build it yourself (a newer `main`, or your own fork)? See below.
+
 ## Building the ISO
 
 ```sh
