@@ -45,6 +45,7 @@
           ./modules/dashboard.nix
           ./modules/frigate.nix
           ./modules/home-assistant.nix
+          ./modules/minio.nix
         ];
       };
 

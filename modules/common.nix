@@ -55,6 +55,11 @@
       type = lib.types.bool;
       default = true;
     };
+    minio.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "S3-compatible object storage (MinIO) — see modules/minio.nix.";
+    };
     homeAssistant = {
       enable = lib.mkOption {
         type = lib.types.bool;

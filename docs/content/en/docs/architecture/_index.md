@@ -76,6 +76,7 @@ disagreeing.
   mySystem.features = {
     jellyfin.enable = true;
     frigate.enable = true;
+    minio.enable = false; # S3-compatible object storage, off by default
     homeAssistant = {
       enable = true;       # Home Assistant + its Mosquitto broker + its Samba share
       zwave.enable = false; # no dongle attached yet
@@ -383,6 +384,8 @@ directly-managed systemd unit.
 | Frigate (via its own nginx vhost) | `modules/frigate.nix` | 8098 | LAN + nebula1 |
 | Home Assistant | `modules/home-assistant.nix` | 8123 | LAN + nebula1 |
 | Mosquitto (MQTT) | `modules/home-assistant.nix` | 1883 | LAN + nebula1 |
+| MinIO (S3 API) | `modules/minio.nix` | 9000 | LAN + nebula1 |
+| MinIO (console) | `modules/minio.nix` | 9001 | LAN + nebula1 |
 
 ### Jellyfin
 
@@ -546,6 +549,45 @@ yet), Mosquitto (`services.mosquitto`), and a Samba share for the config
 directory. Full writeup, including the reverse-proxy `trusted_proxies`
 requirement and how to enable Z-Wave once the dongle arrives, is in the
 [Home Assistant doc](/docs/home-assistant/).
+
+### MinIO
+
+`modules/minio.nix` — S3-compatible object storage, off by default
+(`mySystem.features.minio.enable = false;`). Two backends registered with
+Traefik via the generic `backends`-map pattern: `minio` (the S3 API,
+port 9000) and `minio-console` (the web console, port 9001), each
+getting its own pair of routers/domains the same way every other service
+here does — no special-casing needed, unlike Frigate or qBittorrent.
+
+- **Package**: nixpkgs' own `pkgs.minio` predates upstream `minio/minio`
+  archiving its GitHub repo in 2025 (after removing most of the open
+  source Console/community edition in favor of their commercial AIStor
+  product), so it isn't a reliable source of current releases. This repo
+  builds its own package (`pkgs/minio.nix`) directly from
+  [pgsty/minio](https://github.com/pgsty/minio) — a fork maintained by the
+  Pigsty project (which depends on MinIO for its own Postgres
+  backup/object-storage stack) that keeps publishing releases from the
+  same source. The upstream release is a statically-linked Go binary, so
+  the package is just a `fetchurl` + install, no build step and no
+  `autoPatchelfHook` needed. Bump the pinned release tag/version/hash in
+  that file to update.
+- **Reuses nixpkgs' `services.minio` module** for everything except the
+  package itself (`services.minio.package = pkgs.callPackage
+  ../pkgs/minio.nix { };`) — systemd hardening, the `minio` user/group,
+  and `tmpfiles` rules all come from nixpkgs, unmodified.
+- **Root credentials**: out-of-repo, same pattern as Traefik's
+  `LINODE_TOKEN` — `rootCredentialsFile = "/etc/minio/minio.env";`, an
+  `EnvironmentFile=` with `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`. See
+  `secrets/extra-files/persist/etc/minio/minio.env.example` and the
+  [deployment doc](/docs/deployment/)'s secrets table. Missing the file is
+  a clean no-start (nixpkgs' module sets `ConditionPathExists` on it), not
+  a crash loop — same posture as Z-Wave without a dongle.
+- **Storage**: left at the module's own default, `/var/lib/minio/data` —
+  a single-path, non-erasure-coded data dir, persisted like every other
+  service's `/var/lib/<name>` state. Deliberately not routed onto the
+  `rust/media`/`rust/data` datasets, which already have their own
+  established meaning (media library, download landing zone) that this
+  would muddy.
 
 ### Traefik
 

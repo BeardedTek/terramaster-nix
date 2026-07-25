@@ -30,6 +30,7 @@
   mySystem.features = {
     jellyfin.enable = true;
     frigate.enable = true;
+    minio.enable = true;
 
     homeAssistant = {
       enable = true;

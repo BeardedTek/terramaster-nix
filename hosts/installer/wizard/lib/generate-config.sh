@@ -33,6 +33,7 @@ ${users_nix}  ];
   mySystem.features = {
     jellyfin.enable = $(f jellyfin);
     frigate.enable = $(f frigate);
+    minio.enable = $(f minio);
 
     homeAssistant = {
       enable = $(f homeassistant);
@@ -75,6 +76,8 @@ _gen_persistence_block() {
       "/var/lib/frigate"
       "/var/lib/hass"
       "/var/lib/mosquitto"
+      "/var/lib/minio"
+      "/etc/minio"
     ];
     files = [
       "/etc/machine-id"

@@ -34,6 +34,8 @@
       "/var/lib/frigate"
       "/var/lib/hass"
       "/var/lib/mosquitto"
+      "/var/lib/minio"
+      "/etc/minio"
     ];
     files = [
       "/etc/machine-id"

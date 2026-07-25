@@ -14,6 +14,8 @@ let
     qbittorrent = 8080;
     frigate = 8098;
     hass = 8123;
+    minio = 9000;
+    "minio-console" = 9001;
   };
 
   backendEnabled = {
@@ -25,6 +27,8 @@ let
     jackett = f.mediaAcquisition.enable && f.mediaAcquisition.jackett.enable;
     seerr = f.mediaAcquisition.enable && f.mediaAcquisition.seerr.enable;
     qbittorrent = f.mediaAcquisition.enable && f.mediaAcquisition.qbittorrent.enable;
+    minio = f.minio.enable;
+    "minio-console" = f.minio.enable;
   };
 
   enabledBackends = lib.filterAttrs (name: _: backendEnabled.${name}) backends;
