@@ -23,7 +23,15 @@ Check for a newer version now? Requires network access. If this fails or you say
     wiz_msgbox "No update available" "Couldn't clone $WIZ_REPO_URL (no network, or the clone failed — see /tmp/wiz-git-clone.log). Falling back to the baked-in copy."
   fi
 
-  cp -r "$WIZ_REPO_BAKED_IN" "$WIZ_REPO_WORKDIR"
+  # -L: WIZ_REPO_BAKED_IN (/etc/nas-installer-repo) is itself a symlink
+  # into the read-only Nix store — plain `cp -r` (no -L) recreates that
+  # same top-level symlink at the destination instead of copying real
+  # content, leaving $WIZ_REPO_WORKDIR pointing straight back at the
+  # read-only store (confirmed the hard way: `stat` showed it as a
+  # symlink, and every later chmod failed with "Read-only file system"
+  # even running as root, since read-only is a property of the store
+  # mount itself, not file ownership).
+  cp -rL "$WIZ_REPO_BAKED_IN" "$WIZ_REPO_WORKDIR"
   chmod -R u+w "$WIZ_REPO_WORKDIR"
   wiz_set repo_source "baked-in ISO snapshot"
 }

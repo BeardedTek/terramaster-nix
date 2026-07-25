@@ -145,7 +145,15 @@ EOF
 
 # Path B: disko already derives fileSystems for everything the pool
 # covers (see hosts/terramaster/f4-245/configuration.nix, the template
-# this mirrors) — nothing to hand-write beyond hostId and the tmpfs root.
+# this mirrors) — nothing to hand-write beyond hostId, the tmpfs root,
+# and neededForBoot on /nix and /persist. disko has no way to know those
+# two specifically need to be mounted before stage-2 activation (that's
+# an application-level fact, not something derivable from the pool
+# layout) — confirmed the hard way: impermanence's own assertion
+# ("filesystems used for persistent storage must have neededForBoot
+# set") failed on a real install using this generator before this was
+# added, since disko's auto-generated fileSystems entries default it to
+# false.
 gen_configuration_nix_new() {
   cat <<EOF
 {
@@ -160,6 +168,9 @@ gen_configuration_nix_new() {
     fsType = "tmpfs";
     options = [ "size=2G" "mode=755" ];
   };
+
+  fileSystems."/nix".neededForBoot = true;
+  fileSystems."/persist".neededForBoot = true;
 
 $(_gen_persistence_block)
 }

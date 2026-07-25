@@ -72,7 +72,12 @@ stage_90_install() {
 
   wiz_msgbox "Installing NixOS" "Running nixos-install now — this can take a while (downloading/building packages). The console will show progress."
 
-  nixos-install --root /mnt --flake "$flake_attr" --no-root-password
+  # --impure: confirmed the hard way that nixos-install's own internal
+  # nix invocation doesn't pick up NIX_CONFIG=pure-eval=false from this
+  # shell's environment (unlike plain `nix build`) — modules/users.nix's
+  # builtins.getEnv calls need real impure evaluation, not just the env
+  # vars being exported.
+  nixos-install --root /mnt --flake "$flake_attr" --no-root-password --impure
 
   mkdir -p /mnt/persist/nixos-installer-output
   cp "$WIZ_REPO_WORKDIR/variables.nix" /mnt/persist/nixos-installer-output/
