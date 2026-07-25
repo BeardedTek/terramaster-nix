@@ -155,22 +155,28 @@ let
     '';
   };
 
-  # While applyingFile exists, serves the live progressFile; once the
-  # apply finishes (applyingFile removed via the trap above), always
-  # falls back to statusFile — which nas-update-apply's own last step
-  # already refreshed, so there's no stale-progress state to fall into.
+  # While applyingFile exists, serves the live progressFile. Otherwise
+  # runs a fresh GitHub check on every single request rather than
+  # trusting nas-update-check's hourly cache — confirmed the hard way,
+  # the "Check for updates" button read straight from that cache and
+  # kept reporting the previous release as latest for up to an hour
+  # after a new one actually went out. A live check here is one fast
+  # HTTP GET, well within GitHub's unauthenticated rate limit for
+  # something only a human clicks occasionally — the hourly timer still
+  # runs too, mainly so statusFile has *something* in it before anyone's
+  # ever opened the page.
   statusCgi = pkgs.writeShellApplication {
     name = "nas-update-status-cgi";
-    runtimeInputs = [ pkgs.coreutils ];
+    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils ];
     text = ''
       printf 'Status: 200 OK\r\nContent-Type: application/json\r\n\r\n'
       if [ -f ${applyingFile} ] && [ -f ${progressFile} ]; then
         cat ${progressFile}
-      elif [ -f ${statusFile} ]; then
-        cat ${statusFile}
-      else
-        printf '{"current":"unknown","latest":null,"updateAvailable":false}'
+        exit 0
       fi
+      ${writeStatusFn}
+      write_status
+      cat ${statusFile}
     '';
   };
 in
@@ -234,15 +240,16 @@ in
     };
 
     # Rides on the existing dashboard vhost (modules/dashboard.nix,
-    # port 8097) — no new Traefik backend, no new firewall port. Both
-    # locations sit behind the same password; status alone is low-risk
-    # (just "is a newer version out"), but there's no reason to split
-    # the auth boundary for it.
+    # port 8097) — no new Traefik backend, no new firewall port.
+    # /update/status is deliberately NOT behind auth_basic — same trust
+    # level as metrics.json, which is already unauthenticated: "a newer
+    # release exists" is meant to be visible to anyone who can reach the
+    # dashboard at all, so the page can show it without asking for a
+    # password first. Only /update/trigger — the one that actually runs
+    # nixos-rebuild — is gated.
     services.nginx.virtualHosts.dashboard.locations = {
       "= /update/status" = {
         extraConfig = ''
-          auth_basic "NAS Update";
-          auth_basic_user_file /etc/nas-update/htpasswd;
           fastcgi_pass unix:/run/fcgiwrap-nas-update.sock;
           fastcgi_param SCRIPT_FILENAME ${lib.getExe statusCgi};
           fastcgi_param REQUEST_METHOD $request_method;

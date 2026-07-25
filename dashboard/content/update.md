@@ -3,14 +3,16 @@ title: Update
 ---
 
 <p class="text-gray-700 dark:text-gray-300 mb-8 leading-relaxed">
-  Checks GitHub for a newer tagged release and, if you confirm, fetches it
-  and rebuilds the system in place. Requires the admin password &mdash;
-  ask whoever manages this NAS if you don't have it.
+  The current and latest available version are always shown below to
+  anyone who can reach this dashboard. Actually applying an update &mdash;
+  fetching the new release and rebuilding the system in place &mdash;
+  needs the admin password. Ask whoever manages this NAS if you don't
+  have it.
 </p>
 
 <div class="max-w-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6 mb-8">
   <label for="admin-password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Admin password</label>
-  <input type="password" id="admin-password" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4" placeholder="Required to check or apply updates" />
+  <input type="password" id="admin-password" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4" placeholder="Only needed to apply an update" />
 
   <div id="update-info" class="mb-4 text-sm text-gray-700 dark:text-gray-300">
     <p>Current version: <span id="current-version" class="font-mono">&mdash;</span></p>
@@ -76,13 +78,8 @@ title: Update
   }
 
   function checkNow() {
-    if (!passwordEl.value) {
-      showMessage("Enter the admin password first.", "error");
-      return;
-    }
-    fetch("/update/status", { headers: { Authorization: authHeader() }, cache: "no-store" })
+    fetch("/update/status", { cache: "no-store" })
       .then(function (r) {
-        if (r.status === 401) { throw new Error("Wrong password."); }
         if (!r.ok) { throw new Error("Update service returned an error (HTTP " + r.status + ")."); }
         return r.json();
       })
@@ -119,6 +116,10 @@ title: Update
   checkBtn.addEventListener("click", checkNow);
 
   updateBtn.addEventListener("click", function () {
+    if (!passwordEl.value) {
+      showMessage("Enter the admin password first.", "error");
+      return;
+    }
     if (!confirm("This rebuilds the system in place. It can take several minutes and services may briefly restart. Continue?")) {
       return;
     }
@@ -135,5 +136,7 @@ title: Update
         setUpdateEnabled(true);
       });
   });
+
+  checkNow();
 })();
 </script>
