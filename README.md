@@ -15,3 +15,6 @@ and a list of `CHANGEME` placeholders that need real values before deploying.
 - [docs/HOME-ASSISTANT.md](docs/HOME-ASSISTANT.md) — Home Assistant setup:
   HACS, Z-Wave JS, Mosquitto, the config-directory Samba share, and how to
   extend it further.
+- [docs/INSTALLER.md](docs/INSTALLER.md) — the self-contained installer
+  ISO: a TUI wizard for provisioning a *new* NAS (blank disks or an
+  existing pool to adopt), building/flashing it, and what it automates.
