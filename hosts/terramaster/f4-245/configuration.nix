@@ -1,28 +1,7 @@
-{ beardedtekInitialHash, dyoungInitialHash, rootInitialHash, ... }:
-
 {
   system.stateVersion = "26.05";
 
-  networking.hostName = "young";
   networking.hostId = "975edc0d";
-
-  mySystem.contactInfo = [
-    {
-      label = "Tech Support";
-      email = "support@beardedtek.com";
-      phone = "9075198577";
-    }
-    {
-      label = "Sales";
-      email = "sales@beardedtek.com";
-      phone = "9075198577";
-    }
-    {
-      label = "Customer Support";
-      email = "help@beardedtek.com";
-      phone = "9075198577";
-    }
-  ];
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -103,37 +82,4 @@
       "/etc/ssh/ssh_host_ed25519_key.pub"
     ];
   };
-
-  users.mutableUsers = true;
-
-  assertions = [
-    {
-      assertion = beardedtekInitialHash != "";
-      message = "BEARDEDTEK_INITIAL_HASH is empty — source secrets/initial-passwords.env before building";
-    }
-    {
-      assertion = dyoungInitialHash != "";
-      message = "DYOUNG_INITIAL_HASH is empty — source secrets/initial-passwords.env before building";
-    }
-    {
-      assertion = rootInitialHash != "";
-      message = "ROOT_INITIAL_HASH is empty — source secrets/initial-passwords.env before building";
-    }
-  ];
-
-  users.users.root.initialHashedPassword = rootInitialHash;
-
-  users.users.beardedtek = {
-    isNormalUser = true;
-    extraGroups = [ "wheel" ];
-    initialHashedPassword = beardedtekInitialHash;
-  };
-
-  users.users.dyoung = {
-    isNormalUser = true;
-    extraGroups = [ "wheel" ];
-    initialHashedPassword = dyoungInitialHash;
-  };
-
-  security.sudo.wheelNeedsPassword = true;
 }

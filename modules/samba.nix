@@ -1,13 +1,16 @@
-{ config, ... }:
+{ config, lib, ... }:
 
+let
+  hostName = config.networking.hostName;
+in
 {
   services.samba = {
     enable = true;
     settings = {
       global = {
-        workgroup = "YOUNG";
-        "server string" = "young";
-        "netbios name" = "young";
+        workgroup = lib.toUpper hostName;
+        "server string" = hostName;
+        "netbios name" = hostName;
         security = "user";
         "server min protocol" = "SMB2";
         "map to guest" = "never";
@@ -28,13 +31,7 @@
         "valid users" = "beardedtek dyoung";
         "admin users" = "beardedtek";
       };
-
-      # modules/home-assistant.nix's config dir (/var/lib/hass, owned by
-      # the "hass" system user) — "force user"/"force group" so file
-      # operations through this share happen as "hass" regardless of
-      # which Samba user connected, rather than needing beardedtek/dyoung
-      # added to that system user's group just to edit configuration.yaml
-      # from a PC.
+    } // lib.optionalAttrs config.mySystem.features.homeAssistant.enable {
       hass = {
         path = "/var/lib/hass";
         browseable = "yes";

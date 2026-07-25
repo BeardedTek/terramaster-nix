@@ -5,6 +5,70 @@ this way. `docs/DEPLOYMENT.md` is the step-by-step install procedure;
 `docs/TROUBLESHOOTING.md` is the catalog of failure modes hit (and fixed)
 while bringing this box up. This doc is the "why" in between.
 
+## `variables.nix`
+
+The one file to edit for host-level tuning — hostname, contact info, and
+which service groups/services are enabled. Imported as a plain module in
+`flake.nix`, same as any other file under `modules/`.
+
+- **`networking.hostName`**: the single source of truth for the box's
+  name. `modules/traefik.nix`, `modules/frigate.nix`, and
+  `modules/samba.nix` all read `config.networking.hostName` rather than
+  hardcoding it, so changing it here actually renames every proxied
+  domain (`<service>.<hostname>.beardedtek.com`,
+  `<service>-<hostname>.nebula.beardedtek.com`), Frigate's own vhost, and
+  the Samba server string/NetBIOS name/workgroup, consistently. It does
+  **not** touch the ZFS-import-critical `networking.hostId` (a separate,
+  arbitrary identifier — see "ZFS dataset map" below) or anything in the
+  Hugo dashboard's static prose (`dashboard/content/*.md`'s Samba/NFS
+  pages still say "young" and list fixed IPs directly, since those are
+  plain markdown, not templated).
+- **`mySystem.contactInfo`**: unchanged from before, just relocated here.
+- **`mySystem.features`**: enable/disable each service, declared in
+  `modules/common.nix`'s options and consumed by each service's own
+  module. Two levels: a **group** toggle (`homeAssistant.enable`,
+  `mediaAcquisition.enable`) that fully turns off everything in that
+  group, and **per-service** toggles underneath that only matter while
+  their group is on:
+  ```nix
+  mySystem.features = {
+    jellyfin.enable = true;
+    frigate.enable = true;
+    homeAssistant = {
+      enable = true;       # Home Assistant + its Mosquitto broker + its Samba share
+      zwave.enable = false; # no dongle attached yet
+      hacs.enable = true;
+    };
+    mediaAcquisition = {
+      enable = true;        # Seerr, Radarr, Sonarr, Jackett, qBittorrent
+      seerr.enable = true;
+      radarr.enable = true;
+      sonarr.enable = true;
+      jackett.enable = true;
+      qbittorrent.enable = true;
+    };
+  };
+  ```
+  Turning a service off is fully inert, not just "the process doesn't
+  run": its Traefik routers/backend service disappear from
+  `modules/traefik.nix`'s dynamic config, it drops out of
+  `mySystem.serviceBackends` (so `modules/dashboard.nix`'s metrics script
+  stops polling its port and its dashboard tile hides itself — see
+  `dashboard/content/services.md`'s `applyStatus()`), and its per-service
+  firewall rule (declared in each service's own module) never gets added.
+  Disabling the whole `homeAssistant` group also drops the Samba `hass`
+  share (`modules/samba.nix`) and the Mosquitto broker, since both exist
+  only to support it. Persistence directories
+  (`environment.persistence."/persist".directories` in
+  `hosts/terramaster/f4-245/configuration.nix`) are left listed regardless of any
+  toggle — harmless if the directory never gets created, and one less
+  thing to keep in sync by hand.
+  Every module implements this the same way: gate the whole file's
+  `config` under `lib.mkIf <group>.enable`, then `lib.mkMerge` in
+  sub-toggle-specific blocks under `lib.mkIf <group>.<sub>.enable` for
+  anything that's separately switchable (`modules/home-assistant.nix`'s
+  HACS install service is the clearest example — see its `mkMerge` list).
+
 ## Hardware
 
 TerraMaster F4-245: 4-bay NAS, Intel N-series CPU (QuickSync-capable, iHD
@@ -16,7 +80,7 @@ internal USB slot used as the boot/system drive.
 ### The `rust` pool is pre-existing and untouched by disko
 
 `rust` (RAIDZ1 across the 4 HDDs) already existed before this flake, with
-data already on it. `hosts/young/disko.nix` only ever partitions the
+data already on it. `hosts/terramaster/f4-245/disko.nix` only ever partitions the
 **256GB USB drive** (a single ESP, vfat, mounted `/boot`) — there is no
 disko config for the 4 HDDs at all, on purpose. `rust` is *imported*, never
 created or formatted. If disko ever grows a config block referencing any
@@ -35,7 +99,7 @@ Two new ZFS datasets carry everything else:
 
 The [`nix-community/impermanence`](https://github.com/nix-community/impermanence)
 module (`environment.persistence."/persist"` in
-`hosts/young/configuration.nix`) bind-mounts specific paths from `/persist`
+`hosts/terramaster/f4-245/configuration.nix`) bind-mounts specific paths from `/persist`
 back onto the tmpfs root at boot. Anything not explicitly listed there is
 gone on every reboot.
 
@@ -57,7 +121,7 @@ mount shadows/orphans whatever was already nested inside the first one.
 
 Every dataset this config references via `fileSystems.*` — including the
 pool's own top-level `rust` dataset (`fileSystems."/rust"` in
-`hosts/young/configuration.nix`), not just its children — must be
+`hosts/terramaster/f4-245/configuration.nix`), not just its children — must be
 `mountpoint=legacy`. See `docs/TROUBLESHOOTING.md` for the exact failure
 signatures this produces when missed, and `docs/DEPLOYMENT.md` step 3 for
 the one-time `zfs set` commands.
@@ -81,7 +145,7 @@ All mounted `fsType = "zfs"`, all `mountpoint=legacy` on the pool side.
 
 ## What's persisted, and why
 
-`environment.persistence."/persist"` in `hosts/young/configuration.nix`
+`environment.persistence."/persist"` in `hosts/terramaster/f4-245/configuration.nix`
 lists two kinds of paths:
 
 **Whole directories** (`directories = [...]`): each service's state dir
@@ -102,17 +166,29 @@ Seerr, qBittorrent, Traefik), plus:
 
 ## Users and passwords
 
-Three accounts: `root`, `beardedtek` (admin), `dyoung` (share access) —
-both `beardedtek` and `dyoung` have `wheel` (sudo, password-required via
-`security.sudo.wheelNeedsPassword = true`). Neither has Samba access
-extended to `root`.
+Accounts are data, not code: `variables.nix` lists who exists —
 
-`users.mutableUsers = true` plus `initialHashedPassword` for all three
-accounts is a deliberate, specific choice, not the default pattern most
-NixOS configs use. The requirement was: passwords provided as out-of-repo
-secrets, but genuinely self-service changeable via `passwd` afterward,
-persisting across future rebuilds. Reading NixOS's actual activation
-script (`update-users-groups.pl`) confirmed `mutableUsers = false`
+```nix
+mySystem.users = [
+  { name = "beardedtek"; wheel = true; }
+  { name = "dyoung"; wheel = true; }
+];
+```
+
+— and `modules/users.nix` (implementing `options.mySystem.users` from
+`modules/common.nix`) turns that list into real `users.users.*` entries,
+`root` included implicitly (not part of the list, always created).
+Adding, removing, or changing who has `wheel` (sudo, password-required via
+`security.sudo.wheelNeedsPassword = true`, also set in `modules/users.nix`)
+is a `variables.nix` edit, not a `hosts/*/configuration.nix` one. Neither
+account has Samba access extended to `root`.
+
+`users.mutableUsers = true` plus `initialHashedPassword` per account is a
+deliberate, specific choice, not the default pattern most NixOS configs
+use. The requirement was: passwords provided as out-of-repo secrets, but
+genuinely self-service changeable via `passwd` afterward, persisting
+across future rebuilds. Reading NixOS's actual activation script
+(`update-users-groups.pl`) confirmed `mutableUsers = false`
 unconditionally re-locks/reasserts the configured password on *every*
 activation, regardless of `hashedPasswordFile`, `userborn`, or any custom
 activation script workaround — there's no way to get both "out-of-repo
@@ -123,10 +199,14 @@ is permanently theirs. The tradeoff: this value can't be used to
 force-rotate a password later by editing config — once the account exists,
 it's inert for that account.
 
-The three hashes (`BEARDEDTEK_INITIAL_HASH`, `DYOUNG_INITIAL_HASH`,
-`ROOT_INITIAL_HASH`) come from `secrets/initial-passwords.env` via
-`builtins.getEnv` in `flake.nix`'s `specialArgs` — never committed, and
-only readable under impure evaluation. See `docs/DEPLOYMENT.md`.
+Each account's hash comes from the environment variable
+`<NAME_UPPERCASE>_INITIAL_HASH` (`modules/users.nix` reads it via
+`builtins.getEnv`, deriving the variable name from `mySystem.users`
+automatically — adding a user to the list needs no matching edit anywhere
+else) — sourced from `secrets/initial-passwords.env`, never committed, and
+only readable under impure evaluation. `modules/users.nix` also generates
+one assertion per account (including `root`) that fails the build early
+with a clear message if its hash is empty. See `docs/DEPLOYMENT.md`.
 
 `beardedtek`'s real SSH public key is likewise never committed — delivered
 straight to `/home/beardedtek/.ssh/authorized_keys` via
@@ -276,9 +356,9 @@ backend uses.
   existed for routing) and read back in `modules/dashboard.nix` — same
   pattern as `mySystem.lanInterface`.
 - **Admin contact info** (`options.mySystem.contactInfo`, `modules/common.nix`):
-  a list of `{ label, email, phone }` entries, set per-host in
-  `hosts/young/configuration.nix` rather than hardcoded into the Hugo
-  content. `modules/dashboard.nix` serializes it to `data/contact.json`
+  a list of `{ label, email, phone }` entries, set in `variables.nix`
+  rather than hardcoded into the Hugo content.
+  `modules/dashboard.nix` serializes it to `data/contact.json`
   and copies it into the Hugo source tree at build time (Hugo auto-loads
   any `data/*.json` as `.Site.Data.contact`), read by
   `dashboard/layouts/partials/contact-info.html` — shared by the footer

@@ -17,17 +17,14 @@
     {
       nixosConfigurations.young = nixpkgs.lib.nixosSystem {
         inherit system;
-        specialArgs = {
-          beardedtekInitialHash = builtins.getEnv "BEARDEDTEK_INITIAL_HASH";
-          dyoungInitialHash = builtins.getEnv "DYOUNG_INITIAL_HASH";
-          rootInitialHash = builtins.getEnv "ROOT_INITIAL_HASH";
-        };
         modules = [
           disko.nixosModules.disko
           impermanence.nixosModules.impermanence
-          ./hosts/young/disko.nix
-          ./hosts/young/configuration.nix
+          ./hosts/terramaster/f4-245/disko.nix
+          ./hosts/terramaster/f4-245/configuration.nix
+          ./variables.nix
           ./modules/common.nix
+          ./modules/users.nix
           ./modules/zfs.nix
           ./modules/samba.nix
           ./modules/nfs.nix

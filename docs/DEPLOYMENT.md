@@ -20,7 +20,7 @@ Nothing below will work until these are real values.
 
 | File | Placeholder | Replace with |
 |---|---|---|
-| `hosts/young/disko.nix` | `CHANGEME-usb-boot-drive` | the USB drive's `/dev/disk/by-id/...` path — you can't know this until step 2 |
+| `hosts/terramaster/f4-245/disko.nix` | `CHANGEME-usb-boot-drive` | the USB drive's `/dev/disk/by-id/...` path — you can't know this until step 2 |
 | `modules/common.nix` | `mySystem.lanInterface` default, `"CHANGEME-lan-if"` | your LAN interface name, e.g. `eno1` — found in step 2. Single source of truth: both `samba.nix` and `nfs.nix` read it from here. |
 
 There's no LAN CIDR to fill in for NFS — `nfs.nix` detects whatever
@@ -38,17 +38,17 @@ never show these as trackable):**
 |---|---|
 | `secrets/extra-files/persist/etc/nebula/config.yaml` | already in place — your real Nebula config, CA/cert/key embedded. Lives under `persist/` (not `etc/`) because `--extra-files` writes directly onto whatever's mounted under `/mnt` during install (step 4b) — `/mnt/persist` is the real `rust/persist` dataset at that point, `/mnt/etc` is not (it's ephemeral install-scratch space, gone by first boot, well before impermanence's `/etc/nebula` bind-mount from `/persist/etc/nebula` even exists to shadow it) |
 | `secrets/extra-files/home/beardedtek/.ssh/authorized_keys` | copy `authorized_keys.example` in the same folder, drop in your real public key, drop the `.example` suffix |
-| `secrets/initial-passwords.env` | copy `initial-passwords.env.example`, fill in real `mkpasswd -m sha-512` output for `BEARDEDTEK_INITIAL_HASH`, `DYOUNG_INITIAL_HASH`, `ROOT_INITIAL_HASH` |
+| `secrets/initial-passwords.env` | copy `initial-passwords.env.example`, fill in real `mkpasswd -m sha-512` output for `ROOT_INITIAL_HASH` plus one `<NAME_UPPERCASE>_INITIAL_HASH` per entry in `variables.nix`'s `mySystem.users` (currently `BEARDEDTEK_INITIAL_HASH`, `DYOUNG_INITIAL_HASH`) |
 | `secrets/extra-files/persist/etc/traefik/traefik.env` | copy `traefik.env.example` in the same folder, fill in the real Linode API token as `LINODE_TOKEN` — used for the DNS-01 challenge in `modules/traefik.nix` |
 
 Everything under `secrets/extra-files/` mirrors the target's filesystem
 1:1 (e.g. `secrets/extra-files/etc/nebula/config.yaml` → `/etc/nebula/config.yaml`
 on the deployed box). One `--extra-files` flag copies the whole tree at
 once (step 5). `secrets/initial-passwords.env` is different — it's read
-locally at *build* time (`builtins.getEnv`, via `flake.nix`'s
-`specialArgs`), not delivered to the target at all, so **every** command
-that builds or deploys `young` (steps 4c below, and any later
-`nixos-rebuild switch --target-host ...`) needs both of:
+locally at *build* time (`modules/users.nix`, `builtins.getEnv` per name
+in `mySystem.users` plus `root`), not delivered to the target at all, so
+**every** command that builds or deploys `young` (steps 4c below, and any
+later `nixos-rebuild switch --target-host ...`) needs both of:
 
 ```sh
 set -a; source secrets/initial-passwords.env; set +a
@@ -101,7 +101,7 @@ ls -la /dev/disk/by-id/     # → the internal USB drive's stable id
 ip link                     # → the real LAN interface name
 ```
 
-Go back and fill in the `CHANGEME` values in `hosts/young/disko.nix` and
+Go back and fill in the `CHANGEME` values in `hosts/terramaster/f4-245/disko.nix` and
 `modules/common.nix` with what you just found. The temporary root password
 only matters for the SSH connections in steps 3–4 — it doesn't carry over
 to the installed system (`beardedtek`'s real key, delivered separately in
@@ -119,7 +119,7 @@ Still on the live installer, over SSH (or at the console):
 ```sh
 # rust was last imported under a different host's ZFS hostid. Stamp this
 # session's hostid to match what `young` will use (networking.hostId in
-# hosts/young/configuration.nix) BEFORE importing, so the import "sticks" —
+# hosts/terramaster/f4-245/configuration.nix) BEFORE importing, so the import "sticks" —
 # otherwise it comes up mismatched again on first real boot too.
 zgenhostid 975edc0d
 zpool import -f rust

@@ -2,10 +2,11 @@
 
 let
   lanIf = config.mySystem.lanInterface;
+  hostName = config.networking.hostName;
   backends = config.mySystem.serviceBackends; # set by modules/traefik.nix
 
   # Generated from mySystem.contactInfo (set per-host, e.g.
-  # hosts/young/configuration.nix) rather than hardcoded into the Hugo
+  # hosts/terramaster/f4-245/configuration.nix) rather than hardcoded into the Hugo
   # content itself — Hugo auto-loads any data/*.json file as
   # .Site.Data.contact, read by dashboard/layouts/partials/contact-info.html
   # (shared by the footer and the Help page's {{< contact >}} shortcode).
@@ -121,12 +122,13 @@ let
         )})
 
       jq -n --arg generated_at "$(date -Is)" \
+            --arg host "${hostName}" \
             --argjson disks "$disks" \
             --argjson load "$load" \
             --argjson memory "$memory" \
             --argjson network "$network" \
             --argjson services "$services" \
-            '{generated_at:$generated_at, disks:$disks, load:$load, memory:$memory, network:$network, services:$services}' \
+            '{generated_at:$generated_at, host:$host, disks:$disks, load:$load, memory:$memory, network:$network, services:$services}' \
             > "$tmp"
 
       chmod 644 "$tmp"

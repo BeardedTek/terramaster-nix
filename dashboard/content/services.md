@@ -130,22 +130,20 @@ title: Services
   var host = window.location.hostname;
   var onNebula = host.indexOf(".nebula.") !== -1;
   var onLocalPath = window.location.port === "8090";
-  if (!onLocalPath) {
-    document.querySelectorAll("#service-grid a[data-service]").forEach(function (a) {
-      var name = a.getAttribute("data-service");
-      var target = onNebula
-        ? name + "-young.nebula.beardedtek.com"
-        : name + ".young.beardedtek.com";
-      a.href = "https://" + target + "/";
-    });
-  }
 
-  function applyStatus(services) {
-    (services || []).forEach(function (s) {
+  function applyStatus(data) {
+    var names = {};
+    (data.services || []).forEach(function (s) {
+      names[s.name] = true;
       var card = document.querySelector('#service-grid a[data-service="' + s.name + '"]');
       if (!card) return;
       if (onLocalPath && s.port) {
         card.href = "http://" + host + ":" + s.port + "/";
+      } else if (data.host) {
+        var target = onNebula
+          ? s.name + "-" + data.host + ".nebula.beardedtek.com"
+          : s.name + "." + data.host + ".beardedtek.com";
+        card.href = "https://" + target + "/";
       }
       var badge = card.querySelector(".status-badge");
       var dot = card.querySelector(".status-dot");
@@ -162,12 +160,15 @@ title: Services
         if (text) text.textContent = "OFFLINE";
       }
     });
+    document.querySelectorAll("#service-grid a[data-service]").forEach(function (a) {
+      a.style.display = names[a.getAttribute("data-service")] ? "" : "none";
+    });
   }
 
   function refresh() {
     fetch("/metrics.json", { cache: "no-store" })
       .then(function (r) { return r.json(); })
-      .then(function (data) { applyStatus(data.services); })
+      .then(applyStatus)
       .catch(function () {});
   }
 

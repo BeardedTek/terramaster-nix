@@ -8,8 +8,14 @@ is instead wired up as its own native NixOS service or a small piece of
 plumbing around `services.home-assistant`, in `modules/home-assistant.nix`
 (plus one line in `modules/samba.nix` for the share).
 
+The whole group (Home Assistant + Mosquitto + the Samba share), plus HACS
+and Z-Wave individually, are on/off switches in `variables.nix` — see
+`docs/ARCHITECTURE.md`'s "`variables.nix`" section.
+
 - **Nebula**: `https://hass-young.nebula.beardedtek.com`
 - **LAN**: `https://hass.young.beardedtek.com`
+  (`young` here is `networking.hostName`, set once in `variables.nix` —
+  see `docs/ARCHITECTURE.md`'s "`variables.nix`" section)
 - Direct, without Traefik: `http://192.168.3.181:8123` (LAN) or
   `http://10.100.0.17:8123` (Nebula) — opened on both interfaces
   alongside the proxied domains above, same posture as Jellyfin/Sonarr
@@ -74,29 +80,27 @@ reproducible-build model, so nixpkgs doesn't ship it. Instead:
 
 ## Z-Wave JS — disabled until a dongle is attached
 
-`services.zwave-js.enable = false` right now. Its `serialPort` option has
-no sane default, and the service would just fail to start without a real
-USB device path — there was no Z-Wave dongle physically attached to
-`young` when this was set up.
+`mySystem.features.homeAssistant.zwave.enable = false` in `variables.nix`
+right now. `modules/home-assistant.nix`'s `serialPort` has no sane
+default, and the service would just fail to start without a real USB
+device path — there was no Z-Wave dongle physically attached to `young`
+when this was set up.
 
 **Once the dongle is attached:**
 
 1. On the box: `ls /dev/serial/by-id/` — find its stable device path
    (don't use a bare `/dev/ttyUSB0`-style path; USB enumeration order
    isn't guaranteed across reboots, same reasoning as the boot drive's
-   `by-id` path in `hosts/young/disko.nix`).
-2. In `modules/home-assistant.nix`, set:
-   ```nix
-   services.zwave-js = {
-     enable = true;
-     serialPort = "/dev/serial/by-id/<the-real-path>";
-   };
-   ```
-3. Redeploy. Home Assistant's `zwave_js` component is already included
-   (`extraComponents`), so once the zwave-js-server is actually running,
-   add the "Z-Wave JS" integration through Settings → Devices & Services —
-   it should find the local server automatically (`localhost:3000`, the
-   module's default `port`).
+   `by-id` path in `hosts/terramaster/f4-245/disko.nix`).
+2. In `modules/home-assistant.nix`, replace the placeholder
+   `serialPort = "/dev/ttyUSB0";` with the real `by-id` path.
+3. In `variables.nix`, set `mySystem.features.homeAssistant.zwave.enable
+   = true;`.
+4. Redeploy. Home Assistant's `zwave_js` component gets added to
+   `extraComponents` automatically once the flag above is on, so once the
+   zwave-js-server is actually running, add the "Z-Wave JS" integration
+   through Settings → Devices & Services — it should find the local
+   server automatically (`localhost:3000`, the module's default `port`).
 
 ## Mosquitto (MQTT broker)
 
@@ -145,7 +149,7 @@ Samba section — just pick `hass` instead of `media`/`data`.
 state, `custom_components/`, its own SQLite recorder database, etc.) and
 `/var/lib/mosquitto` (retained messages, its persistence database) are
 both in `environment.persistence."/persist".directories`
-(`hosts/young/configuration.nix`) — full state survives every reboot
+(`hosts/terramaster/f4-245/configuration.nix`) — full state survives every reboot
 despite the tmpfs root, same as every other stateful service here.
 
 ## No build-time config validator
@@ -172,4 +176,4 @@ adding to `services.home-assistant.extraComponents` in
 the URL of its page under
 [home-assistant.io/integrations](https://www.home-assistant.io/integrations/)
 (e.g. `https://www.home-assistant.io/integrations/ffmpeg/` → `"ffmpeg"`).
-Currently just `["mqtt" "zwave_js"]`.
+Currently just `"mqtt"` plus `"zwave_js"` when the Z-Wave toggle above is on.

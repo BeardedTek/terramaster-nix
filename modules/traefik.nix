@@ -2,6 +2,8 @@
 
 let
   lanIf = config.mySystem.lanInterface;
+  hostName = config.networking.hostName;
+  f = config.mySystem.features;
 
   backends = {
     jellyfin = 8096;
@@ -13,6 +15,19 @@ let
     frigate = 8098;
     hass = 8123;
   };
+
+  backendEnabled = {
+    jellyfin = f.jellyfin.enable;
+    frigate = f.frigate.enable;
+    hass = f.homeAssistant.enable;
+    sonarr = f.mediaAcquisition.enable && f.mediaAcquisition.sonarr.enable;
+    radarr = f.mediaAcquisition.enable && f.mediaAcquisition.radarr.enable;
+    jackett = f.mediaAcquisition.enable && f.mediaAcquisition.jackett.enable;
+    seerr = f.mediaAcquisition.enable && f.mediaAcquisition.seerr.enable;
+    qbittorrent = f.mediaAcquisition.enable && f.mediaAcquisition.qbittorrent.enable;
+  };
+
+  enabledBackends = lib.filterAttrs (name: _: backendEnabled.${name}) backends;
 
   nebulaTls = {
     certResolver = "dns01-nebula";
@@ -28,22 +43,22 @@ let
     certResolver = "dns01-nebula";
     domains = [
       {
-        main = "young.beardedtek.com";
-        sans = [ "*.young.beardedtek.com" ];
+        main = "${hostName}.beardedtek.com";
+        sans = [ "*.${hostName}.beardedtek.com" ];
       }
     ];
   };
 
   routersFor = name: extraMiddlewares: {
-    "${name}-young-nebula" = {
-      rule = "Host(`${name}-young.nebula.beardedtek.com`)";
-      service = "${name}-young";
+    "${name}-${hostName}-nebula" = {
+      rule = "Host(`${name}-${hostName}.nebula.beardedtek.com`)";
+      service = "${name}-${hostName}";
       entryPoints = [ "https" ];
       tls = nebulaTls;
     } // (lib.optionalAttrs (extraMiddlewares != [ ]) { middlewares = extraMiddlewares; });
-    "${name}-young-lan" = {
-      rule = "Host(`${name}.young.beardedtek.com`)";
-      service = "${name}-young";
+    "${name}-${hostName}-lan" = {
+      rule = "Host(`${name}.${hostName}.beardedtek.com`)";
+      service = "${name}-${hostName}";
       entryPoints = [ "https" ];
       tls = lanTls;
     } // (lib.optionalAttrs (extraMiddlewares != [ ]) { middlewares = extraMiddlewares; });
@@ -95,15 +110,15 @@ in
       http.routers = (lib.foldl' (
         acc: name:
         acc // (routersFor name (lib.optionals (name == "qbittorrent") [ "qb-headers" ]))
-      ) { } (builtins.attrNames backends)) // {
-        young-nebula = {
-          rule = "Host(`young.nebula.beardedtek.com`)";
+      ) { } (builtins.attrNames enabledBackends)) // {
+        "${hostName}-nebula" = {
+          rule = "Host(`${hostName}.nebula.beardedtek.com`)";
           service = "dashboard";
           entryPoints = [ "https" ];
           tls = nebulaTls;
         };
-        young-lan = {
-          rule = "Host(`young.beardedtek.com`)";
+        "${hostName}-lan" = {
+          rule = "Host(`${hostName}.beardedtek.com`)";
           service = "dashboard";
           entryPoints = [ "https" ];
           tls = lanTls;
@@ -118,16 +133,17 @@ in
 
       http.services = (lib.mapAttrs' (
         name: port:
-        lib.nameValuePair "${name}-young" {
+        lib.nameValuePair "${name}-${hostName}" {
           loadBalancer.servers = [ { url = "http://127.0.0.1:${toString port}"; } ];
         }
-      ) backends) // {
+      ) enabledBackends) // {
         dashboard.loadBalancer.servers = [ { url = "http://127.0.0.1:8097"; } ];
-        qbittorrent-young.loadBalancer = {
+      } // (lib.optionalAttrs (enabledBackends ? qbittorrent) {
+        "qbittorrent-${hostName}".loadBalancer = {
           servers = [ { url = "http://127.0.0.1:${toString backends.qbittorrent}"; } ];
           passHostHeader = false;
         };
-      };
+      });
 
       http.middlewares.qb-headers.headers.customRequestHeaders = {
         X-Frame-Options = "SAMEORIGIN";
@@ -140,5 +156,5 @@ in
   networking.firewall.interfaces."nebula1".allowedTCPPorts = [ 80 443 8099 ];
   networking.firewall.interfaces.${lanIf}.allowedTCPPorts = [ 80 443 8099 8090 ];
 
-  mySystem.serviceBackends = backends;
+  mySystem.serviceBackends = enabledBackends;
 }

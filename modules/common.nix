@@ -18,6 +18,77 @@
     '';
   };
 
+  options.mySystem.features = {
+    jellyfin.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+    };
+    frigate.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+    };
+    homeAssistant = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Home Assistant, its Mosquitto broker, and its Samba share.";
+      };
+      zwave.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+      };
+      hacs.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+      };
+    };
+    mediaAcquisition = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Seerr, Radarr, Sonarr, Jackett, qBittorrent group.";
+      };
+      seerr.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+      };
+      radarr.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+      };
+      sonarr.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+      };
+      jackett.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+      };
+      qbittorrent.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+      };
+    };
+  };
+
+  options.mySystem.users = lib.mkOption {
+    type = lib.types.listOf (
+      lib.types.submodule {
+        options = {
+          name = lib.mkOption { type = lib.types.str; };
+          wheel = lib.mkOption { type = lib.types.bool; default = false; };
+        };
+      }
+    );
+    default = [ ];
+    description = ''
+      Normal user accounts to create (see variables.nix), implemented by
+      modules/users.nix. Each account's initial password hash comes from
+      the environment variable <NAME_UPPERCASE>_INITIAL_HASH — see
+      secrets/initial-passwords.env.example — never written into the repo.
+    '';
+  };
+
   options.mySystem.contactInfo = lib.mkOption {
     type = lib.types.listOf (
       lib.types.submodule {
@@ -39,11 +110,11 @@
     );
     default = [ ];
     description = ''
-      NAS admin contact entries, set per-host (e.g.
-      hosts/young/configuration.nix) — read by modules/dashboard.nix and
-      passed into the Hugo build as data/contact.json, so the same list
-      shows up in both the dashboard's footer and its Help page without
-      being hardcoded into the site content itself.
+      NAS admin contact entries, set in variables.nix — read by
+      modules/dashboard.nix and passed into the Hugo build as
+      data/contact.json, so the same list shows up in both the dashboard's
+      footer and its Help page without being hardcoded into the site
+      content itself.
     '';
   };
 
