@@ -77,7 +77,7 @@ let
   # the settled statusFile.
   applyScript = pkgs.writeShellApplication {
     name = "nas-update-apply";
-    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.gnutar pkgs.coreutils pkgs.nixos-rebuild ];
+    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.gnutar pkgs.gzip pkgs.coreutils pkgs.nixos-rebuild ];
     text = ''
       rm -f ${triggerFile}
       touch ${applyingFile}
@@ -167,10 +167,17 @@ let
   # ever opened the page.
   statusCgi = pkgs.writeShellApplication {
     name = "nas-update-status-cgi";
-    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils ];
+    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils pkgs.findutils ];
     text = ''
       printf 'Status: 200 OK\r\nContent-Type: application/json\r\n\r\n'
-      if [ -f ${applyingFile} ] && [ -f ${progressFile} ]; then
+      # Not just "is applyingFile still there" — a run that fails fast
+      # (confirmed the hard way: a bad PATH inside nas-update-apply made
+      # it fail in under a second) can finish and clean up applyingFile
+      # before the frontend's first poll ever lands, silently discarding
+      # the failure message. Also treat a progressFile written in the
+      # last 2 minutes as current, so a fast-finished run's result is
+      # still visible for a bit rather than only during the run itself.
+      if [ -f ${progressFile} ] && { [ -f ${applyingFile} ] || [ -n "$(find ${progressFile} -mmin -2 2>/dev/null)" ]; }; then
         cat ${progressFile}
         exit 0
       fi

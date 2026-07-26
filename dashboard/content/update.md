@@ -130,6 +130,7 @@ title: Update
         if (r.status === 401) { throw new Error("Wrong password."); }
         if (!r.ok) { throw new Error("Could not start the update."); }
         polling = setInterval(checkNow, 4000);
+        checkNow();
       })
       .catch(function (err) {
         showMessage(err.message || "Could not start the update.", "error");
