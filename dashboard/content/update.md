@@ -31,21 +31,15 @@ title: Update
     <button id="modal-close-x" type="button" class="hidden absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" aria-label="Close">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
     </button>
-
     <!-- Confirm view -->
     <div id="modal-confirm-view">
       <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Apply update?</h3>
-      <p class="text-sm text-gray-700 dark:text-gray-300 mb-6">
-        This fetches <span id="modal-confirm-version" class="font-mono"></span> and rebuilds the system
-        in place. It can take several minutes, and services may briefly
-        restart as part of activation.
-      </p>
+      <p class="text-sm text-gray-700 dark:text-gray-300 mb-6">This fetches <span id="modal-confirm-version" class="font-mono"></span> and rebuilds the system in place. It can take several minutes, and services may briefly restart as part of activation.</p>
       <div class="flex justify-end gap-2">
         <button id="modal-cancel-btn" type="button" class="text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600">Cancel</button>
         <button id="modal-confirm-btn" type="button" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Update now</button>
       </div>
     </div>
-
     <!-- Progress view -->
     <div id="modal-progress-view" class="hidden">
       <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Updating</h3>
@@ -55,7 +49,6 @@ title: Update
         <svg id="modal-icon-failed" class="hidden w-6 h-6 text-red-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         <span id="modal-status-text" class="text-sm text-gray-700 dark:text-gray-300">Starting...</span>
       </div>
-
       <button id="log-toggle-btn" type="button" class="flex items-center gap-1 text-sm text-primary-700 dark:text-primary-500 hover:underline mb-2">
         <svg id="log-toggle-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
         <span>Show details</span>
@@ -64,7 +57,6 @@ title: Update
         <div id="log-stages" class="text-xs text-gray-600 dark:text-gray-400 mb-2 space-y-0.5"></div>
         <pre id="log-build" class="bg-gray-900 text-gray-100 text-xs p-3 rounded-lg max-h-64 overflow-y-auto whitespace-pre-wrap break-all"></pre>
       </div>
-
       <div class="flex justify-end mt-4">
         <button id="modal-close-btn" type="button" class="hidden text-white bg-primary-700 hover:bg-primary-800 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700">Close</button>
       </div>
