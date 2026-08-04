@@ -34,12 +34,13 @@
     minio.enable = true;
     filebrowser.enable = true;
 
-    # Phase 1 of the SSO rollout: LLDAP alone, validated on its own
-    # before Authelia (sso.authelia.enable) layers forward-auth on top
-    # in Phase 2 — see the SSO plan. Nothing else changes yet: no
-    # service is in mySystem.sso.protectedServices, so this just stands
-    # the directory up and syncs mySystem.users into it.
+    # Phase 1 (LLDAP alone) validated on young. Phase 2: Authelia itself,
+    # forward-auth gating exactly one low-stakes test service (Sonarr —
+    # see modules/authelia.nix's candidateProtectedServices) to validate
+    # the redirect round trip and the shared-session-across-both-domain-
+    # shapes assumption before rolling out to the rest.
     sso.enable = true;
+    sso.authelia.enable = true;
 
     homeAssistant = {
       enable = true;

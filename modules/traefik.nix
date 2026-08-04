@@ -18,7 +18,12 @@ let
     minio = 9000;
     "minio-console" = 9001;
     files = 8095;
-    authelia = 9091;
+    # "auth", not "authelia": modules/authelia.nix's own
+    # session.cookies[0].authelia_url points at auth.${hostName}.${domain}
+    # (confirmed the hard way — a mismatched name here means Authelia
+    # redirects unauthenticated requests to a hostname with no router at
+    # all). Keep the two in sync if either changes.
+    auth = 9091;
   };
 
   backendEnabled = {
@@ -33,7 +38,7 @@ let
     minio = f.minio.enable;
     "minio-console" = f.minio.enable;
     files = f.filebrowser.enable;
-    authelia = f.sso.authelia.enable;
+    auth = f.sso.authelia.enable;
   };
 
   enabledBackends = lib.filterAttrs (name: _: backendEnabled.${name}) backends;
@@ -174,7 +179,7 @@ in
           # Authelia 4.38+'s ForwardAuth endpoint (confirmed against the
           # 4.39.20 package this flake's nixpkgs pin — nixos-26.05 —
           # actually ships); older Authelia used /api/verify instead.
-          address = "http://127.0.0.1:${toString backends.authelia}/api/authz/forward-auth";
+          address = "http://127.0.0.1:${toString backends.auth}/api/authz/forward-auth";
           trustForwardHeader = true;
           authResponseHeaders = [ "Remote-User" "Remote-Groups" "Remote-Name" "Remote-Email" ];
         };

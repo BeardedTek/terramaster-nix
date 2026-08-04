@@ -3,6 +3,16 @@
 let
   cfg = config.mySystem.features.minio;
   lanIf = config.mySystem.lanInterface;
+
+  # 9000 (S3 API) always stays open regardless — most S3 clients (rclone,
+  # s3cmd, etc.) can't participate in a browser-cookie SSO flow at all, so
+  # it was never a candidate for mySystem.sso.protectedServices in the
+  # first place. 9001 (the browser admin console) is exactly what
+  # "minio-console" in modules/authelia.nix's candidateProtectedServices
+  # is meant to gate — leaving it directly open would let anyone bypass
+  # that two_factor policy via http://<ip>:9001. See modules/media-stack.nix
+  # for the same pattern applied to the media-acquisition services.
+  consoleDirectlyReachable = !(config.mySystem.sso.protectedServices ? "minio-console");
 in
 {
   config = lib.mkIf cfg.enable {
@@ -40,7 +50,7 @@ in
     # dataDir/configDir path instead of an exports file.
     systemd.services.minio.unitConfig.RequiresMountsFor = [ "/rust/minio" ];
 
-    networking.firewall.interfaces."nebula1".allowedTCPPorts = [ 9000 9001 ];
-    networking.firewall.interfaces.${lanIf}.allowedTCPPorts = [ 9000 9001 ];
+    networking.firewall.interfaces."nebula1".allowedTCPPorts = [ 9000 ] ++ lib.optionals consoleDirectlyReachable [ 9001 ];
+    networking.firewall.interfaces.${lanIf}.allowedTCPPorts = [ 9000 ] ++ lib.optionals consoleDirectlyReachable [ 9001 ];
   };
 }

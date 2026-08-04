@@ -32,6 +32,15 @@ let
         id = "authelia";
         email = "authelia@${domain}";
         password_file = ldapPasswordFile;
+        # Without this, the account can bind fine but can only see its
+        # own entry — confirmed the hard way via a manual ldapsearch: a
+        # plain LLDAP user has no read access to the rest of the
+        # directory by default. lldap_strict_readonly is LLDAP's own
+        # built-in group for exactly this (a service account that needs
+        # to search/read everyone, not a full admin) — see bootstrap.sh's
+        # own protected-groups list (lldap_admin, lldap_password_manager,
+        # lldap_strict_readonly), which is where this name comes from.
+        groups = [ "lldap_strict_readonly" ];
       });
     }
   ];
@@ -62,7 +71,7 @@ let
   # at a time, phase by phase, once each has been click-tested.
   candidateProtectedServices = {
     sonarr = {
-      enable = false; # Phase 2 test service — flip once LLDAP+Authelia's shared-cookie-domain question is validated
+      enable = true; # Phase 2 test service
       policy = "one_factor";
     };
     radarr = { enable = false; policy = "one_factor"; };
@@ -113,15 +122,38 @@ in
           authelia_url = "https://auth.${hostName}.${domain}";
         }];
 
+        # implementation = "lldap" mainly relaxes validation for features
+        # LLDAP doesn't support (account expiration/lockout attributes) —
+        # it does NOT auto-populate users_filter/groups_filter/attributes
+        # the way I'd first assumed (confirmed the hard way: Authelia
+        # refused to start with "option 'users_filter' is required" even
+        # with implementation set). This is the exact block Authelia's
+        # own LLDAP integration docs recommend —
+        # https://www.authelia.com/integration/ldap/lldap/ — with our
+        # base_dn substituted in. ou=people/ou=groups are LLDAP's own
+        # fixed internal schema, not something lldap_config.toml
+        # configures, so they're safe to hardcode here.
         authentication_backend.ldap = {
+          implementation = "lldap";
           address = "ldap://127.0.0.1:3890";
           base_dn = baseDn;
+          additional_users_dn = "ou=people";
+          additional_groups_dn = "ou=groups";
           # Dedicated bind account, distinct from LLDAP's own bootstrap
           # admin — least-privilege, same "unprivileged dedicated user"
           # idiom self-update.nix's nas-update and filebrowser.nix's
           # filebrowser system users already use, just inside LLDAP's own
           # accounts rather than a Unix user.
           user = "uid=authelia,ou=people,${baseDn}";
+          username_attribute = "uid";
+          display_name_attribute = "cn";
+          mail_attribute = "mail";
+          group_name_attribute = "cn";
+          # {username_attribute}/{input}/{dn} are Authelia's own template
+          # placeholders (substituted by Authelia at runtime), not Nix
+          # interpolation — plain single braces, left untouched by Nix.
+          users_filter = "(&(|({username_attribute}={input})({mail_attribute}={input}))(objectClass=person))";
+          groups_filter = "(&(member={dn})(objectClass=groupOfNames))";
         };
 
         access_control = {
