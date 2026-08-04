@@ -71,14 +71,14 @@ let
   # at a time, phase by phase, once each has been click-tested.
   candidateProtectedServices = {
     sonarr = {
-      enable = true; # Phase 2 test service
+      enable = true; # Phase 2 test service, validated end-to-end on young
       policy = "one_factor";
     };
-    radarr = { enable = false; policy = "one_factor"; };
-    jackett = { enable = false; policy = "one_factor"; };
-    seerr = { enable = false; policy = "one_factor"; };
-    qbittorrent = { enable = false; policy = "one_factor"; }; # validate alongside the existing qb-headers middleware once flipped on
-    frigate = { enable = false; policy = "one_factor"; };
+    radarr = { enable = true; policy = "one_factor"; }; # Phase 3
+    jackett = { enable = true; policy = "one_factor"; }; # Phase 3
+    seerr = { enable = true; policy = "one_factor"; }; # Phase 3
+    qbittorrent = { enable = true; policy = "one_factor"; }; # Phase 3 — validate alongside the existing qb-headers middleware
+    frigate = { enable = true; policy = "one_factor"; }; # Phase 3
     "minio-console" = { enable = false; policy = "two_factor"; group = "admins"; };
   };
   protectedServices = lib.mapAttrs

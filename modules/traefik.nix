@@ -132,6 +132,7 @@ in
         acc // (routersFor name (
           (lib.optionals (name == "qbittorrent") [ "qb-headers" ])
           ++ (lib.optionals (protected ? ${name}) [ "authelia" ])
+          ++ (lib.optionals (name == "frigate" && protected ? frigate) [ "frigate-proxy-secret" ])
         ))
       ) { } (builtins.attrNames enabledBackends)) // {
         "${hostName}-nebula" = {
@@ -183,6 +184,14 @@ in
           trustForwardHeader = true;
           authResponseHeaders = [ "Remote-User" "Remote-Groups" "Remote-Name" "Remote-Email" ];
         };
+      }) // (lib.optionalAttrs (protected ? frigate) {
+        # Frigate's own docs: without this, anything that can reach its
+        # nginx vhost at all (not just Traefik) could forge
+        # Remote-User/Remote-Groups and get in — Frigate checks this
+        # header against its own settings.proxy.auth_secret
+        # (modules/frigate.nix), which must be the exact same value.
+        frigate-proxy-secret.headers.customRequestHeaders."X-Proxy-Secret" =
+          lib.removeSuffix "\n" (builtins.readFile "/persist/etc/frigate/proxy_auth_secret");
       });
     };
   };
