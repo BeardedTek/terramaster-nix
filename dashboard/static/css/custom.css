@@ -218,6 +218,27 @@
     margin-top: 0.125rem;
   }
 
+  /* max-w-lg (a plain bracket-free utility) is present in the vendored
+     bundle and worked fine, but there's no compiled utility for "2/3
+     of the viewport" and arbitrary-value syntax like max-h-[90vh]
+     doesn't work here either (same "not in the original site's
+     templates" gap) — plain CSS again rather than a second guess. */
+  .update-modal-panel {
+    max-width: 32rem;
+    max-height: 90vh;
+  }
+  @media (min-width: 1024px) {
+    .update-modal-panel {
+      max-width: 66vw;
+    }
+  }
+
+  /* bg-black/50 (opacity-modifier syntax) is also missing — the modal
+     backdrop was rendering with no dimming at all. */
+  .update-modal-overlay {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+
   .update-icon-failed {
     color: #dc2626;
   }
