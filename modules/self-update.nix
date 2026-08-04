@@ -12,8 +12,20 @@ let
   stagingDir = "/persist/nixos-update-staging";
   triggerFile = "/run/nas-update/trigger-update";
   applyingFile = "/run/nas-update/applying";
-  statusFile = "/var/lib/dashboard/update-status.json";
-  progressFile = "/var/lib/dashboard/update-progress.json";
+  # Under /run/nas-update (tmpfs, owned by the unprivileged nas-update
+  # user — see below), not /var/lib/dashboard: confirmed the hard way
+  # that nas-update-status-cgi, invoked via fcgiwrap as that user, can't
+  # write into /var/lib/dashboard at all (root:root 0755, from
+  # dashboard-metrics' own StateDirectory — readable, not writable, by
+  # anyone else). The write failed silently under this script's `set
+  # -e` *after* the CGI had already sent its 200 OK headers, so the
+  # client just got an empty body ("Unexpected end of JSON input") with
+  # no indication anything had gone wrong server-side. Same "no
+  # persistence across reboots, cheap to regenerate" posture
+  # metrics.json already uses, just a level up in /run instead of
+  # /var/lib.
+  statusFile = "/run/nas-update/update-status.json";
+  progressFile = "/run/nas-update/update-progress.json";
 
   # Shared between checkScript and the end of applyScript, so both ever
   # write the exact same {current, latest, updateAvailable, releaseUrl}
