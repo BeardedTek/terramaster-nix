@@ -3,6 +3,7 @@
 
   mySystem.manufacturer = "terramaster";
   mySystem.model = "young";
+  mySystem.domain = "beardedtek.com";
 
   mySystem.users = [
     { name = "beardedtek"; wheel = true; }
@@ -32,6 +33,13 @@
     frigate.enable = true;
     minio.enable = true;
     filebrowser.enable = true;
+
+    # Phase 1 of the SSO rollout: LLDAP alone, validated on its own
+    # before Authelia (sso.authelia.enable) layers forward-auth on top
+    # in Phase 2 — see the SSO plan. Nothing else changes yet: no
+    # service is in mySystem.sso.protectedServices, so this just stands
+    # the directory up and syncs mySystem.users into it.
+    sso.enable = true;
 
     homeAssistant = {
       enable = true;

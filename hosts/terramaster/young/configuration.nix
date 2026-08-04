@@ -81,6 +81,31 @@
       "/var/lib/filebrowser"
       "/etc/filebrowser"
       "/etc/nas-update"
+      "/etc/lldap"
+      # Not "/var/lib/lldap": modules/lldap.nix's services.lldap runs
+      # with DynamicUser = true, and systemd's own DynamicUser handling
+      # wants to own that path itself (rename it to /var/lib/private/lldap
+      # on first start, then symlink /var/lib/lldap back to it) —
+      # confirmed the hard way, that rename() fails with "Device or
+      # resource busy" when impermanence has already bind-mounted
+      # /var/lib/lldap from /persist. Persisting /var/lib/private itself
+      # (the parent, not just .../lldap) sidesteps the conflict: nothing
+      # else claims /var/lib/lldap, so systemd's own symlink dance
+      # proceeds normally, and lldap's subdirectory comes along for free
+      # since it lives inside the now-persisted parent.
+      #
+      # mode = "0700" matters and isn't the impermanence default (0755):
+      # systemd refuses to use /var/lib/private at all if it's more
+      # permissive than 0700 — confirmed the hard way, second failure
+      # after the path fix above ("mode 0755 that is too permissive
+      # (0700 was requested), refusing"). Also confirmed: impermanence
+      # only applies user/group/mode when *creating* a directory that
+      # doesn't yet exist in persistent storage — it won't retroactively
+      # fix one already created wrong, so a directory created before this
+      # change needs a manual `chmod 0700` once, not just this edit.
+      { directory = "/var/lib/private"; user = "root"; group = "root"; mode = "0700"; }
+      "/etc/authelia"
+      "/var/lib/authelia-main"
     ];
     files = [
       "/etc/machine-id"

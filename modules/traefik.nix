@@ -3,6 +3,7 @@
 let
   lanIf = config.mySystem.lanInterface;
   hostName = config.networking.hostName;
+  domain = config.mySystem.domain;
   f = config.mySystem.features;
 
   backends = {
@@ -17,6 +18,7 @@ let
     minio = 9000;
     "minio-console" = 9001;
     files = 8095;
+    authelia = 9091;
   };
 
   backendEnabled = {
@@ -31,16 +33,23 @@ let
     minio = f.minio.enable;
     "minio-console" = f.minio.enable;
     files = f.filebrowser.enable;
+    authelia = f.sso.authelia.enable;
   };
 
   enabledBackends = lib.filterAttrs (name: _: backendEnabled.${name}) backends;
+
+  # Set by modules/authelia.nix; read here to decide which backends get
+  # the `authelia` ForwardAuth middleware attached below — same
+  # "one file computes, another consumes" shape mySystem.serviceBackends
+  # already uses between this file and modules/dashboard.nix.
+  protected = config.mySystem.sso.protectedServices;
 
   nebulaTls = {
     certResolver = "dns01-nebula";
     domains = [
       {
-        main = "nebula.beardedtek.com";
-        sans = [ "*.nebula.beardedtek.com" ];
+        main = "nebula.${domain}";
+        sans = [ "*.nebula.${domain}" ];
       }
     ];
   };
@@ -49,21 +58,21 @@ let
     certResolver = "dns01-nebula";
     domains = [
       {
-        main = "${hostName}.beardedtek.com";
-        sans = [ "*.${hostName}.beardedtek.com" ];
+        main = "${hostName}.${domain}";
+        sans = [ "*.${hostName}.${domain}" ];
       }
     ];
   };
 
   routersFor = name: extraMiddlewares: {
     "${name}-${hostName}-nebula" = {
-      rule = "Host(`${name}-${hostName}.nebula.beardedtek.com`)";
+      rule = "Host(`${name}-${hostName}.nebula.${domain}`)";
       service = "${name}-${hostName}";
       entryPoints = [ "https" ];
       tls = nebulaTls;
     } // (lib.optionalAttrs (extraMiddlewares != [ ]) { middlewares = extraMiddlewares; });
     "${name}-${hostName}-lan" = {
-      rule = "Host(`${name}.${hostName}.beardedtek.com`)";
+      rule = "Host(`${name}.${hostName}.${domain}`)";
       service = "${name}-${hostName}";
       entryPoints = [ "https" ];
       tls = lanTls;
@@ -115,16 +124,19 @@ in
     dynamicConfigOptions = {
       http.routers = (lib.foldl' (
         acc: name:
-        acc // (routersFor name (lib.optionals (name == "qbittorrent") [ "qb-headers" ]))
+        acc // (routersFor name (
+          (lib.optionals (name == "qbittorrent") [ "qb-headers" ])
+          ++ (lib.optionals (protected ? ${name}) [ "authelia" ])
+        ))
       ) { } (builtins.attrNames enabledBackends)) // {
         "${hostName}-nebula" = {
-          rule = "Host(`${hostName}.nebula.beardedtek.com`)";
+          rule = "Host(`${hostName}.nebula.${domain}`)";
           service = "dashboard";
           entryPoints = [ "https" ];
           tls = nebulaTls;
         };
         "${hostName}-lan" = {
-          rule = "Host(`${hostName}.beardedtek.com`)";
+          rule = "Host(`${hostName}.${domain}`)";
           service = "dashboard";
           entryPoints = [ "https" ];
           tls = lanTls;
@@ -151,11 +163,22 @@ in
         };
       });
 
-      http.middlewares.qb-headers.headers.customRequestHeaders = {
-        X-Frame-Options = "SAMEORIGIN";
-        Referer = "";
-        Origin = "";
-      };
+      http.middlewares = {
+        qb-headers.headers.customRequestHeaders = {
+          X-Frame-Options = "SAMEORIGIN";
+          Referer = "";
+          Origin = "";
+        };
+      } // (lib.optionalAttrs f.sso.authelia.enable {
+        authelia.forwardAuth = {
+          # Authelia 4.38+'s ForwardAuth endpoint (confirmed against the
+          # 4.39.20 package this flake's nixpkgs pin — nixos-26.05 —
+          # actually ships); older Authelia used /api/verify instead.
+          address = "http://127.0.0.1:${toString backends.authelia}/api/authz/forward-auth";
+          trustForwardHeader = true;
+          authResponseHeaders = [ "Remote-User" "Remote-Groups" "Remote-Name" "Remote-Email" ];
+        };
+      });
     };
   };
 

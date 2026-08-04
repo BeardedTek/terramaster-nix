@@ -2,7 +2,8 @@
 
 let
   hostName = config.networking.hostName;
-  vhost = "frigate.${hostName}.beardedtek.com";
+  domain = config.mySystem.domain;
+  vhost = "frigate.${hostName}.${domain}";
 in
 {
   config = lib.mkIf config.mySystem.features.frigate.enable {
@@ -20,7 +21,7 @@ in
         { addr = "0.0.0.0"; port = 8098; }
         { addr = "[::]"; port = 8098; }
       ];
-      serverAliases = [ "frigate-${hostName}.nebula.beardedtek.com" ];
+      serverAliases = [ "frigate-${hostName}.nebula.${domain}" ];
     };
 
     networking.firewall.interfaces."nebula1".allowedTCPPorts = [ 8098 ];

@@ -48,6 +48,8 @@
           ./modules/minio.nix
           ./modules/filebrowser.nix
           ./modules/self-update.nix
+          ./modules/lldap.nix
+          ./modules/authelia.nix
         ];
       };
 

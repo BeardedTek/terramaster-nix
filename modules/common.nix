@@ -35,6 +35,18 @@
     description = "Set in variables.nix, alongside mySystem.manufacturer.";
   };
 
+  options.mySystem.domain = lib.mkOption {
+    type = lib.types.str;
+    description = ''
+      Set in variables.nix. The base domain every per-service hostname is
+      built from — modules/traefik.nix's LAN/Nebula routers
+      (<svc>.<hostName>.$domain, <svc>-<hostName>.nebula.$domain),
+      modules/frigate.nix's own vhost, and modules/lldap.nix /
+      modules/authelia.nix's LDAP base DN and session cookie domain all
+      derive from this one value instead of each hardcoding it separately.
+    '';
+  };
+
   options.mySystem.serviceBackends = lib.mkOption {
     type = lib.types.attrsOf lib.types.port;
     default = { };
@@ -43,6 +55,34 @@
       modules/traefik.nix and read by modules/dashboard.nix (for its
       per-service up/down checks) — avoids the two modules maintaining
       separate copies of the same list.
+    '';
+  };
+
+  options.mySystem.sso.protectedServices = lib.mkOption {
+    type = lib.types.attrsOf (
+      lib.types.submodule {
+        options = {
+          policy = lib.mkOption {
+            type = lib.types.enum [ "one_factor" "two_factor" ];
+            default = "one_factor";
+            description = "Authelia access_control policy for this service's Traefik routers.";
+          };
+          group = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Restrict to this LLDAP group only; null means any authenticated user.";
+          };
+        };
+      }
+    );
+    default = { };
+    description = ''
+      Set by modules/authelia.nix, keyed by the same names as
+      modules/traefik.nix's `backends` attrset. Read back by
+      modules/traefik.nix to decide which backends get the `authelia`
+      ForwardAuth middleware attached — the same "one file computes,
+      another consumes" shape mySystem.serviceBackends already
+      established between traefik.nix and dashboard.nix.
     '';
   };
 
@@ -77,6 +117,30 @@
         and a password-gated button on the dashboard fetches the latest
         tag and runs nixos-rebuild switch — see modules/self-update.nix.
       '';
+    };
+    sso = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          LLDAP directory — see modules/lldap.nix. Off by default; this
+          is the master switch for the identity source of truth, turned
+          on first and by itself (see mySystem.features.sso.authelia.enable
+          for the SSO/forward-auth layer, enabled separately once LLDAP
+          alone has been validated).
+        '';
+      };
+      authelia.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Authelia (SSO/forward-auth/OIDC provider), LDAP-backed against
+          mySystem.features.sso — see modules/authelia.nix. Kept as its
+          own flag, separate from sso.enable, so LLDAP can be deployed and
+          validated on its own first (this repo's established phased-
+          rollout discipline) before layering forward-auth on top.
+        '';
+      };
     };
     homeAssistant = {
       enable = lib.mkOption {
