@@ -49,6 +49,15 @@ title: Update
         <svg id="modal-icon-failed" class="hidden w-6 h-6 update-icon-failed shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         <span id="modal-status-text" class="text-sm text-gray-700 dark:text-gray-300">Starting...</span>
       </div>
+      <ul id="step-list" class="text-sm mb-4">
+        <li class="update-step" data-step="download"><span class="update-step-icon" data-step-icon="download">&#9675;</span>Downloading latest release</li>
+        <li class="update-step" data-step="rebuild"><span class="update-step-icon" data-step-icon="rebuild">&#9675;</span>Rebuilding<ul id="derivations-list" class="update-derivations-list hidden"></ul></li>
+        <li class="update-step" data-step="inhibitors"><span class="update-step-icon" data-step-icon="inhibitors">&#9675;</span>Check switch inhibitors</li>
+        <li class="update-step" data-step="activate"><span class="update-step-icon" data-step-icon="activate">&#9675;</span>Activate configuration</li>
+        <li class="update-step" data-step="etc"><span class="update-step-icon" data-step-icon="etc">&#9675;</span>Setting up /etc</li>
+        <li class="update-step" data-step="reload"><span class="update-step-icon" data-step-icon="reload">&#9675;</span>Reloading &amp; restarting units</li>
+        <li class="update-step" data-step="done"><span class="update-step-icon" data-step-icon="done">&#9675;</span>Done</li>
+      </ul>
       <button id="log-toggle-btn" type="button" class="flex items-center gap-1 text-sm text-primary-700 dark:text-primary-500 hover:underline mb-2">
         <svg id="log-toggle-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
         <span>Show details</span>
@@ -94,6 +103,49 @@ title: Update
 
   var polling = null;
   var latestKnown = "";
+
+  // Order matters: each step's own regex also matches every later
+  // step's marker, so whichever marker is the furthest along in the
+  // real nixos-rebuild output automatically marks everything before it
+  // done too — no separate state tracking needed between polls.
+  var STEPS = [
+    { key: "download", re: /rebuilding \(this can take a while\)|checking switch inhibitors|activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "rebuild", re: /checking switch inhibitors|activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "inhibitors", re: /activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "activate", re: /setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "etc", re: /reloading|restarting|done\. the new configuration/i },
+    { key: "reload", re: /done\. the new configuration/i },
+    { key: "done", re: null }
+  ];
+
+  function renderSteps(data) {
+    var stageText = (data.log || []).map(function (e) { return e.message; }).join(" | ");
+    var buildLog = data.buildLog || "";
+    var combined = stageText + "\n" + buildLog;
+
+    STEPS.forEach(function (step) {
+      var isDone = step.key === "done" ? data.state === "success" : step.re.test(combined);
+      var li = document.querySelector('[data-step="' + step.key + '"]');
+      var icon = document.querySelector('[data-step-icon="' + step.key + '"]');
+      if (!li || !icon) { return; }
+      li.classList.toggle("update-step-done", isDone);
+      icon.innerHTML = isDone ? "&#10003;" : "&#9675;";
+    });
+
+    var derivationsList = document.getElementById("derivations-list");
+    var match = buildLog.match(/these \d+ derivations?[^\n]*will be built:\r?\n((?:\s+\/nix\/store\/\S+\r?\n?)+)/i);
+    if (match) {
+      var lines = match[1].split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+      derivationsList.innerHTML = "";
+      lines.forEach(function (l) {
+        var short = l.replace(/^\/nix\/store\/[a-z0-9]+-/, "");
+        var item = document.createElement("li");
+        item.textContent = short;
+        derivationsList.appendChild(item);
+      });
+      derivationsList.classList.remove("hidden");
+    }
+  }
 
   function authHeader() {
     return "Basic " + btoa("admin:" + passwordEl.value);
@@ -161,18 +213,38 @@ title: Update
       logBuildEl.textContent = data.buildLog;
       logBuildEl.scrollTop = logBuildEl.scrollHeight;
     }
+    renderSteps(data);
   }
 
+  // Renders a terminal state exactly once per run. Without this guard,
+  // the success branch's own background refresh re-fetched /update/status,
+  // which — for up to two minutes after a run finishes (see
+  // nas-update-status-cgi's freshness window) — still reports
+  // state:"success", so applyProgress ran again, called showProgressView()
+  // again, and reopened the modal a moment after Close was clicked.
+  var lastRenderedTerminal = null;
+
   function applyProgress(data) {
+    var terminal = data.state === "success" || data.state === "failed";
+    if (terminal && lastRenderedTerminal === data.state) {
+      return;
+    }
+    if (!terminal) {
+      lastRenderedTerminal = null;
+    }
+
     showProgressView();
     setTerminalIcon(data.state);
     statusTextEl.textContent = data.message || data.state;
     renderLog(data);
 
     if (data.state === "success") {
+      lastRenderedTerminal = "success";
       stopPolling();
-      checkNow();
+      currentEl.textContent = latestKnown || currentEl.textContent;
+      setUpdateEnabled(false);
     } else if (data.state === "failed") {
+      lastRenderedTerminal = "failed";
       stopPolling();
       setUpdateEnabled(true);
     }
@@ -236,11 +308,14 @@ title: Update
   });
 
   confirmBtn.addEventListener("click", function () {
+    lastRenderedTerminal = null;
     showProgressView();
     setTerminalIcon("running");
     statusTextEl.textContent = "Starting...";
     logStagesEl.innerHTML = "";
     logBuildEl.textContent = "";
+    document.getElementById("derivations-list").classList.add("hidden");
+    renderSteps({ log: [], buildLog: "", state: "running" });
     setUpdateEnabled(false);
 
     fetch("/update/trigger", { method: "POST", headers: { Authorization: authHeader() } })

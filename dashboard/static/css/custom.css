@@ -233,6 +233,45 @@
     }
   }
 
+  .update-step {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.125rem 0;
+    color: #6b7280;
+  }
+  .dark .update-step {
+    color: #9ca3af;
+  }
+  .update-step-done {
+    color: #111827;
+  }
+  .dark .update-step-done {
+    color: #f3f4f6;
+  }
+  .update-step-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1rem;
+    flex-shrink: 0;
+  }
+  .update-step-done .update-step-icon {
+    color: #16a34a;
+  }
+  .update-derivations-list {
+    margin: 0.25rem 0 0.25rem 1.6rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.7rem;
+    color: #6b7280;
+    max-height: 8rem;
+    overflow-y: auto;
+    list-style: none;
+  }
+  .dark .update-derivations-list {
+    color: #9ca3af;
+  }
+
   /* bg-black/50 (opacity-modifier syntax) is also missing — the modal
      backdrop was rendering with no dimming at all. */
   .update-modal-overlay {
