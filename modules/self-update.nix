@@ -26,6 +26,7 @@ let
   # /var/lib.
   statusFile = "/run/nas-update/update-status.json";
   progressFile = "/run/nas-update/update-progress.json";
+  buildLogFile = "/run/nas-update/build.log";
 
   # Shared between checkScript and the end of applyScript, so both ever
   # write the exact same {current, latest, updateAvailable, releaseUrl}
@@ -92,13 +93,25 @@ let
     runtimeInputs = [ pkgs.curl pkgs.jq pkgs.gnutar pkgs.gzip pkgs.coreutils pkgs.nixos-rebuild ];
     text = ''
       rm -f ${triggerFile}
+      rm -f ${progressFile} ${buildLogFile}
       touch ${applyingFile}
       trap 'rm -f ${applyingFile}' EXIT
 
       ${writeStatusFn}
 
+      # Appends to a running log (stage transitions, not the raw build
+      # output — that's buildLogFile, tailed in separately by statusCgi)
+      # instead of just overwriting the one current message, so the
+      # frontend's log accordion can show the whole run's history, not
+      # just whatever the last poll happened to catch.
       write_progress() {
-        jq -n --arg state "$1" --arg message "$2" '{state:$state, message:$message}' > ${progressFile}.tmp
+        local state="$1" message="$2" now log_json
+        now=$(date -Is)
+        log_json="[]"
+        [ -f ${progressFile} ] && log_json=$(jq -c '.log // []' ${progressFile} 2>/dev/null || echo '[]')
+        jq -n --arg state "$state" --arg message "$message" --arg time "$now" --argjson log "$log_json" \
+          '{state:$state, message:$message, log: ($log + [{time:$time, message:$message}])}' \
+          > ${progressFile}.tmp
         mv ${progressFile}.tmp ${progressFile}
       }
 
@@ -139,13 +152,19 @@ let
       # shellcheck disable=SC1091
       source ${secretsEnv}
       set +a
-      if nixos-rebuild switch --flake "$src_dir#${hostName}" --impure; then
+      # Real nixos-rebuild output, not just our own stage messages —
+      # captured to buildLogFile (world-readable, see below) so
+      # statusCgi can tail it into the response while this is still
+      # running, for the frontend's log accordion.
+      : > ${buildLogFile}
+      chmod 644 ${buildLogFile}
+      if nixos-rebuild switch --flake "$src_dir#${hostName}" --impure 2>&1 | tee -a ${buildLogFile}; then
         echo "$latest" > ${versionFile}
         rm -rf ${stagingDir}
         write_progress "success" "Updated to $latest"
         write_status
       else
-        write_progress "failed" "nixos-rebuild failed — see: journalctl -u nas-update-apply"
+        write_progress "failed" "nixos-rebuild failed — see the log below"
         write_status
         exit 1
       fi
@@ -190,7 +209,9 @@ let
       # last 2 minutes as current, so a fast-finished run's result is
       # still visible for a bit rather than only during the run itself.
       if [ -f ${progressFile} ] && { [ -f ${applyingFile} ] || [ -n "$(find ${progressFile} -mmin -2 2>/dev/null)" ]; }; then
-        cat ${progressFile}
+        build_log=""
+        [ -f ${buildLogFile} ] && build_log=$(tail -n 500 ${buildLogFile})
+        jq --arg buildLog "$build_log" '. + {buildLog: $buildLog}' ${progressFile}
         exit 0
       fi
       ${writeStatusFn}
