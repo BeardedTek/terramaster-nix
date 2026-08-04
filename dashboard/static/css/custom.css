@@ -188,3 +188,36 @@
    input:checked + .slider:before {
     transform: translateX(1em);
    }
+
+  /* Update page modal (dashboard/content/update.md). Hand-written
+     rather than Tailwind utilities: this dashboard's CSS is a vendored,
+     pre-built bundle from a different site (see docs/ARCHITECTURE.md's
+     Dashboard section) — only classes that site's own templates
+     happened to use got compiled in, and quite a few this page reached
+     for (dark: color variants, whitespace-pre-wrap, break-all) simply
+     aren't present. They don't error, they just silently do nothing,
+     which is what made this hard to read instead of obviously broken.
+     Dark mode itself is real and matches the site's own mechanism —
+     .dark toggled on <html>, see static/js/app.bundle.js. */
+  .update-log-output {
+    background-color: #0f172a;
+    color: #e2e8f0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    max-height: 16rem;
+  }
+
+  .update-log-stages {
+    color: #4b5563;
+  }
+  .dark .update-log-stages {
+    color: #9ca3af;
+  }
+  .update-log-stages > div + div {
+    margin-top: 0.125rem;
+  }
+
+  .update-icon-failed {
+    color: #dc2626;
+  }

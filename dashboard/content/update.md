@@ -46,7 +46,7 @@ title: Update
       <div class="flex items-center gap-3 mb-4">
         <div id="modal-spinner" class="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 dark:border-gray-600 border-t-primary-600 shrink-0"></div>
         <svg id="modal-icon-success" class="hidden w-6 h-6 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-        <svg id="modal-icon-failed" class="hidden w-6 h-6 text-red-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <svg id="modal-icon-failed" class="hidden w-6 h-6 update-icon-failed shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         <span id="modal-status-text" class="text-sm text-gray-700 dark:text-gray-300">Starting...</span>
       </div>
       <button id="log-toggle-btn" type="button" class="flex items-center gap-1 text-sm text-primary-700 dark:text-primary-500 hover:underline mb-2">
@@ -54,8 +54,8 @@ title: Update
         <span>Show details</span>
       </button>
       <div id="log-panel" class="hidden">
-        <div id="log-stages" class="text-xs text-gray-600 dark:text-gray-400 mb-2 space-y-0.5"></div>
-        <pre id="log-build" class="bg-gray-900 text-gray-100 text-xs p-3 rounded-lg max-h-64 overflow-y-auto whitespace-pre-wrap break-all"></pre>
+        <div id="log-stages" class="text-xs update-log-stages mb-2"></div>
+        <pre id="log-build" class="update-log-output text-xs p-3 rounded-lg overflow-y-auto"></pre>
       </div>
       <div class="flex justify-end mt-4">
         <button id="modal-close-btn" type="button" class="hidden text-white bg-primary-700 hover:bg-primary-800 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700">Close</button>
