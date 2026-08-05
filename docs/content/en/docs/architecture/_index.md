@@ -329,6 +329,31 @@ straight to `/home/beardedtek/.ssh/authorized_keys` via
 (not tmpfs), so it persists without needing an `environment.persistence`
 entry.
 
+### Unix/PAM login against LLDAP
+
+`modules/unix-ldap-login.nix` (gated on `mySystem.features.sso.enable`, same
+flag the LLDAP/Authelia SSO rollout uses elsewhere) adds the same LLDAP
+directory as an *additional* authentication source for local console login
+and `sudo`/`su`, via `users.ldap.loginPam` and nslcd (`users.ldap.daemon.enable`,
+isolating the LDAP bind password to nslcd's own process rather than every
+PAM-consuming process reading it directly). It does not replace anything:
+local accounts from `mySystem.users` above keep their own password hashes,
+and NixOS's default PAM rule stack (`nixos/modules/security/pam.nix`) puts
+`pam_unix` ahead of `pam_ldap`, both `sufficient` — local logins keep
+working exactly as before even if LLDAP is unreachable. `nsswitch` stays
+off: every LLDAP account already has a matching local Unix account (LLDAP
+mirrors `mySystem.users` exactly, see below), so there's no "LDAP-only"
+identity for NSS to resolve yet. SSH itself is untouched — it's key-only
+(`mySystem.security.sshPasswordAuth` defaults to `false`), so PAM auth is
+never consulted there regardless of this module.
+
+Like every other service that needs to look up *someone else's* LLDAP
+entry (Authelia, the dashboard's own login, Jellyfin's LDAP plugin), this
+uses a dedicated `uid=unix-login,ou=people,...` bind account in LLDAP's
+built-in `lldap_strict_readonly` group — a plain bind can only ever see its
+own entry, and nslcd needs to search for a user's DN by username before
+re-binding as them.
+
 ## Network and firewall model
 
 Every module that opens firewall ports scopes them per-interface, never a

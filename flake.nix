@@ -52,6 +52,7 @@
           ./modules/authelia.nix
           ./modules/smtp-relay.nix
           ./modules/dashboard-login.nix
+          ./modules/unix-ldap-login.nix
         ];
       };
 

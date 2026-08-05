@@ -108,6 +108,7 @@
       "/etc/opensmtpd"
       "/etc/jellyfin"
       "/etc/dashboard-login"
+      "/etc/unix-ldap-login"
     ];
     files = [
       "/etc/machine-id"

@@ -107,7 +107,7 @@ file directly there (`ssh ... 'cat > /tmp/x' < localfile`, then
 
 ## Freshly-created persistence bind-mounts get the wrong ownership (general pattern)
 
-**The general shape of this bug, seen three times now under three
+**The general shape of this bug, seen four times now under four
 different mechanisms:** the first time `environment.persistence` creates
 a brand-new source directory under `/persist` for a service's
 `/var/lib/<name>` (i.e. the very first activation after adding a new
@@ -120,8 +120,24 @@ time. After that first correct pass, it's fine on every future boot,
 since the directory already has real content/ownership on `rust/persist`
 and nothing about it is "fresh" anymore.
 
-Three confirmed instances, three different underlying mechanisms:
+Four confirmed instances, four different underlying mechanisms:
 
+- **`systemd.tmpfiles.rules` `z` (fix ownership) lines on a delivered
+  secret** (`modules/unix-ldap-login.nix`'s LDAP bind password): the file
+  itself was there (out-of-band secret, delivered before the rebuild that
+  first introduced its `/etc/unix-ldap-login` persistence entry), but
+  nslcd's `preStart` — which runs as the unprivileged `nslcd` user, not
+  root — got "Permission denied" reading it. The `z ... root nslcd - -`
+  rule meant to fix that was correctly generated
+  (`/etc/tmpfiles.d/00-nixos.conf` had it verbatim) but simply hadn't been
+  applied yet: same race as the directory-creation case below, just a
+  `z` line instead of a `d` line, and a file instead of a directory.
+  Symptom: `cat: /etc/<x>/<secret>: Permission denied` in the journal for
+  the consuming service, immediately followed by that service failing to
+  parse its own config (an empty value from the failed `cat` produces a
+  malformed config line downstream — a second-looking symptom with the
+  same root cause, not two separate bugs). **Fix:** `sudo systemd-tmpfiles
+  --create`, then restart the affected service.
 - **`systemd.tmpfiles.settings`-declared directories** (qBittorrent): a
   service crashes because a directory it expects
   (`Profile::ensureDirectoryExists`-style fatal errors, or similar) simply

@@ -57,6 +57,7 @@ never show these as trackable):**
 | `secrets/extra-files/persist/etc/frigate/proxy_auth_secret` | only if `mySystem.features.frigate.enable = true;` and Frigate is in `mySystem.sso.protectedServices` — a real `openssl rand -hex 32` value, checked against an `X-Proxy-Secret` header Traefik sends on every request (see `modules/frigate.nix`, `modules/traefik.nix`) |
 | `secrets/extra-files/persist/etc/jellyfin/ldap_bind_password` | only if `mySystem.features.jellyfin.enable = true;` and `mySystem.features.sso.enable = true;` — the password for the dedicated `uid=jellyfin,ou=people,...` LLDAP bind account, read once on first start to write the official `jellyfin-plugin-ldapauth` plugin's config (see `modules/media-stack.nix`) |
 | `secrets/extra-files/persist/etc/dashboard-login/ldap_password` | only if `mySystem.features.sso.enable = true;` — the password for the dedicated `uid=dashboard-login,ou=people,...` LLDAP bind account, used to check an already-logged-in user's group membership (see `modules/dashboard-login.nix`) |
+| `secrets/extra-files/persist/etc/unix-ldap-login/ldap_password` | only if `mySystem.features.sso.enable = true;` — the password for the dedicated `uid=unix-login,ou=people,...` LLDAP bind account, used by nslcd to search for a user's DN by username before re-binding as them for real Unix console/`sudo` login (see `modules/unix-ldap-login.nix`) |
 
 Everything under `secrets/extra-files/` mirrors the target's filesystem
 1:1 (e.g. `secrets/extra-files/etc/nebula/config.yaml` → `/etc/nebula/config.yaml`
