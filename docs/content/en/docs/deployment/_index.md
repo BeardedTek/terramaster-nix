@@ -55,6 +55,7 @@ never show these as trackable):**
 | `secrets/extra-files/persist/etc/filebrowser/oidc_client_secret` | only if `mySystem.features.sso.authelia.enable = true;` — the plaintext OIDC client secret matching `candidateOidcClients.filebrowser`'s hash (see `modules/filebrowser.nix`) |
 | `secrets/extra-files/persist/etc/authelia/{oidc_hmac_secret,oidc_issuer_private_key.pem}` | only if any `candidateOidcClients` entry is enabled — `oidc_hmac_secret` is a real `openssl rand -hex 32` value, `oidc_issuer_private_key.pem` is generated with `authelia crypto pair rsa generate` (see `modules/authelia.nix`) |
 | `secrets/extra-files/persist/etc/frigate/proxy_auth_secret` | only if `mySystem.features.frigate.enable = true;` and Frigate is in `mySystem.sso.protectedServices` — a real `openssl rand -hex 32` value, checked against an `X-Proxy-Secret` header Traefik sends on every request (see `modules/frigate.nix`, `modules/traefik.nix`) |
+| `secrets/extra-files/persist/etc/jellyfin/ldap_bind_password` | only if `mySystem.features.jellyfin.enable = true;` and `mySystem.features.sso.enable = true;` — the password for the dedicated `uid=jellyfin,ou=people,...` LLDAP bind account, read once on first start to write the official `jellyfin-plugin-ldapauth` plugin's config (see `modules/media-stack.nix`) |
 
 Everything under `secrets/extra-files/` mirrors the target's filesystem
 1:1 (e.g. `secrets/extra-files/etc/nebula/config.yaml` → `/etc/nebula/config.yaml`

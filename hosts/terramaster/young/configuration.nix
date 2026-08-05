@@ -107,6 +107,7 @@
       "/etc/authelia"
       "/var/lib/authelia-main"
       "/etc/opensmtpd"
+      "/etc/jellyfin"
     ];
     files = [
       "/etc/machine-id"

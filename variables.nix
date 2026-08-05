@@ -14,7 +14,7 @@
   mySystem.smtp = {
     host = "mail.beardedtek.com";
     port = 465;
-    scheme = "submission"; # "smtp", "submission", or "submissions"
+    scheme = "submissions"; # "smtp", "submission", or "submissions"
     sender = "NO-REPLY@beardedtek.com";
     username = "no-reply@beardedtek.com";
   };
