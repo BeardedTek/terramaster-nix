@@ -50,6 +50,7 @@
           ./modules/self-update.nix
           ./modules/lldap.nix
           ./modules/authelia.nix
+          ./modules/smtp-relay.nix
         ];
       };
 

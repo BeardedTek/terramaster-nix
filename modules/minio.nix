@@ -3,16 +3,16 @@
 let
   cfg = config.mySystem.features.minio;
   lanIf = config.mySystem.lanInterface;
+  hostName = config.networking.hostName;
+  domain = config.mySystem.domain;
 
-  # 9000 (S3 API) always stays open regardless — most S3 clients (rclone,
-  # s3cmd, etc.) can't participate in a browser-cookie SSO flow at all, so
-  # it was never a candidate for mySystem.sso.protectedServices in the
-  # first place. 9001 (the browser admin console) is exactly what
-  # "minio-console" in modules/authelia.nix's candidateProtectedServices
-  # is meant to gate — leaving it directly open would let anyone bypass
-  # that two_factor policy via http://<ip>:9001. See modules/media-stack.nix
-  # for the same pattern applied to the media-acquisition services.
-  consoleDirectlyReachable = !(config.mySystem.sso.protectedServices ? "minio-console");
+  # Native OIDC (Tier A per the SSO plan), not the Traefik ForwardAuth
+  # gate the media-acquisition services use — so unlike Frigate/Sonarr,
+  # there's no direct-IP bypass concern to close a firewall port over:
+  # MinIO's own console always requires its own login (OIDC or root
+  # credentials) regardless of access path, the same reasoning
+  # modules/filebrowser.nix's OIDC integration already relies on.
+  oidcEnabled = config.mySystem.features.sso.authelia.enable;
 in
 {
   config = lib.mkIf cfg.enable {
@@ -40,7 +40,41 @@ in
       # and docs/DEPLOYMENT.md's secrets table. Missing the file is a
       # clean no-start (services.minio sets ConditionPathExists on it),
       # not a crash loop.
+      # MINIO_IDENTITY_OPENID_CLIENT_SECRET (the one genuinely secret OIDC
+      # value below) is delivered as one more line in this same file, not
+      # a separate one — services.minio has no generic settings/environment
+      # passthrough to hang a second EnvironmentFile off declaratively
+      # without relying on NixOS's list-merge behavior for this specific
+      # option, and this file is already exactly "secrets MinIO reads at
+      # its own startup." See docs/DEPLOYMENT.md's secrets table.
       rootCredentialsFile = "/etc/minio/minio.env";
+    };
+
+    # Non-secret OIDC settings — plain systemd Environment=, safe to
+    # derive straight from Nix-known values (no drift risk the way a
+    # manually-typed env-file line would have). The secret
+    # (MINIO_IDENTITY_OPENID_CLIENT_SECRET) is NOT here; see
+    # rootCredentialsFile's comment above.
+    #
+    # CLAIM_NAME=groups + the matching Authelia claims_policy
+    # (modules/authelia.nix) is the official, if awkward, Authelia<->MinIO
+    # integration path — https://www.authelia.com/integration/openid-connect/clients/minio/
+    # explicitly frames it as a workaround for MinIO not retrieving claims
+    # the standard OIDC way. ROLE_POLICY is deliberately unset (setting
+    # both role_policy and claim_name is a MinIO config error) — the
+    # "admins" LLDAP group's claim value must match a real MinIO IAM
+    # policy name for the mapping to actually grant anything; creating
+    # that policy in MinIO itself is a manual follow-up, not yet
+    # automated here.
+    systemd.services.minio.environment = lib.optionalAttrs oidcEnabled {
+      MINIO_IDENTITY_OPENID_CONFIG_URL = "https://auth.${hostName}.${domain}/.well-known/openid-configuration";
+      MINIO_IDENTITY_OPENID_CLIENT_ID = "minio-console";
+      MINIO_IDENTITY_OPENID_SCOPES = "openid,profile,email,groups";
+      MINIO_IDENTITY_OPENID_REDIRECT_URI = "https://minio-console.${hostName}.${domain}/oauth_callback";
+      MINIO_IDENTITY_OPENID_REDIRECT_URI_DYNAMIC = "off";
+      MINIO_IDENTITY_OPENID_DISPLAY_NAME = "Authelia";
+      MINIO_IDENTITY_OPENID_CLAIM_NAME = "groups";
+      MINIO_IDENTITY_OPENID_CLAIM_USERINFO = "on";
     };
 
     # No automatic ordering between a plain fileSystems mount and a
@@ -50,7 +84,7 @@ in
     # dataDir/configDir path instead of an exports file.
     systemd.services.minio.unitConfig.RequiresMountsFor = [ "/rust/minio" ];
 
-    networking.firewall.interfaces."nebula1".allowedTCPPorts = [ 9000 ] ++ lib.optionals consoleDirectlyReachable [ 9001 ];
-    networking.firewall.interfaces.${lanIf}.allowedTCPPorts = [ 9000 ] ++ lib.optionals consoleDirectlyReachable [ 9001 ];
+    networking.firewall.interfaces."nebula1".allowedTCPPorts = [ 9000 9001 ];
+    networking.firewall.interfaces.${lanIf}.allowedTCPPorts = [ 9000 9001 ];
   };
 }

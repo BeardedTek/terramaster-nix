@@ -106,6 +106,7 @@
       { directory = "/var/lib/private"; user = "root"; group = "root"; mode = "0700"; }
       "/etc/authelia"
       "/var/lib/authelia-main"
+      "/etc/opensmtpd"
     ];
     files = [
       "/etc/machine-id"

@@ -5,6 +5,20 @@
   mySystem.model = "young";
   mySystem.domain = "beardedtek.com";
 
+  # Fill in your real values here — the password is NOT set in this file,
+  # it's delivered out-of-repo (see
+  # secrets/extra-files/persist/etc/authelia/smtp_password.example and
+  # docs/DEPLOYMENT.md's secrets table). Leave this whole block removed
+  # (mySystem.smtp stays null) to keep Authelia's file-based notification
+  # fallback instead.
+  mySystem.smtp = {
+    host = "mail.beardedtek.com";
+    port = 465;
+    scheme = "submission"; # "smtp", "submission", or "submissions"
+    sender = "NO-REPLY@beardedtek.com";
+    username = "no-reply@beardedtek.com";
+  };
+
   mySystem.users = [
     { name = "beardedtek"; wheel = true; }
     { name = "dyoung"; wheel = true; }

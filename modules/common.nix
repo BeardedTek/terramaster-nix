@@ -47,6 +47,42 @@
     '';
   };
 
+  options.mySystem.smtp = lib.mkOption {
+    type = lib.types.nullOr (
+      lib.types.submodule {
+        options = {
+          host = lib.mkOption { type = lib.types.str; };
+          port = lib.mkOption { type = lib.types.port; default = 587; };
+          scheme = lib.mkOption {
+            type = lib.types.enum [ "smtp" "submission" "submissions" ];
+            default = "submission";
+          };
+          sender = lib.mkOption {
+            type = lib.types.str;
+            description = "RFC5322 sender address for outgoing notifications.";
+          };
+          username = lib.mkOption { type = lib.types.str; };
+        };
+      }
+    );
+    default = null;
+    description = ''
+      Set in variables.nix. Connection details for the real upstream mail
+      provider — consumed by modules/smtp-relay.nix, which runs a small
+      localhost-only OpenSMTPD relay every other service actually talks
+      to (unauthenticated, since it's loopback-only), so credentials for
+      the real provider live in exactly one place rather than being
+      plumbed through every consumer individually. `sender` is reused
+      directly by consumers (e.g. modules/authelia.nix's notifier) as
+      their own From: address. Null means both the relay and any
+      consumer's email notifications are disabled — modules/authelia.nix
+      falls back to writing notifications to a local file instead. The
+      SMTP password is never set here — it's delivered out-of-repo, see
+      secrets/extra-files/persist/etc/opensmtpd/secrets.example and
+      docs/DEPLOYMENT.md's secrets table.
+    '';
+  };
+
   options.mySystem.serviceBackends = lib.mkOption {
     type = lib.types.attrsOf lib.types.port;
     default = { };

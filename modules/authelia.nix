@@ -5,6 +5,7 @@ let
   cfg = f.sso.authelia;
   hostName = config.networking.hostName;
   domain = config.mySystem.domain;
+  smtp = config.mySystem.smtp;
   # "beardedtek.com" -> "dc=beardedtek,dc=com" — shared with
   # modules/lldap.nix so the two can never drift apart.
   baseDn = lib.concatMapStringsSep "," (part: "dc=${part}") (lib.splitString "." domain);
@@ -79,7 +80,9 @@ let
     seerr = { enable = true; policy = "one_factor"; }; # Phase 3
     qbittorrent = { enable = true; policy = "one_factor"; }; # Phase 3 — validate alongside the existing qb-headers middleware
     frigate = { enable = true; policy = "one_factor"; }; # Phase 3
-    "minio-console" = { enable = false; policy = "two_factor"; group = "admins"; };
+    # No minio-console entry: it gets native OIDC (candidateOidcClients
+    # below) instead of this plain ForwardAuth gate — MinIO has a real
+    # OIDC client, unlike the gate-only apps above.
   };
   protectedServices = lib.mapAttrs
     (_: v: { inherit (v) policy; } // lib.optionalAttrs (v ? group) { inherit (v) group; })
@@ -89,6 +92,87 @@ let
     domain = [ "${name}.${hostName}.${domain}" "${name}-${hostName}.nebula.${domain}" ];
     policy = p.policy;
   } // lib.optionalAttrs (p ? group) { subject = [ "group:${p.group}" ]; };
+
+  # Second "hot-pluggable" table, same shape/spirit as
+  # candidateProtectedServices above but for services that get real OIDC
+  # client passthrough instead of a plain forward-auth gate. Adding one
+  # later (e.g. MinIO) is one entry here plus that service's own module
+  # reading its plaintext client secret from a matching /etc/authelia
+  # secret file — see docs/DEPLOYMENT.md's secrets table.
+  #
+  # clientSecretHash is the argon2id *digest*, not the plaintext secret —
+  # confirmed against Authelia's own `authelia crypto hash generate`
+  # guide: modern Authelia (this flake's pin, 4.39.20) stores a hash here
+  # and the plaintext only ever goes into the client application's own
+  # config (modules/filebrowser.nix etc.), read from
+  # /etc/authelia/oidc-clients/<name>_secret — never written into this
+  # repo.
+  candidateOidcClients = {
+    filebrowser = {
+      enable = true; # Phase 4
+      clientSecretHash = "$argon2id$v=19$m=65536,t=3,p=4$aFblAB65E8E3yeHaBVln0w$FRqWs+EwgRIz/CHoEgHCQuPXQ3W07WEkg6fJuPRDiR4";
+      # Must match modules/traefik.nix's `backends` key for this service,
+      # NOT the client_id — confirmed the hard way: registering redirect
+      # URIs under "filebrowser.<host>.<domain>" while the real Traefik
+      # backend/vhost is named "files" (traefik.nix's `backends.files`)
+      # got Authelia's own "redirect_uri does not match any of the OAuth
+      # 2.0 Client's pre-registered redirect_uris" error, since
+      # FileBrowser constructs its callback URL from whatever hostname it
+      # was actually reached through.
+      vhost = "files";
+      # FileBrowser Quantum's OIDC callback route — confirmed against its
+      # actual source (backend/http/oidc.go): @Router
+      # /api/auth/oidc/callback.
+      redirectPaths = [ "/api/auth/oidc/callback" ];
+      scopes = [ "openid" "profile" "email" "groups" ];
+    };
+    "minio-console" = {
+      enable = true; # Phase 4
+      clientSecretHash = "$argon2id$v=19$m=65536,t=3,p=4$585RxXTFigxige43ZgJOdQ$nF5t4Vb2fI8vBd0Xc0IrUBO/EBrqwv5rG7FUUL4TRNw";
+      vhost = "minio-console";
+      # Confirmed against Authelia's own official MinIO integration guide
+      # (authelia.com/integration/openid-connect/clients/minio/) — MinIO
+      # doesn't retrieve claims the standard OIDC way, needing both this
+      # specific extra client config AND a top-level claims_policies
+      # entry below (claimsPolicies) that the client references.
+      redirectPaths = [ "/oauth_callback" ];
+      scopes = [ "openid" "profile" "email" "groups" ];
+      policy = "two_factor"; # matches the two_factor tier this console already had under the (now-removed) ForwardAuth gate
+      extra = {
+        require_pkce = false;
+        response_types = [ "code" ];
+        grant_types = [ "authorization_code" ];
+        access_token_signed_response_alg = "none";
+        userinfo_signed_response_alg = "none";
+        token_endpoint_auth_method = "client_secret_basic";
+        claims_policy = "minio";
+      };
+    };
+  };
+  oidcClients = lib.filterAttrs (_: v: v.enable) candidateOidcClients;
+
+  oidcClientFor = name: c: {
+    client_id = name;
+    client_name = name;
+    client_secret = c.clientSecretHash;
+    redirect_uris = lib.concatMap
+      (path: [
+        "https://${c.vhost}.${hostName}.${domain}${path}"
+        "https://${c.vhost}-${hostName}.nebula.${domain}${path}"
+      ])
+      c.redirectPaths;
+    scopes = c.scopes;
+    authorization_policy = c.policy or "one_factor";
+    public = false;
+  } // (c.extra or { });
+
+  # MinIO-specific workaround the official guide calls for — a named,
+  # reusable claim set the "minio-console" client references via
+  # extra.claims_policy above. Only emitted if that client is actually
+  # enabled.
+  claimsPolicies = lib.optionalAttrs (oidcClients ? "minio-console") {
+    minio.id_token = [ "rat" "groups" "email" "email_verified" "alt_emails" "preferred_username" "name" ];
+  };
 in
 {
   config = lib.mkIf cfg.enable {
@@ -174,19 +258,56 @@ in
         };
 
         storage.local.path = "/var/lib/authelia-main/db.sqlite3";
-        notifier.filesystem.filename = "/var/lib/authelia-main/notifications.txt"; # no SMTP set up yet — password-reset emails won't send; fine for one-time-password-set-via-LLDAP-UI usage for now
-      };
+        # mySystem.smtp unset (null) falls back to writing notifications
+        # to a local file instead of emailing them — fine for
+        # one-time-password-set-via-LLDAP-UI usage, but means password
+        # resets and 2FA registration links never actually arrive by
+        # mail. Talks to modules/smtp-relay.nix's loopback-only relay,
+        # not the real upstream provider directly — no username/password
+        # needed here at all, since that relay is unauthenticated for
+        # local connections and holds the real credentials itself. See
+        # modules/common.nix's mySystem.smtp for the full rationale.
+        notifier = if smtp != null then {
+          smtp = {
+            address = "smtp://127.0.0.1:25";
+            inherit (smtp) sender;
+            # Authelia requires STARTTLS by default — fine for the real
+            # upstream hop, but this connects to modules/smtp-relay.nix's
+            # loopback-only OpenSMTPD, which doesn't offer TLS at all
+            # (no eavesdropping risk on 127.0.0.1 to itself). Confirmed
+            # the hard way: startup failed with "TLSMandatory, but target
+            # host does not support STARTTLS" without this.
+            disable_require_tls = true;
+          };
+        } else {
+          filesystem.filename = "/var/lib/authelia-main/notifications.txt";
+        };
+      } // (lib.optionalAttrs (oidcClients != { }) {
+        # Gated on oidcClients != {} so the oidc secret files below only
+        # need to exist once something actually uses them — same
+        # "nothing required until it's actually opted into" shape the
+        # rest of this file follows.
+        identity_providers.oidc = {
+          clients = lib.mapAttrsToList oidcClientFor oidcClients;
+        } // (lib.optionalAttrs (claimsPolicies != { }) {
+          claims_policies = claimsPolicies;
+        });
+      });
 
       secrets = {
         jwtSecretFile = "/etc/authelia/jwt_secret";
         sessionSecretFile = "/etc/authelia/session_secret";
         storageEncryptionKeyFile = "/etc/authelia/storage_encryption_key";
-      };
+      } // (lib.optionalAttrs (oidcClients != { }) {
+        oidcHmacSecretFile = "/etc/authelia/oidc_hmac_secret";
+        oidcIssuerPrivateKeyFile = "/etc/authelia/oidc_issuer_private_key.pem";
+      });
 
       # LDAP bind password: no dedicated `secrets.*` option for it, so
       # this is Authelia's own documented `_FILE`-suffix env-var
       # convention instead — see
-      # https://www.authelia.com/configuration/methods/secrets/.
+      # https://www.authelia.com/configuration/methods/secrets/. No SMTP
+      # password needed here — see the notifier.smtp comment above.
       environmentVariables = {
         AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD_FILE = ldapPasswordFile;
       };

@@ -3,9 +3,31 @@
 let
   cfg = config.mySystem.features.filebrowser;
   lanIf = config.mySystem.lanInterface;
+  hostName = config.networking.hostName;
+  domain = config.mySystem.domain;
 
   port = 8095;
   stateDir = "/var/lib/filebrowser";
+
+  # Native OIDC (Tier A per the SSO plan) rather than the Traefik
+  # ForwardAuth gate everything else uses — FileBrowser Quantum handles
+  # its own redirect flow directly against Authelia's real OIDC provider,
+  # so there's no Traefik middleware involved and no firewall-bypass
+  # concern the way there was for Frigate/MinIO (this app's own login,
+  # password or OIDC, is unconditionally required regardless of access
+  # path). Only active once mySystem.features.sso.authelia.enable is
+  # true; config.mySystem.features.sso is read here rather than through
+  # candidateOidcClients directly so this file doesn't need to know
+  # modules/authelia.nix's internal table shape.
+  ssoEnabled = config.mySystem.features.sso.authelia.enable;
+  # Plaintext client secret, matching the argon2 digest of the same
+  # value registered in modules/authelia.nix's candidateOidcClients —
+  # read straight from /persist (Nix eval-time builtins.readFile, same
+  # pattern modules/frigate.nix uses for its proxy_auth_secret), not a
+  # runtime *File option: pkgs.formats.yaml bakes configFile's values in
+  # at build time regardless, so there's no separate runtime read to
+  # delegate this to.
+  oidcClientSecret = lib.removeSuffix "\n" (builtins.readFile "/persist/etc/filebrowser/oidc_client_secret");
 
   # server.database/cacheDir are absolute paths under this unit's own
   # StateDirectory (systemd creates /var/lib/filebrowser itself, owned by
@@ -36,9 +58,21 @@ let
         { path = "/rust/data"; name = "Data"; config.defaultEnabled = true; }
       ];
     };
-    auth.methods.password = {
-      enabled = true;
-      signup = false;
+    auth.methods = {
+      password = {
+        enabled = true;
+        signup = false;
+      };
+    } // lib.optionalAttrs ssoEnabled {
+      oidc = {
+        enabled = true;
+        createUser = true;
+        clientId = "filebrowser";
+        clientSecret = oidcClientSecret;
+        issuerUrl = "https://auth.${hostName}.${domain}";
+        scopes = "openid profile email groups";
+        adminGroup = "admins";
+      };
     };
   };
 in
