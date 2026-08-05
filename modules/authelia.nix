@@ -148,13 +148,29 @@ let
         claims_policy = "minio";
       };
     };
+    homeassistant = {
+      enable = true; # Phase 6
+      # Public client (no client_secret) — hass-oidc-auth's own docs
+      # explicitly recommend this over a confidential client for home
+      # setups: "using properly configured redirect URLs + PKCE already
+      # provides enough security... using a client secret introduces the
+      # risk of it getting lost/stolen." Authelia enforces PKCE for
+      # public clients automatically.
+      public = true;
+      vhost = "hass"; # matches modules/traefik.nix's backends.hass
+      # hass-oidc-auth's fixed callback route — confirmed against its
+      # own docs (docs/configuration.md): "<your HA URL>/auth/oidc/callback".
+      redirectPaths = [ "/auth/oidc/callback" ];
+      # groups_scope defaults to "groups" in hass-oidc-auth, matching
+      # what's requested here — no override needed.
+      scopes = [ "openid" "profile" "groups" ];
+    };
   };
   oidcClients = lib.filterAttrs (_: v: v.enable) candidateOidcClients;
 
   oidcClientFor = name: c: {
     client_id = name;
     client_name = name;
-    client_secret = c.clientSecretHash;
     redirect_uris = lib.concatMap
       (path: [
         "https://${c.vhost}.${hostName}.${domain}${path}"
@@ -163,8 +179,10 @@ let
       c.redirectPaths;
     scopes = c.scopes;
     authorization_policy = c.policy or "one_factor";
-    public = false;
-  } // (c.extra or { });
+    public = c.public or false;
+  } // (lib.optionalAttrs (!(c.public or false)) {
+    client_secret = c.clientSecretHash;
+  }) // (c.extra or { });
 
   # MinIO-specific workaround the official guide calls for — a named,
   # reusable claim set the "minio-console" client references via
