@@ -80,7 +80,6 @@
       "/etc/minio"
       "/var/lib/filebrowser"
       "/etc/filebrowser"
-      "/etc/nas-update"
       "/etc/lldap"
       # Not "/var/lib/lldap": modules/lldap.nix's services.lldap runs
       # with DynamicUser = true, and systemd's own DynamicUser handling
@@ -108,6 +107,7 @@
       "/var/lib/authelia-main"
       "/etc/opensmtpd"
       "/etc/jellyfin"
+      "/etc/dashboard-login"
     ];
     files = [
       "/etc/machine-id"

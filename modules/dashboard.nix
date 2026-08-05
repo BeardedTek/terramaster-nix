@@ -5,6 +5,18 @@ let
   hostName = config.networking.hostName;
   backends = config.mySystem.serviceBackends; # set by modules/traefik.nix
 
+  # See modules/dashboard-login.nix for the full rationale — a dashboard-
+  # local LDAP-bind login rather than routing through Authelia, since
+  # Authelia's session cookie can't work for this vhost's direct-IP
+  # access path at all (domain-scoped cookies are never sent to a raw IP
+  # request, by browsers, unconditionally). Off entirely (homepage and
+  # everything else public, exactly as before this feature existed)
+  # unless LLDAP itself is enabled.
+  loginEnabled = config.mySystem.features.sso.enable;
+  authRequestSnippet = ''
+    auth_request /internal/dashboard-auth-check;
+  '';
+
   # Generated from mySystem.contactInfo (set per-host, e.g.
   # hosts/terramaster/f4-245/configuration.nix) rather than hardcoded into the Hugo
   # content itself — Hugo auto-loads any data/*.json file as
@@ -165,10 +177,73 @@ in
         { addr = "[::]"; port = 8097; }
       ];
       root = dashboardSite;
-      locations."= /metrics.json".alias = "/var/lib/dashboard/metrics.json";
+      extraConfig = lib.optionalString loginEnabled ''
+        error_page 401 = @dashboard_login_redirect;
+      '';
+      locations = {
+        # Public, same as the homepage itself — the homepage's own live
+        # status widgets (disk/load/memory/network/service reachability)
+        # read this, and the homepage is meant to be viewable without
+        # logging in at all.
+        "= /metrics.json" = {
+          alias = "/var/lib/dashboard/metrics.json";
+        };
+
+        # Explicit exact match — takes precedence over the general "/"
+        # fallback below for just the root path, keeping the homepage
+        # public even though everything else requires login. try_files
+        # (rather than relying on the default `index` directive) matters
+        # here: nginx's `index` resolves a directory request via an
+        # *internal redirect* to /index.html, which re-runs location
+        # matching from scratch — and /index.html doesn't match this
+        # exact "= /" block, so it fell through to the general "/"
+        # location below and got gated anyway (confirmed live: curl
+        # against "/" 302'd to /login/ despite this block existing).
+        # try_files serves the file within this same location's context,
+        # no re-match, so it actually stays public.
+        "= /" = {
+          root = dashboardSite;
+          extraConfig = ''
+            try_files /index.html =404;
+          '';
+        };
+      } // (lib.optionalAttrs loginEnabled {
+        # Static assets the public homepage (and modules/dashboard-login.nix's
+        # login page) need to render — kept public regardless of login
+        # state, same reasoning as the homepage itself. The login page's
+        # own location (/login/) and CGI endpoints
+        # (/login/submit, /logout, the internal auth-check location, and
+        # the @dashboard_login_redirect the error_page above points at)
+        # live in modules/dashboard-login.nix, alongside the CGI
+        # derivations they reference — same file, same "one module owns
+        # its own nginx locations" shape modules/self-update.nix already
+        # uses for /update/status and /update/trigger on this same vhost.
+        "^~ /css/".root = dashboardSite;
+        "^~ /js/".root = dashboardSite;
+        "^~ /images/".root = dashboardSite;
+
+        # LLDAP's own admin UI redirect page — public for the same reason
+        # /login/ is: someone locked out (forgotten password) needs to be
+        # able to reach LLDAP to reset it without already being logged
+        # into the dashboard first.
+        "^~ /account/".root = dashboardSite;
+
+        # Catch-all: every other dashboard page (Services, Samba, NFS,
+        # the /update page, Help) falls through to here and requires
+        # login. Explicit root, not relying on inheritance from the
+        # vhost level, to keep this location's behavior fully spelled
+        # out alongside the auth_request that makes it different from
+        # the equivalent unauthenticated default this repo had before.
+        "/" = {
+          root = dashboardSite;
+          extraConfig = authRequestSnippet;
+        };
+      });
     };
   };
 
   networking.firewall.interfaces."nebula1".allowedTCPPorts = [ 8097 ];
   networking.firewall.interfaces.${lanIf}.allowedTCPPorts = [ 8097 ];
+
+  mySystem.dashboardSite = dashboardSite;
 }

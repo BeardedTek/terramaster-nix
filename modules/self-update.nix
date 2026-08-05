@@ -4,6 +4,17 @@ let
   cfg = config.mySystem.features.selfUpdate;
   hostName = config.networking.hostName;
 
+  # /update/status and /update/trigger below now rely entirely on
+  # modules/dashboard-login.nix's auth_request checks for protection —
+  # there's no htpasswd fallback anymore (removed once dashboard login
+  # itself could tell admins apart from ordinary users). That makes
+  # enabling selfUpdate without also enabling sso leave /update/trigger
+  # completely open, same as every other dashboard location when SSO's
+  # off (see modules/dashboard.nix's loginEnabled) — consistent with the
+  # rest of this vhost, but worth calling out since this module used to
+  # be independently self-protecting.
+  loginEnabled = config.mySystem.features.sso.enable;
+
   repo = "BeardedTek/terramaster-nix";
   apiLatest = "https://api.github.com/repos/${repo}/releases/latest";
 
@@ -227,15 +238,6 @@ in
 
     systemd.tmpfiles.rules = [
       "d /run/nas-update 0750 nas-update nas-update - -"
-      # auth_basic_user_file is read directly by the nginx *worker*
-      # process (config.services.nginx.user/.group, not root) — unlike
-      # EnvironmentFile= secrets elsewhere in this repo (read by systemd
-      # itself, as root, before dropping privileges), so root:root 0600
-      # actually breaks this one instead of being the safe default.
-      # `z` fixes ownership/mode on every activation regardless of how
-      # the file was actually delivered, and is a no-op if it's not
-      # there yet (first boot, before the secret's been copied in).
-      "z /etc/nas-update/htpasswd 0640 root ${config.services.nginx.group} - -"
     ];
 
     systemd.services.nas-update-check = {
@@ -281,15 +283,15 @@ in
 
     # Rides on the existing dashboard vhost (modules/dashboard.nix,
     # port 8097) — no new Traefik backend, no new firewall port.
-    # /update/status is deliberately NOT behind auth_basic — same trust
-    # level as metrics.json, which is already unauthenticated: "a newer
-    # release exists" is meant to be visible to anyone who can reach the
-    # dashboard at all, so the page can show it without asking for a
-    # password first. Only /update/trigger — the one that actually runs
-    # nixos-rebuild — is gated.
+    # /update/status is gated behind plain dashboard login (any logged-in
+    # user, not admin-only) — same as /metrics.json in modules/dashboard.nix,
+    # per the dashboard-wide login design. This used to predate that
+    # design and was left unauthenticated; fixed here to actually match.
+    # /update/trigger below needs admin specifically, not just login.
     services.nginx.virtualHosts.dashboard.locations = {
       "= /update/status" = {
         extraConfig = ''
+          ${lib.optionalString loginEnabled "auth_request /internal/dashboard-auth-check;"}
           fastcgi_pass unix:/run/fcgiwrap-nas-update.sock;
           fastcgi_param SCRIPT_FILENAME ${lib.getExe statusCgi};
           fastcgi_param REQUEST_METHOD $request_method;
@@ -300,8 +302,20 @@ in
       };
       "= /update/trigger" = {
         extraConfig = ''
-          auth_basic "NAS Update";
-          auth_basic_user_file /etc/nas-update/htpasswd;
+          # Gated on dashboard-login admin status specifically (not just
+          # "logged in") — see modules/dashboard-login.nix's
+          # adminCheckCgi/dashboard-admin-check. This used to be a
+          # separate htpasswd prompt layered on top of dashboard login;
+          # that's gone now that dashboard login itself distinguishes
+          # admins from ordinary LDAP users, so there's no longer a
+          # meaningful second secret to re-enter. Note this location
+          # previously had NO auth_request at all despite a comment
+          # claiming otherwise — the general "/" catch-all's auth_request
+          # never actually covered this exact-match location, so
+          # /update/trigger was protected by htpasswd alone. Fixed here,
+          # not just carried forward, since removing htpasswd without
+          # this would have left it wide open.
+          ${lib.optionalString loginEnabled "auth_request /internal/dashboard-admin-check;"}
           fastcgi_pass unix:/run/fcgiwrap-nas-update.sock;
           fastcgi_param SCRIPT_FILENAME ${lib.getExe triggerCgi};
           fastcgi_param REQUEST_METHOD $request_method;

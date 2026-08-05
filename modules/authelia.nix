@@ -258,21 +258,20 @@ in
           groups_filter = "(&(member={dn})(objectClass=groupOfNames))";
         };
 
+        # No dashboard domain rules here at all — the dashboard's own
+        # Traefik routers never had the `authelia` ForwardAuth middleware
+        # attached in the first place (they're hardcoded separately from
+        # routersFor, below), so an access_control entry for them would be
+        # inert. Dashboard-wide login is handled entirely at the nginx
+        # layer instead (modules/dashboard-login.nix,
+        # modules/dashboard.nix's auth_request wiring) — deliberately not
+        # routed through Authelia's cross-domain session, which can't work
+        # for the dashboard's direct-IP access path (browsers never send a
+        # domain-scoped cookie to a raw IP request, no server-side fix for
+        # that). See the SSO plan's "Dashboard-wide gating" section.
         access_control = {
           default_policy = "deny";
-          rules = [
-            # Dashboard: homepage and the /update page/status endpoint stay
-            # fully public, unchanged from today — see modules/self-update.nix
-            # for why /update/status is deliberately unauthenticated.
-            # /update/trigger itself is intentionally NOT listed here; see
-            # the SSO plan's "Dashboard /update step-up" section — it's
-            # layered behind the existing htpasswd gate instead of an
-            # Authelia policy tier, once that phase lands.
-            {
-              domain = [ "${hostName}.${domain}" "${hostName}.nebula.${domain}" ];
-              policy = "bypass";
-            }
-          ] ++ (lib.mapAttrsToList ruleFor protectedServices);
+          rules = lib.mapAttrsToList ruleFor protectedServices;
         };
 
         storage.local.path = "/var/lib/authelia-main/db.sqlite3";

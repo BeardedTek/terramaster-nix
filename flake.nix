@@ -51,6 +51,7 @@
           ./modules/lldap.nix
           ./modules/authelia.nix
           ./modules/smtp-relay.nix
+          ./modules/dashboard-login.nix
         ];
       };
 

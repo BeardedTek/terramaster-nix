@@ -94,6 +94,17 @@
     '';
   };
 
+  options.mySystem.dashboardSite = lib.mkOption {
+    type = lib.types.nullOr lib.types.package;
+    default = null;
+    description = ''
+      The built Hugo dashboard site, set unconditionally by
+      modules/dashboard.nix. Read by modules/dashboard-login.nix so its
+      login page location can serve straight from the exact same build
+      output, without rebuilding an identical derivation a second time.
+    '';
+  };
+
   options.mySystem.sso.protectedServices = lib.mkOption {
     type = lib.types.attrsOf (
       lib.types.submodule {

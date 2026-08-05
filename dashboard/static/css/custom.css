@@ -281,3 +281,74 @@
   .update-icon-failed {
     color: #dc2626;
   }
+
+  /* dashboard/static/js/auth-nav.js's profile button + dropdown
+     (Phase 7 of the SSO rollout). Hand-written for the same reason as
+     the update modal above: arbitrary-position/z-index/width utilities
+     aren't in this vendored bundle, only what flowbite-beardedtek.com's
+     own templates happened to use. bg-white/dark:bg-gray-800/border/
+     rounded-lg/shadow-sm (the panel's background) ARE confirmed present
+     (already used in dashboard/content/update.md's cards) so those stay
+     as plain Tailwind classes on the element itself. */
+  .auth-nav-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    background: transparent;
+    cursor: pointer;
+  }
+  .dark .auth-nav-button {
+    color: #d1d5db;
+  }
+  .auth-nav-button:hover {
+    background-color: #f3f4f6;
+  }
+  .dark .auth-nav-button:hover {
+    background-color: #374151;
+  }
+
+  .auth-nav-dropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    width: 12rem;
+    z-index: 50;
+    overflow: hidden;
+  }
+
+  .auth-nav-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    color: #374151;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+  }
+  .dark .auth-nav-item {
+    color: #d1d5db;
+  }
+  .auth-nav-item:hover {
+    background-color: #f3f4f6;
+  }
+  .dark .auth-nav-item:hover {
+    background-color: #374151;
+  }
+
+  /* System Preferences' group/mode toggles (preferences-toggles.js) —
+     dims a whole sub-section (switch rows or a static-network field
+     grid) while its inputs are disabled, rather than just showing the
+     browser's bare disabled-input styling on each one individually. */
+  .preferences-dimmed {
+    opacity: 0.5;
+  }
+  .switch input:disabled + .slider {
+    cursor: not-allowed;
+  }
