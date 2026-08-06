@@ -5,16 +5,16 @@ menu: {main: {weight: 20}}
 weight: 20
 ---
 
-Design rationale, deployment steps, and troubleshooting for the Bearded
-NAS flake.
+Everything you need to install and use Bearded NAS.
 
-- **[Architecture](/docs/architecture/)** — design rationale: what each
-  piece is for and why it's built this way.
-- **[Deployment](/docs/deployment/)** — step-by-step install procedure
-  for `young`.
-- **[Installer ISO](/docs/installer/)** — the self-contained TUI installer
-  for provisioning a new NAS.
-- **[Home Assistant](/docs/home-assistant/)** — HACS, Z-Wave JS, Mosquitto,
-  and the Samba config share.
-- **[Troubleshooting](/docs/troubleshooting/)** — failure modes hit (and
-  fixed) while building and operating this system, by symptom.
+- **[Introduction](/docs/introduction/)** — what this project is and what
+  it gives you.
+- **[Installation](/docs/installation/)** — installer ISO (default) or
+  `nixos-anywhere` from a workstation.
+- **[Usage](/docs/usage/)** — logging in, the web dashboard, managing
+  users in LLDAP, and every available service.
+- **[Troubleshooting](/docs/troubleshooting/)** — common problems and what
+  to do about them.
+- **[Architecture](/docs/architecture/)** — reference material: design
+  rationale and internals, for anyone maintaining or extending the flake
+  itself.

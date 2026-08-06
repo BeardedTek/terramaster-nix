@@ -1,6 +1,6 @@
 ---
 title: Bearded NAS
-description: A self-hosted NixOS flake for TerraMaster-family NAS hardware
+description: A NixOS based Distribution for Low Powered NAS Devices
 params:
   body_class: td-navbar-links-all-active
 ---
@@ -39,28 +39,29 @@ to bring a new box up from blank disks.
 
 {{% blocks/section color="primary" type="row" %}}
 
-{{% blocks/feature title="Declarative storage" icon="fa-solid fa-server" url="/docs/architecture/" %}}
+{{% blocks/feature title="Declarative storage" icon="fa-solid fa-server" url="/docs/installation/" %}}
 
 ZFS pool creation or adoption, tmpfs root to spare the boot drive, and
-`impermanence`-backed persistence — see the
-[architecture doc](/docs/architecture/) for the full design.
+`impermanence`-backed persistence — see
+[Installation](/docs/installation/) to get started.
 
 {{% /blocks/feature %}}
 
-{{% blocks/feature title="Self-contained installer" icon="fa-solid fa-compact-disc" url="/docs/installer/" %}}
+{{% blocks/feature title="Self-contained installer" icon="fa-solid fa-compact-disc" url="/docs/installation/iso/" %}}
 
 A bootable ISO with a TUI wizard that partitions disks, collects users
 and settings, and runs `nixos-install` itself — no separate workstation
 required. Pre-built for every
 [release](https://github.com/BeardedTek/terramaster-nix/releases), or
-[see the docs](/docs/installer/) to build your own.
+[see the docs](/docs/installation/iso/) to build your own.
 
 {{% /blocks/feature %}}
 
-{{% blocks/feature title="Media & home automation" icon="fa-solid fa-house-signal" url="/docs/home-assistant/" %}}
+{{% blocks/feature title="Media & home automation" icon="fa-solid fa-house-signal" url="/docs/usage/services/" %}}
 
 Jellyfin, Sonarr, Radarr, Jackett, Seerr, Home Assistant, and Frigate,
-proxied through Traefik on both the LAN and a Nebula mesh.
+proxied through Traefik on both the LAN and a Nebula mesh — see
+[Available Services](/docs/usage/services/).
 
 {{% /blocks/feature %}}
 

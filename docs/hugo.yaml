@@ -42,7 +42,7 @@ languages:
     label: English
     title: Bearded NAS
     params:
-      description: A self-hosted NixOS flake for TerraMaster-family NAS hardware — declarative storage, media stack, and a self-contained installer wizard.
+      description: A NixOS based Distribution for Low Powered NAS Devices — declarative storage, media stack, and a self-contained installer wizard.
 
 markup:
   goldmark:
