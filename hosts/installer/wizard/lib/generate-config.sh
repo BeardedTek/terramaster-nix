@@ -22,11 +22,14 @@ gen_variables_nix() {
 
   mySystem.manufacturer = "$(wiz_get manufacturer)";
   mySystem.model = "$(wiz_get instance)";
+  mySystem.domain = "$(wiz_get domain)";
 
   mySystem.users = [
 ${users_nix}  ];
 
   mySystem.contactInfo = [ ];
+
+  mySystem.lanInterface = "$(wiz_get lan_if)";
 
   mySystem.security.sshPasswordAuth = $(wiz_get use_password_auth);
 

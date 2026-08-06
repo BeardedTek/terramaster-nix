@@ -87,6 +87,14 @@ in
 {
   services.traefik = {
     enable = true;
+    # Kept as a real (non-"-") path here: services.traefik.environmentFiles
+    # is typed `listOf path`, which rejects a "-"-prefixed string outright
+    # ("is not of type absolute path") — confirmed the hard way. This value
+    # still needs to be non-empty regardless, since nixpkgs' own module
+    # uses `cfg.environmentFiles != []` to decide whether to route through
+    # the envsubst'd /run/traefik/config.toml at all (see
+    # systemd.services.traefik override below, which makes the file
+    # optional at the *systemd* level instead).
     environmentFiles = [ "/etc/traefik/traefik.env" ];
 
     staticConfigOptions = {
@@ -195,6 +203,25 @@ in
       });
     };
   };
+
+  # Overrides nixpkgs' own systemd.services.traefik.serviceConfig.EnvironmentFile
+  # (set verbatim from services.traefik.environmentFiles above) with a
+  # "-"-prefixed path — systemd's own EnvironmentFile= syntax for "load if
+  # present, don't fail the unit if it's missing" — bypassing that NixOS
+  # option's strict `listOf path` type (which rejects a "-" prefix outright)
+  # by setting the underlying systemd directive directly instead. Matches
+  # 70-secrets.sh's own documented intent ("Nebula/Traefik secrets are
+  # optional — those services just won't work until configured
+  # post-install"), which wasn't actually true before this: Traefik
+  # (fronting every other web service on the box) failed to start at all
+  # without a real LINODE_TOKEN, confirmed on a fresh install with no
+  # DNS/ACME set up yet. The envsubst pre-start step (nixpkgs' own
+  # traefik.nix) doesn't independently require the file to exist — it just
+  # substitutes empty values for whatever didn't load — so this is safe:
+  # cert issuance still fails without a real token, but Traefik itself (and
+  # everything behind it) is reachable over plain HTTP either way.
+  systemd.services.traefik.serviceConfig.EnvironmentFile =
+    lib.mkForce "-/etc/traefik/traefik.env";
 
   networking.firewall.interfaces."nebula1".allowedTCPPorts = [ 80 443 8099 ];
   networking.firewall.interfaces.${lanIf}.allowedTCPPorts = [ 80 443 8099 8090 ];

@@ -66,6 +66,26 @@ let
 in
 {
   config = lib.mkIf cfg.enable {
+    # lldap.service runs with DynamicUser=true, User=Group="lldap" — that
+    # name is only resolvable via nss-systemd *while the service is
+    # actually running* (confirmed the hard way: `getent group lldap`
+    # returns nothing, and a `systemd-tmpfiles` `z ... lldap - -` rule
+    # fails outright with "Failed to resolve group 'lldap': Unknown
+    # group", whenever the service isn't up). Since this file has to be
+    # readable *before* lldap can start at all, the group-ownership fix
+    # every other LDAP-bind secret in this repo uses (see
+    # modules/unix-ldap-login.nix's own `z` rule) is a deadlock here
+    # specifically — chown to a name that only exists once the thing
+    # trying to read the file has already started. World-readable is the
+    # pragmatic way out (the directory itself is already 0755, so this
+    # doesn't newly expose anything beyond "any local process on this
+    # box" that wasn't already true of the directory listing); a
+    # `LoadCredential=`-based module rewrite would avoid that but is a
+    # bigger change, deliberately not made here.
+    systemd.tmpfiles.rules = [
+      "z ${adminPassFile} 0644 root root - -"
+    ];
+
     services.lldap = {
       enable = true;
       # Freeform passthrough straight to lldap_config.toml — see

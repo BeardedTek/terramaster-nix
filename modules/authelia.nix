@@ -203,6 +203,26 @@ in
 
     mySystem.sso.protectedServices = protectedServices;
 
+    # services.authelia.instances.main runs as the fixed `authelia-main`
+    # system user and reads every settings.secrets.*File / ldapPasswordFile
+    # path directly — same pattern, same fix, as modules/unix-ldap-login.nix's
+    # own bindPasswordFile `z` rule: a plain `chmod 600` (root-only, e.g.
+    # from the installer wizard) leaves these unreadable by that user. `z`
+    # is a no-op for any file not there yet (first boot, before the secret's
+    # been copied in) — oidc_hmac_secret/oidc_issuer_private_key.pem are
+    # always required once authelia is enabled at all, not just when a
+    # feature flag turns on an OIDC client: modules/authelia.nix's own
+    # candidateOidcClients.filebrowser entry is unconditionally
+    # `enable = true`.
+    systemd.tmpfiles.rules = [
+      "z ${ldapPasswordFile} 0640 root authelia-main - -"
+      "z /etc/authelia/jwt_secret 0640 root authelia-main - -"
+      "z /etc/authelia/session_secret 0640 root authelia-main - -"
+      "z /etc/authelia/storage_encryption_key 0640 root authelia-main - -"
+      "z /etc/authelia/oidc_hmac_secret 0640 root authelia-main - -"
+      "z /etc/authelia/oidc_issuer_private_key.pem 0640 root authelia-main - -"
+    ];
+
     services.authelia.instances.main = {
       enable = true;
 

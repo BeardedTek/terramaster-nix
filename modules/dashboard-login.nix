@@ -217,6 +217,15 @@ in
       # (12h) auto-removes stale session files on its own, independent of
       # (but consistent with) sessionTtlMinutes' own explicit check above.
       "d ${sessionDir} 0700 dashboard-login dashboard-login 12h -"
+      # loginCgi (fcgiwrap, User=dashboard-login) reads this delivered
+      # secret directly — same pattern, same fix, as
+      # modules/unix-ldap-login.nix's own bindPasswordFile `z` rule: a
+      # plain `chmod 600` (root-only, e.g. from the installer wizard)
+      # leaves it unreadable by that user, and the admin-group check
+      # silently fails safe to isAdmin=false rather than failing loudly —
+      # confirmed the hard way, a real admin account logged in fine but
+      # never saw System Preferences.
+      "z ${ldapBindPasswordFile} 0640 root dashboard-login - -"
     ];
 
     # Re-run on every activation, same reconciliation shape as

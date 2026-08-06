@@ -24,6 +24,7 @@ $(wiz_get pool_disks | sed 's/^/    /')
 
   wiz_msgbox "Review" "manufacturer/instance: $(wiz_get manufacturer)/$(wiz_get instance)
 hostname: $(wiz_get hostname)
+domain: $(wiz_get domain)
 LAN interface: $(wiz_get lan_if)
 repo source: $(wiz_get repo_source)
 

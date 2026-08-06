@@ -29,6 +29,14 @@ Continue?" || wiz_abort "Instance directory already exists: $manufacturer/$insta
     "$instance")
   wiz_set hostname "$hostname"
 
+  local domain
+  domain=$(wiz_input "Domain" \
+    "mySystem.domain — required, no default. The base domain every per-service hostname is built from (<service>.${hostname}.<domain> on the LAN, <service>-${hostname}.nebula.<domain> over a Nebula mesh if configured) — Traefik always runs and always needs this, regardless of which other services are enabled. Doesn't need to resolve anywhere right now if you're not setting up DNS/Traefik certs yet, but the option itself has no default and must be set to something.")
+  if [ -z "$domain" ]; then
+    wiz_die "Domain can't be empty — mySystem.domain has no default and Traefik (always enabled) requires it."
+  fi
+  wiz_set domain "$domain"
+
   hostid=$(head -c8 /etc/machine-id 2>/dev/null || true)
   if [ -z "$hostid" ]; then
     hostid=$(tr -dc 'a-f0-9' < /dev/urandom | head -c8)

@@ -65,6 +65,20 @@ stage_90_install() {
     mount -t zfs "$data" "/mnt/$pool/data"
   fi
 
+  # modules/filebrowser.nix and modules/frigate.nix both read a secret via
+  # builtins.readFile "/persist/etc/..." — an *eval-time* read (not a
+  # runtime *File option), which nixos-install's own `nix build`-under-
+  # the-hood resolves against this live installer's ambient root, NOT
+  # --root /mnt. On a fresh install /mnt/persist is the only place that
+  # data exists (nothing is mounted at bare /persist yet — this session
+  # booted off a tmpfs root), so those reads always fail with "path
+  # '/persist/etc/...' does not exist" unless something makes the two
+  # agree. Bind-mounting closes that gap for every secret written under
+  # /mnt/persist below, present and future, without each module needing
+  # its own special case.
+  mkdir -p /persist
+  mount --bind /mnt/persist /persist
+
   local first_user
   first_user=$(wiz_get user_list | head -n1)
   if [ -n "$(wiz_get ssh_pubkey)" ]; then
@@ -117,10 +131,52 @@ stage_90_install() {
       openssl rand -hex 32 > /mnt/persist/etc/authelia/session_secret
       openssl rand -hex 32 > /mnt/persist/etc/authelia/storage_encryption_key
       openssl rand -hex 16 > /mnt/persist/etc/authelia/ldap_password
+      # modules/authelia.nix's candidateOidcClients.filebrowser entry is
+      # unconditionally enable = true, so these two are always required
+      # once authelia itself is on — not gated on feature_filebrowser.
+      # oidc_issuer_private_key.pem needs a real RSA key, not just random
+      # bytes: Authelia signs OIDC tokens with it.
+      openssl rand -hex 32 > /mnt/persist/etc/authelia/oidc_hmac_secret
+      openssl genrsa -out /mnt/persist/etc/authelia/oidc_issuer_private_key.pem 2048 2>/dev/null
       chmod 600 /mnt/persist/etc/authelia/jwt_secret \
         /mnt/persist/etc/authelia/session_secret \
         /mnt/persist/etc/authelia/storage_encryption_key \
-        /mnt/persist/etc/authelia/ldap_password
+        /mnt/persist/etc/authelia/ldap_password \
+        /mnt/persist/etc/authelia/oidc_hmac_secret \
+        /mnt/persist/etc/authelia/oidc_issuer_private_key.pem
+
+      # modules/filebrowser.nix reads this at eval time (builtins.readFile,
+      # not a runtime *File option) whenever ssoEnabled — the file has to
+      # exist before nixos-install even evaluates the config, not just
+      # before FileBrowser starts. Caught by the VM install test: without
+      # this, nixos-install fails outright with "path
+      # '/persist/etc/filebrowser/oidc_client_secret' does not exist".
+      if [ "$(wiz_get feature_filebrowser)" = "true" ]; then
+        mkdir -p /mnt/persist/etc/filebrowser
+        openssl rand -hex 32 > /mnt/persist/etc/filebrowser/oidc_client_secret
+        # Separate from the OIDC client secret above — this is
+        # FileBrowser's own *local* break-glass admin account
+        # (filebrowser-setup.service's FILEBROWSER_ADMIN_USER/PASSWORD,
+        # see secrets/extra-files/persist/etc/filebrowser/admin.env.example),
+        # required unconditionally by modules/filebrowser.nix's
+        # EnvironmentFile — deliberately not the same username as any real
+        # LLDAP user (see that .example file's own comment on why).
+        {
+          echo "FILEBROWSER_ADMIN_USER=admin"
+          echo "FILEBROWSER_ADMIN_PASSWORD=$(openssl rand -hex 16)"
+        } > /mnt/persist/etc/filebrowser/admin.env
+        chmod 600 /mnt/persist/etc/filebrowser/oidc_client_secret /mnt/persist/etc/filebrowser/admin.env
+      fi
+
+      # modules/frigate.nix's proxyAuthSecret is the same eval-time
+      # readFile pattern, forced once frigate lands in
+      # mySystem.sso.protectedServices (authelia.nix, gated on this same
+      # feature_sso_authelia flag) — same fix, same reason.
+      if [ "$(wiz_get feature_frigate)" = "true" ]; then
+        mkdir -p /mnt/persist/etc/frigate
+        openssl rand -hex 32 > /mnt/persist/etc/frigate/proxy_auth_secret
+        chmod 600 /mnt/persist/etc/frigate/proxy_auth_secret
+      fi
     fi
   fi
 
@@ -163,6 +219,9 @@ secrets/initial-passwords.env was NOT copied there (it only ever mattered for th
     for mnt in $(findmnt -R -o TARGET -n /mnt 2>/dev/null | sort -r); do
       umount "$mnt" 2>/dev/null || umount -l "$mnt" 2>/dev/null
     done
+    # The /persist bind mount added above lives outside the /mnt subtree,
+    # so the loop above never touches it.
+    umount /persist 2>/dev/null || umount -l /persist 2>/dev/null
     zpool export "$(wiz_get pool_name)" 2>/dev/null
     reboot
   fi

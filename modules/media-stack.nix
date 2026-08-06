@@ -83,6 +83,17 @@ in
     })
 
     (lib.mkIf (f.jellyfin.enable && ldapEnabled) {
+      # jellyfin-ldap-plugin-setup (below) runs as the fixed `jellyfin`
+      # system user and reads this delivered secret directly — same
+      # pattern, same fix, as modules/unix-ldap-login.nix's own
+      # bindPasswordFile `z` rule: a plain `chmod 600` (root-only, e.g.
+      # from the installer wizard) leaves it unreadable by that user.
+      # `z` is a no-op if the file isn't there yet (first boot, before
+      # the secret's been copied in).
+      systemd.tmpfiles.rules = [
+        "z ${jellyfinLdapBindPasswordFile} 0640 root jellyfin - -"
+      ];
+
       # Re-run on every activation, same reconciliation shape as
       # modules/lldap.nix's lldap-provision-users / modules/authelia.nix's
       # authelia-provision-ldap-bind-user.
