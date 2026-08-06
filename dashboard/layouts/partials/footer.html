@@ -7,7 +7,7 @@
             <ul class="flex flex-wrap justify-around items-center mb-6 text-sm font-medium text-gray-500 sm:mb-0 dark:text-gray-400">
                 {{ range .Site.Data.footer.links }}
                 <li>
-                    <a href="{{ .href | relURL }}" class="hover:text-gray-900 dark:hover:text-white mx-4">{{ .name }}</a>
+                    <a href="{{ .href | relURL }}" class="hover:text-gray-900 dark:hover:text-white mx-4"{{ if .external }} target="_blank" rel="noopener noreferrer"{{ end }}>{{ .name }}</a>
                 </li>
                 {{ end }}
             </ul>

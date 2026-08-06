@@ -1,9 +1,9 @@
 links:
-  - name: Services
-    href: "/services/"
-  - name: Samba
-    href: "/samba/"
-  - name: NFS
-    href: "/nfs/"
+  - name: GitHub
+    href: "https://github.com/BeardedTek/terramaster-nix"
+    external: true
   - name: Help
     href: "/troubleshooting/"
+  - name: Docs
+    href: "https://beardedtek.github.io/terramaster-nix/"
+    external: true

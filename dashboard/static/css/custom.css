@@ -349,6 +349,18 @@
   .preferences-dimmed {
     opacity: 0.5;
   }
+
+  /* Nav bar (layouts/partials/nav.html): "Bearded NAS" next to the logo
+     mark is dropped below 640px so the logo+hostname badge stays short
+     enough for the profile button/theme toggle/hamburger group to fit on
+     the same row — the vendored theme's own flex-wrap on that row let
+     them silently wrap to a second line once auth-nav.js's profile
+     button pushed the row past one line's width on narrow viewports. */
+  @media (max-width: 639px) {
+    .navbar-logo-text {
+      display: none;
+    }
+  }
   .switch input:disabled + .slider {
     cursor: not-allowed;
   }

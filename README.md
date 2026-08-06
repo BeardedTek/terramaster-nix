@@ -30,3 +30,7 @@ for a local preview). Start with:
   extend it further.
 - **[Troubleshooting](docs/content/en/docs/troubleshooting/_index.md)** —
   known failure modes and their fixes, organized by symptom.
+
+## License
+
+[MIT](LICENSE)
