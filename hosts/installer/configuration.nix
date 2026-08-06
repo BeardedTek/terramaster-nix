@@ -35,6 +35,7 @@ in
     pkgs.jq
     pkgs.zfs
     pkgs.curl # wizard's secrets stage: fetching a user's key from github.com/<user>.keys
+    pkgs.openssl # 90-install.sh: generating SSO's machine-credential secrets
     disko.packages.x86_64-linux.disko
   ];
 

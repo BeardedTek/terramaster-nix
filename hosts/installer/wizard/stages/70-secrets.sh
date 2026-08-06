@@ -95,4 +95,22 @@ stage_70_secrets() {
   else
     wiz_set have_traefik "false"
   fi
+
+  # LLDAP's bootstrap admin password — the one new SSO-related secret a
+  # human actually needs to know, since it's used to log into LLDAP's own
+  # admin UI right after install (see 90-install.sh's final message).
+  # Every other new secret (Authelia's crypto secrets, the per-service
+  # LDAP bind-account passwords) is a machine-to-machine credential,
+  # generated and written directly by 90-install.sh with no prompt needed.
+  if [ "$(wiz_get feature_sso)" = "true" ]; then
+    local ldap_pw ldap_pw2
+    while true; do
+      ldap_pw=$(wiz_password "LLDAP admin password" "Set the LLDAP directory's bootstrap admin password — you'll use this to log into LLDAP's own admin UI after install and set an initial password for each user.")
+      ldap_pw2=$(wiz_password "LLDAP admin password" "Confirm:")
+      [ "$ldap_pw" = "$ldap_pw2" ] && [ -n "$ldap_pw" ] && break
+      wiz_msgbox "Mismatch" "Passwords didn't match or were empty — try again."
+    done
+    wiz_set ldap_admin_password "$ldap_pw"
+    unset ldap_pw ldap_pw2
+  fi
 }

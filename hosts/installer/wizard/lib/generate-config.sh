@@ -36,6 +36,9 @@ ${users_nix}  ];
     minio.enable = $(f minio);
     filebrowser.enable = $(f filebrowser);
 
+    sso.enable = $(f sso);
+    sso.authelia.enable = $(f sso_authelia);
+
     homeAssistant = {
       enable = $(f homeassistant);
       zwave.enable = $(f homeassistant_zwave);
@@ -80,7 +83,14 @@ _gen_persistence_block() {
       "/etc/minio"
       "/var/lib/filebrowser"
       "/etc/filebrowser"
-      "/etc/nas-update"
+      "/etc/lldap"
+      "/etc/authelia"
+      "/var/lib/authelia-main"
+      "/etc/opensmtpd"
+      "/etc/jellyfin"
+      "/etc/dashboard-login"
+      "/etc/unix-ldap-login"
+      { directory = "/var/lib/private"; user = "root"; group = "root"; mode = "0700"; }
     ];
     files = [
       "/etc/machine-id"
