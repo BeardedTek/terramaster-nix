@@ -261,7 +261,7 @@ let
 
   statusCgi = pkgs.writeShellApplication {
     name = "dashboard-services-status-cgi";
-    runtimeInputs = [ pkgs.coreutils pkgs.findutils ];
+    runtimeInputs = [ pkgs.jq pkgs.coreutils pkgs.findutils ];
     text = ''
       printf 'Status: 200 OK\r\nContent-Type: application/json\r\n\r\n'
       if [ -f ${runDir}/result ]; then
