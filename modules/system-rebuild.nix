@@ -99,7 +99,7 @@ let
       # embed the literal placeholder %TAG% in its label; substituted
       # here once the real tag is known. `%` isn't a glob metacharacter,
       # so this is a plain literal substring replacement.
-      label=${label//%TAG%/$tag}
+      label=''${label//%TAG%/$tag}
 
       write_progress "running" "Downloading $tag..."
       rm -rf ${stagingDir}
