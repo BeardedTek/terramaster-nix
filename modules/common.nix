@@ -142,6 +142,21 @@
       type = lib.types.bool;
       default = true;
     };
+    nebula.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Nebula overlay mesh VPN — see modules/nebula.nix. Also gates
+        Traefik's *.nebula.<domain> wildcard cert request and the
+        nebula-domain router for every backend service
+        (modules/traefik.nix) — no point requesting/serving a cert for a
+        mesh that isn't running. Defaults to true (not false, unlike the
+        other opt-in flags here) because Nebula ran unconditionally on
+        every host before this flag existed; still needs
+        /etc/nebula/config.yaml delivered out-of-band regardless of this
+        setting (see hosts/installer/wizard/stages/70-secrets.sh).
+      '';
+    };
     minio.enable = lib.mkOption {
       type = lib.types.bool;
       default = false;

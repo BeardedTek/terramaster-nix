@@ -23,6 +23,11 @@ let
   stagingDir = "/persist/nixos-update-staging";
   triggerFile = "/run/nas-update/trigger-update";
   applyingFile = "/run/nas-update/applying";
+  # Both this module and modules/dashboard-services.nix ultimately call
+  # nixos-rebuild switch, which cannot safely run twice at once —
+  # dashboard-services.nix carries the matching check against our own
+  # applyingFile in the other direction.
+  dashboardServicesApplyingFile = "/run/dashboard-services/applying";
   # Under /run/nas-update (tmpfs, owned by the unprivileged nas-update
   # user — see below), not /var/lib/dashboard: confirmed the hard way
   # that nas-update-status-cgi, invoked via fcgiwrap as that user, can't
@@ -104,6 +109,14 @@ let
     runtimeInputs = [ pkgs.curl pkgs.jq pkgs.gnutar pkgs.gzip pkgs.coreutils pkgs.nixos-rebuild ];
     text = ''
       rm -f ${triggerFile}
+
+      if [ -f ${dashboardServicesApplyingFile} ]; then
+        jq -n '{state:"failed", message:"A service change is currently being applied — try again in a moment.", log:[]}' \
+          > ${progressFile}.tmp
+        mv ${progressFile}.tmp ${progressFile}
+        exit 0
+      fi
+
       rm -f ${progressFile} ${buildLogFile}
       touch ${applyingFile}
       trap 'rm -f ${applyingFile}' EXIT

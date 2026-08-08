@@ -15,6 +15,15 @@
       system = "x86_64-linux";
       vars = import ./variables.nix;
       hostDir = ./hosts + "/${vars.mySystem.manufacturer}/${vars.mySystem.model}";
+
+      # Dashboard-driven service enable/disable toggles
+      # (modules/dashboard-services.nix) write here on save — a real
+      # path on disk, independent of which checkout is doing the
+      # building, so it survives both a manual rebuild and every future
+      # self-update fetch (which always re-extracts a fresh tarball that
+      # never saw a local variables.nix edit). A no-op import on any box
+      # that's never touched that feature.
+      serviceOverridesPath = /persist/nixos-service-overrides.nix;
     in
     {
       # Attribute name follows variables.nix's own hostName rather than
@@ -42,7 +51,9 @@
           ./modules/media-stack.nix
           ./modules/nebula.nix
           ./modules/traefik.nix
+          ./modules/traefik-dns01.nix
           ./modules/dashboard.nix
+          ./modules/dashboard-services.nix
           ./modules/frigate.nix
           ./modules/home-assistant.nix
           ./modules/minio.nix
@@ -53,7 +64,7 @@
           ./modules/smtp-relay.nix
           ./modules/dashboard-login.nix
           ./modules/unix-ldap-login.nix
-        ];
+        ] ++ (if builtins.pathExists serviceOverridesPath then [ serviceOverridesPath ] else [ ]);
       };
 
       nixosConfigurations.installer = nixpkgs.lib.nixosSystem {

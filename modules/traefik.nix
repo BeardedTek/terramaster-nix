@@ -69,19 +69,56 @@ let
     ];
   };
 
-  routersFor = name: extraMiddlewares: {
+  # Nebula-variant routers (and the *.nebula.${domain} wildcard cert they
+  # need) only make sense when Nebula is actually running — gated on
+  # mySystem.features.nebula.enable, same flag modules/nebula.nix's own
+  # systemd service is gated on. Requesting/serving a cert for a mesh
+  # interface that doesn't exist is just wasted ACME rate-limit budget.
+  routersFor = name: extraMiddlewares: (lib.optionalAttrs f.nebula.enable {
     "${name}-${hostName}-nebula" = {
       rule = "Host(`${name}-${hostName}.nebula.${domain}`)";
       service = "${name}-${hostName}";
       entryPoints = [ "https" ];
       tls = nebulaTls;
     } // (lib.optionalAttrs (extraMiddlewares != [ ]) { middlewares = extraMiddlewares; });
+  }) // {
     "${name}-${hostName}-lan" = {
       rule = "Host(`${name}.${hostName}.${domain}`)";
       service = "${name}-${hostName}";
       entryPoints = [ "https" ];
       tls = lanTls;
     } // (lib.optionalAttrs (extraMiddlewares != [ ]) { middlewares = extraMiddlewares; });
+  };
+
+  # A domain the admin configures themselves via the dashboard's Let's
+  # Encrypt preferences (modules/traefik-dns01.nix) — envsubst-templated
+  # from /etc/traefik/traefik.env at every Traefik start (see
+  # environmentFiles below), same mechanism the DNS-01 provider name
+  # itself uses. Routed at the dashboard service, same generic default
+  # target the fixed "${hostName}-lan" router below already uses — a
+  # domain with no matching backend is a cert nobody serves behind.
+  # Gated on mySystem.features.traefikDns01.enable (default true): that
+  # flag is also what runs traefik-dns01-defaults.service, which seeds a
+  # harmless, always-valid default into traefik.env before Traefik's
+  # first ever start — without it, nothing guarantees TRAEFIK_EXTRA_DOMAIN
+  # isn't empty, and this router would render with a broken Host(``)
+  # rule. If that feature's ever turned off, this router just disappears
+  # along with it rather than risking that.
+  customDomainRouter = lib.optionalAttrs f.traefikDns01.enable {
+    custom-domain = {
+      rule = "Host(`\${TRAEFIK_EXTRA_DOMAIN}`)";
+      service = "dashboard";
+      entryPoints = [ "https" ];
+      tls = {
+        certResolver = "dns01-nebula";
+        domains = [
+          {
+            main = "\${TRAEFIK_EXTRA_DOMAIN}";
+            sans = [ "\${TRAEFIK_EXTRA_WILDCARD}" ];
+          }
+        ];
+      };
+    };
   };
 in
 {
@@ -124,11 +161,28 @@ in
         lan-local.address = ":8090";
       };
 
+      # provider is envsubst-templated from /etc/traefik/traefik.env's
+      # TRAEFIK_DNS_PROVIDER at every Traefik start — see the long comment
+      # on environmentFiles below for how nixpkgs' own traefik module
+      # already wires the envsubst step up, unconditionally, whenever
+      # environmentFiles != [] (which it always is here). The literal
+      # "\${TRAEFIK_DNS_PROVIDER}" text (escaped $ so Nix doesn't try to
+      # interpolate it) lands in the rendered static-config TOML verbatim
+      # and gets substituted at runtime — no nixpkgs-module changes
+      # needed. Configured via the dashboard's Let's Encrypt preferences
+      # (modules/traefik-dns01.nix), which also seeds a safe default
+      # ("linode", harmlessly inert without a real LINODE_TOKEN — same
+      # "missing/placeholder credential = clean no-op, not a crash"
+      # posture as everywhere else in this repo) before Traefik's first
+      # ever start.
+      #
+      # No explicit `resolvers` override (previously hardcoded to
+      # Linode-specific nameservers, 92.123.94.2/3, undocumented why) —
+      # doesn't generalize across the ~15 providers the dashboard now
+      # supports, so this falls back to lego's own default
+      # authoritative-nameserver auto-discovery instead.
       certificatesResolvers.dns01-nebula.acme = {
-        dnsChallenge = {
-          provider = "linode";
-          resolvers = [ "92.123.94.2:53" "92.123.94.3:53" ];
-        };
+        dnsChallenge.provider = "\${TRAEFIK_DNS_PROVIDER}";
         email = "le@beardedtek.com";
         storage = "/var/lib/traefik/acme.json";
       };
@@ -142,13 +196,14 @@ in
           ++ (lib.optionals (protected ? ${name}) [ "authelia" ])
           ++ (lib.optionals (name == "frigate" && protected ? frigate) [ "frigate-proxy-secret" ])
         ))
-      ) { } (builtins.attrNames enabledBackends)) // {
+      ) { } (builtins.attrNames enabledBackends)) // (lib.optionalAttrs f.nebula.enable {
         "${hostName}-nebula" = {
           rule = "Host(`${hostName}.nebula.${domain}`)";
           service = "dashboard";
           entryPoints = [ "https" ];
           tls = nebulaTls;
         };
+      }) // {
         "${hostName}-lan" = {
           rule = "Host(`${hostName}.${domain}`)";
           service = "dashboard";
@@ -161,7 +216,7 @@ in
           service = "dashboard";
           entryPoints = [ "lan-local" ];
         };
-      };
+      } // customDomainRouter;
 
       http.services = (lib.mapAttrs' (
         name: port:
