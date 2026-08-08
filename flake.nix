@@ -27,6 +27,10 @@
       # Same shape, for modules/dashboard-network.nix's DHCP/Static IP
       # toggle.
       networkOverridesPath = /persist/nixos-network-overrides.nix;
+      # Same shape, for modules/dashboard-smtp.nix's SMTP relay settings
+      # (forces mySystem.smtp as a whole — the password itself lives in
+      # /persist/etc/opensmtpd/secrets, not here).
+      smtpOverridesPath = /persist/nixos-smtp-overrides.nix;
     in
     {
       # Attribute name follows variables.nix's own hostName rather than
@@ -58,6 +62,7 @@
           ./modules/dashboard.nix
           ./modules/dashboard-services.nix
           ./modules/dashboard-network.nix
+          ./modules/dashboard-smtp.nix
           ./modules/system-rebuild.nix
           ./modules/frigate.nix
           ./modules/home-assistant.nix
@@ -70,7 +75,8 @@
           ./modules/dashboard-login.nix
           ./modules/unix-ldap-login.nix
         ] ++ (if builtins.pathExists serviceOverridesPath then [ serviceOverridesPath ] else [ ])
-          ++ (if builtins.pathExists networkOverridesPath then [ networkOverridesPath ] else [ ]);
+          ++ (if builtins.pathExists networkOverridesPath then [ networkOverridesPath ] else [ ])
+          ++ (if builtins.pathExists smtpOverridesPath then [ smtpOverridesPath ] else [ ]);
       };
 
       nixosConfigurations.installer = nixpkgs.lib.nixosSystem {

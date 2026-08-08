@@ -569,39 +569,62 @@ title: System Preferences
   </button>
   <div id="accordion-smtp-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-4">
 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-  Mirrors mySystem.smtp in variables.nix. Preview only &mdash; this form
-  isn't wired up yet.
+  Lets other services on this box (password resets, 2FA links, alerts)
+  send email through a real upstream provider. Saving rebuilds the
+  system in place, same as Services or Network changes &mdash; it can
+  take a few minutes.
 </p>
+<div class="flex items-center justify-between py-2 mb-4">
+  <span class="text-sm font-medium text-gray-900 dark:text-white">Enable SMTP relay</span>
+  <label class="switch"><input type="checkbox" id="smtp-enable"><span class="slider"></span></label>
+</div>
+<div id="smtp-fields">
+<div class="mb-4">
+  <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Provider Preset</span>
+  <select id="smtp-provider-preset" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+    <option value="custom" selected>Custom / Other (SMTP)</option>
+    <option value="gmail">Gmail</option>
+    <option value="outlook">Outlook.com / Hotmail</option>
+    <option value="yahoo">Yahoo Mail</option>
+    <option value="icloud">iCloud Mail</option>
+    <option value="sendgrid">SendGrid</option>
+    <option value="protonmail">Proton Mail (via Bridge)</option>
+  </select>
+  <p id="smtp-provider-hint" class="hidden mt-2 text-sm rounded-lg p-3 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"></p>
+</div>
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">SMTP Host</span>
-    <input type="text" value="mail.beardedtek.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+    <input type="text" id="smtp-host" placeholder="mail.example.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Port</span>
-    <input type="number" value="465" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+    <input type="number" id="smtp-port" value="587" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Encryption</span>
-    <select class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+    <select id="smtp-scheme" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
       <option value="smtp">SMTP (none)</option>
-      <option value="submission">Submission (STARTTLS)</option>
-      <option value="submissions" selected>Submissions (implicit TLS)</option>
+      <option value="submission" selected>Submission (STARTTLS)</option>
+      <option value="submissions">Submissions (implicit TLS)</option>
     </select>
   </div>
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Sender Address</span>
-    <input type="email" value="NO-REPLY@beardedtek.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+    <input type="email" id="smtp-sender" placeholder="no-reply@example.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Username</span>
-    <input type="text" value="no-reply@beardedtek.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+    <input type="text" id="smtp-username" placeholder="no-reply@example.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Password</span>
-    <input type="password" placeholder="Not shown — stored outside git" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+    <input type="password" id="smtp-password" placeholder="Not shown — stored outside git" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
 </div>
+</div>
+<div id="smtp-message" class="mt-4 text-sm hidden"></div>
+<button id="smtp-save-btn" type="button" class="hidden mt-4 text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Save</button>
   </div>
 </div>
 
@@ -766,6 +789,55 @@ title: System Preferences
       </div>
       <div class="flex justify-end mt-4">
         <button id="network-modal-close-btn" type="button" class="hidden text-white bg-primary-700 hover:bg-primary-800 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SMTP Modal -->
+<div id="smtp-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center update-modal-overlay p-4">
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl update-modal-panel w-full overflow-y-auto p-6 relative">
+    <button id="smtp-modal-close-x" type="button" class="hidden absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" aria-label="Close">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+    <!-- Confirm view -->
+    <div id="smtp-modal-confirm-view">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Apply SMTP settings?</h3>
+      <p id="smtp-modal-summary" class="text-sm text-gray-700 dark:text-gray-300 mb-6"></p>
+      <p class="text-sm text-gray-700 dark:text-gray-300 mb-6">This rebuilds the system in place. It can take several minutes, and services may briefly restart as part of activation.</p>
+      <div class="flex justify-end gap-2">
+        <button id="smtp-modal-cancel-btn" type="button" class="text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600">Cancel</button>
+        <button id="smtp-modal-confirm-btn" type="button" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Apply</button>
+      </div>
+    </div>
+    <!-- Progress view -->
+    <div id="smtp-modal-progress-view" class="hidden">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Applying SMTP settings</h3>
+      <div class="flex items-center gap-3 mb-4">
+        <div id="smtp-modal-spinner" class="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 dark:border-gray-600 border-t-primary-600 shrink-0"></div>
+        <svg id="smtp-modal-icon-success" class="hidden w-6 h-6 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <svg id="smtp-modal-icon-failed" class="hidden w-6 h-6 update-icon-failed shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <span id="smtp-modal-status-text" class="text-sm text-gray-700 dark:text-gray-300">Starting...</span>
+      </div>
+      <ul id="smtp-step-list" class="text-sm mb-4">
+        <li class="update-step" data-smtp-step="download"><span class="update-step-icon" data-smtp-step-icon="download">&#9675;</span>Downloading release</li>
+        <li class="update-step" data-smtp-step="rebuild"><span class="update-step-icon" data-smtp-step-icon="rebuild">&#9675;</span>Rebuilding<ul id="smtp-derivations-list" class="update-derivations-list hidden"></ul></li>
+        <li class="update-step" data-smtp-step="inhibitors"><span class="update-step-icon" data-smtp-step-icon="inhibitors">&#9675;</span>Check switch inhibitors</li>
+        <li class="update-step" data-smtp-step="activate"><span class="update-step-icon" data-smtp-step-icon="activate">&#9675;</span>Activate configuration</li>
+        <li class="update-step" data-smtp-step="etc"><span class="update-step-icon" data-smtp-step-icon="etc">&#9675;</span>Setting up /etc</li>
+        <li class="update-step" data-smtp-step="reload"><span class="update-step-icon" data-smtp-step-icon="reload">&#9675;</span>Reloading &amp; restarting units</li>
+        <li class="update-step" data-smtp-step="done"><span class="update-step-icon" data-smtp-step-icon="done">&#9675;</span>Done</li>
+      </ul>
+      <button id="smtp-log-toggle-btn" type="button" class="flex items-center gap-1 text-sm text-primary-700 dark:text-primary-500 hover:underline mb-2">
+        <svg id="smtp-log-toggle-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        <span>Show details</span>
+      </button>
+      <div id="smtp-log-panel" class="hidden">
+        <div id="smtp-log-stages" class="text-xs update-log-stages mb-2"></div>
+        <pre id="smtp-log-build" class="update-log-output text-xs p-3 rounded-lg overflow-y-auto"></pre>
+      </div>
+      <div class="flex justify-end mt-4">
+        <button id="smtp-modal-close-btn" type="button" class="hidden text-white bg-primary-700 hover:bg-primary-800 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700">Close</button>
       </div>
     </div>
   </div>
@@ -1807,5 +1879,361 @@ title: System Preferences
   });
 
   checkNow();
+})();
+</script>
+
+<script>
+(function () {
+  var enableInput = document.getElementById("smtp-enable");
+  var fieldsWrap = document.getElementById("smtp-fields");
+  var presetSelect = document.getElementById("smtp-provider-preset");
+  var presetHint = document.getElementById("smtp-provider-hint");
+  var hostInput = document.getElementById("smtp-host");
+  var portInput = document.getElementById("smtp-port");
+  var schemeInput = document.getElementById("smtp-scheme");
+  var senderInput = document.getElementById("smtp-sender");
+  var usernameInput = document.getElementById("smtp-username");
+  var passwordInput = document.getElementById("smtp-password");
+  var messageEl = document.getElementById("smtp-message");
+  var saveBtn = document.getElementById("smtp-save-btn");
+
+  var modal = document.getElementById("smtp-modal");
+  var modalCloseX = document.getElementById("smtp-modal-close-x");
+  var confirmView = document.getElementById("smtp-modal-confirm-view");
+  var progressView = document.getElementById("smtp-modal-progress-view");
+  var summaryEl = document.getElementById("smtp-modal-summary");
+  var cancelBtn = document.getElementById("smtp-modal-cancel-btn");
+  var confirmBtn = document.getElementById("smtp-modal-confirm-btn");
+  var spinnerEl = document.getElementById("smtp-modal-spinner");
+  var iconSuccessEl = document.getElementById("smtp-modal-icon-success");
+  var iconFailedEl = document.getElementById("smtp-modal-icon-failed");
+  var statusTextEl = document.getElementById("smtp-modal-status-text");
+  var logToggleBtn = document.getElementById("smtp-log-toggle-btn");
+  var logToggleChevron = document.getElementById("smtp-log-toggle-chevron");
+  var logPanel = document.getElementById("smtp-log-panel");
+  var logStagesEl = document.getElementById("smtp-log-stages");
+  var logBuildEl = document.getElementById("smtp-log-build");
+  var modalCloseBtn = document.getElementById("smtp-modal-close-btn");
+
+  // Purely a client-side convenience — every provider ultimately saves
+  // through the same host/port/scheme/sender/username/password fields
+  // (modules/dashboard-smtp.nix), unlike the Let's Encrypt accordion's
+  // per-provider field sets, so there's no backend provider concept to
+  // keep in sync with this list.
+  var PROVIDER_PRESETS = {
+    gmail: {
+      host: "smtp.gmail.com", port: 587, scheme: "submission",
+      hint: "Gmail requires an App Password (Google Account → Security → App passwords) if 2-Step Verification is on — your normal password won't work."
+    },
+    outlook: {
+      host: "smtp-mail.outlook.com", port: 587, scheme: "submission",
+      hint: "Outlook.com/Hotmail requires an App Password if two-factor authentication is enabled on the account."
+    },
+    yahoo: {
+      host: "smtp.mail.yahoo.com", port: 587, scheme: "submission",
+      hint: "Yahoo Mail requires an App Password (Account Security → Generate app password), not your normal sign-in password."
+    },
+    icloud: {
+      host: "smtp.mail.me.com", port: 587, scheme: "submission",
+      hint: "iCloud Mail requires an app-specific password, generated at appleid.apple.com under Sign-In and Security."
+    },
+    sendgrid: {
+      host: "smtp.sendgrid.net", port: 587, scheme: "submission",
+      hint: "SendGrid: set Username to the literal word \"apikey\" and Password to your SendGrid API key."
+    },
+    protonmail: {
+      host: "127.0.0.1", port: 1025, scheme: "submission",
+      hint: "Proton Mail has no direct SMTP access — this requires Proton Mail Bridge running and reachable from this box. Defaults assume Bridge on 127.0.0.1:1025; adjust if yours differs."
+    }
+  };
+
+  function showMessage(text, kind) {
+    messageEl.textContent = text;
+    messageEl.classList.remove("hidden");
+    messageEl.className = "mt-4 text-sm rounded-lg p-3 " + (
+      kind === "error"
+        ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+        : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+    );
+  }
+  function hideMessage() { messageEl.classList.add("hidden"); }
+
+  function updateEnabledState() {
+    var enabled = enableInput.checked;
+    fieldsWrap.classList.toggle("preferences-dimmed", !enabled);
+    fieldsWrap.querySelectorAll("input, select").forEach(function (el) { el.disabled = !enabled; });
+  }
+
+  function applyPreset() {
+    var preset = PROVIDER_PRESETS[presetSelect.value];
+    if (!preset) {
+      presetHint.classList.add("hidden");
+      return;
+    }
+    hostInput.value = preset.host;
+    portInput.value = preset.port;
+    schemeInput.value = preset.scheme;
+    presetHint.textContent = preset.hint;
+    presetHint.classList.remove("hidden");
+    refreshSaveVisibility();
+  }
+
+  // passwordSet mirrors modules/dashboard-smtp.nix's currentCgi — never
+  // the real password, just whether one's already on disk, driving the
+  // "blank field = keep existing" placeholder/validation below.
+  var baseline = { enable: false, host: "", port: 587, scheme: "submission", sender: "", username: "" };
+  var passwordSet = false;
+
+  function buildPayload() {
+    var enabled = enableInput.checked;
+    var payload = { enable: enabled };
+    if (enabled) {
+      payload.host = hostInput.value.trim();
+      payload.port = parseInt(portInput.value, 10) || 0;
+      payload.scheme = schemeInput.value;
+      payload.sender = senderInput.value.trim();
+      payload.username = usernameInput.value.trim();
+    }
+    return payload;
+  }
+
+  function isDirty() {
+    var p = buildPayload();
+    if (p.enable !== baseline.enable) { return true; }
+    if (!p.enable) { return false; }
+    if (p.host !== baseline.host || p.port !== baseline.port || p.scheme !== baseline.scheme ||
+        p.sender !== baseline.sender || p.username !== baseline.username) { return true; }
+    return !!passwordInput.value;
+  }
+
+  function refreshSaveVisibility() {
+    saveBtn.classList.toggle("hidden", !isDirty());
+  }
+
+  [hostInput, portInput, schemeInput, senderInput, usernameInput, passwordInput].forEach(function (el) {
+    el.addEventListener("input", refreshSaveVisibility);
+    el.addEventListener("change", refreshSaveVisibility);
+  });
+  enableInput.addEventListener("change", function () {
+    updateEnabledState();
+    refreshSaveVisibility();
+  });
+  presetSelect.addEventListener("change", applyPreset);
+
+  // Pre-fills the form from the build-time state snapshot
+  // (modules/dashboard-smtp.nix's environment.etc JSON, plus a live
+  // passwordSet check) and takes that as the dirty-tracking baseline —
+  // same shape as the Services accordion's own baseline fetch.
+  fetch("/preferences/smtp/current", { cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      baseline = {
+        enable: !!data.enable,
+        host: data.host || "",
+        port: data.port || 587,
+        scheme: data.scheme || "submission",
+        sender: data.sender || "",
+        username: data.username || ""
+      };
+      passwordSet = !!data.passwordSet;
+      enableInput.checked = baseline.enable;
+      hostInput.value = baseline.host;
+      portInput.value = baseline.port;
+      schemeInput.value = baseline.scheme;
+      senderInput.value = baseline.sender;
+      usernameInput.value = baseline.username;
+      passwordInput.placeholder = passwordSet ? "Already set — leave blank to keep" : "Required";
+      updateEnabledState();
+      refreshSaveVisibility();
+    })
+    .catch(function () {
+      updateEnabledState();
+      refreshSaveVisibility();
+    });
+
+  function openModal() { modal.classList.remove("hidden"); }
+  function closeModal() { modal.classList.add("hidden"); }
+
+  function showConfirmView(payload) {
+    summaryEl.textContent = payload.enable
+      ? "Enable the SMTP relay through " + payload.host + ":" + payload.port + "."
+      : "Disable the SMTP relay. Password-reset and alert emails fall back to a local file until re-enabled.";
+    confirmView.classList.remove("hidden");
+    progressView.classList.add("hidden");
+    modalCloseX.classList.add("hidden");
+    openModal();
+  }
+
+  function showProgressView() {
+    confirmView.classList.add("hidden");
+    progressView.classList.remove("hidden");
+    openModal();
+  }
+
+  function setTerminalIcon(state) {
+    spinnerEl.classList.toggle("hidden", state !== "running");
+    iconSuccessEl.classList.toggle("hidden", state !== "success");
+    iconFailedEl.classList.toggle("hidden", state !== "failed");
+    var terminal = state === "success" || state === "failed";
+    modalCloseBtn.classList.toggle("hidden", !terminal);
+    modalCloseX.classList.toggle("hidden", !terminal);
+  }
+
+  // Same shape as the Services/Network modals' own STEPS/render — see
+  // modules/system-rebuild.nix's applyScript for the literal log
+  // phrases these regexes match against.
+  var SMTP_STEPS = [
+    { key: "download", re: /rebuilding \(this can take a while\)|checking switch inhibitors|activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "rebuild", re: /checking switch inhibitors|activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "inhibitors", re: /activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "activate", re: /setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "etc", re: /reloading|restarting|done\. the new configuration/i },
+    { key: "reload", re: /done\. the new configuration/i },
+    { key: "done", re: null }
+  ];
+
+  function renderSmtpSteps(data) {
+    var stageText = (data.log || []).map(function (e) { return e.message; }).join(" | ");
+    var buildLog = data.buildLog || "";
+    var combined = stageText + "\n" + buildLog;
+
+    SMTP_STEPS.forEach(function (step) {
+      var isDone = step.key === "done" ? data.state === "success" : step.re.test(combined);
+      var li = document.querySelector('[data-smtp-step="' + step.key + '"]');
+      var icon = document.querySelector('[data-smtp-step-icon="' + step.key + '"]');
+      if (!li || !icon) { return; }
+      li.classList.toggle("update-step-done", isDone);
+      icon.innerHTML = isDone ? "&#10003;" : "&#9675;";
+    });
+
+    var derivationsList = document.getElementById("smtp-derivations-list");
+    var match = buildLog.match(/these \d+ derivations?[^\n]*will be built:\r?\n((?:\s+\/nix\/store\/\S+\r?\n?)+)/i);
+    if (match) {
+      var lines = match[1].split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+      derivationsList.innerHTML = "";
+      lines.forEach(function (l) {
+        var short = l.replace(/^\/nix\/store\/[a-z0-9]+-/, "");
+        var item = document.createElement("li");
+        item.textContent = short;
+        derivationsList.appendChild(item);
+      });
+      derivationsList.classList.remove("hidden");
+    }
+  }
+
+  function renderLog(data) {
+    var stages = data.log || [];
+    logStagesEl.innerHTML = "";
+    stages.forEach(function (entry) {
+      var line = document.createElement("div");
+      var t = "";
+      try { t = new Date(entry.time).toLocaleTimeString(); } catch (e) { t = entry.time; }
+      line.textContent = "[" + t + "] " + entry.message;
+      logStagesEl.appendChild(line);
+    });
+    if (data.buildLog) {
+      logBuildEl.textContent = data.buildLog;
+      logBuildEl.scrollTop = logBuildEl.scrollHeight;
+    }
+    renderSmtpSteps(data);
+  }
+
+  var polling = null;
+  function stopPolling() {
+    if (polling) { clearInterval(polling); polling = null; }
+  }
+
+  var pendingPayload = null;
+
+  function poll() {
+    fetch("/preferences/smtp/status", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        showProgressView();
+        setTerminalIcon(data.state);
+        statusTextEl.textContent = data.message || data.state;
+        renderLog(data);
+        if (data.state === "success") {
+          stopPolling();
+          if (pendingPayload) {
+            baseline = {
+              enable: pendingPayload.enable,
+              host: pendingPayload.host || "",
+              port: pendingPayload.port || 587,
+              scheme: pendingPayload.scheme || "submission",
+              sender: pendingPayload.sender || "",
+              username: pendingPayload.username || ""
+            };
+          }
+          if (passwordInput.value) { passwordSet = true; }
+          passwordInput.value = "";
+          passwordInput.placeholder = passwordSet ? "Already set — leave blank to keep" : "Required";
+          refreshSaveVisibility();
+        } else if (data.state === "failed") {
+          stopPolling();
+        }
+      })
+      .catch(function () { /* try again on next tick */ });
+  }
+
+  saveBtn.addEventListener("click", function () {
+    var payload = buildPayload();
+    if (payload.enable) {
+      if (!payload.host || !payload.sender || !payload.username) {
+        showMessage("Host, sender address, and username are all required.", "error");
+        return;
+      }
+      if (!passwordInput.value && !passwordSet) {
+        showMessage("A password is required the first time SMTP is enabled.", "error");
+        return;
+      }
+    }
+    hideMessage();
+    pendingPayload = payload;
+    showConfirmView(payload);
+  });
+
+  cancelBtn.addEventListener("click", closeModal);
+  modalCloseX.addEventListener("click", closeModal);
+  modalCloseBtn.addEventListener("click", closeModal);
+
+  logToggleBtn.addEventListener("click", function () {
+    var hidden = logPanel.classList.toggle("hidden");
+    logToggleChevron.style.transform = hidden ? "" : "rotate(180deg)";
+    logToggleBtn.querySelector("span").textContent = hidden ? "Show details" : "Hide details";
+  });
+
+  confirmBtn.addEventListener("click", function () {
+    showProgressView();
+    setTerminalIcon("running");
+    statusTextEl.textContent = "Starting...";
+    logStagesEl.innerHTML = "";
+    logBuildEl.textContent = "";
+    document.getElementById("smtp-derivations-list").classList.add("hidden");
+    renderSmtpSteps({ log: [], buildLog: "", state: "running" });
+
+    var body = Object.assign({}, pendingPayload);
+    if (body.enable) { body.password = passwordInput.value; }
+
+    fetch("/preferences/smtp/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+      .then(function (r) {
+        return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+      })
+      .then(function (result) {
+        if (!result.ok) {
+          throw new Error((result.data && result.data.error) || "Save failed.");
+        }
+        polling = setInterval(poll, 3000);
+        poll();
+      })
+      .catch(function (err) {
+        setTerminalIcon("failed");
+        statusTextEl.textContent = err.message || "Could not save.";
+      });
+  });
 })();
 </script>
