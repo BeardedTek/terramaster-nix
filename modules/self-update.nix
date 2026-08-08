@@ -273,18 +273,21 @@ in
     systemd.services.nas-update-apply = {
       description = "Apply the latest Bearded NAS release";
       # Same latent bug modules/dashboard-services.nix's own apply
-      # service hit and fixed the hard way: this service's own job is to
-      # run `nixos-rebuild switch`, so its own unit definition is always
-      # part of the closure being switched to, and looks "changed"
-      # relative to the generation currently running it.
-      # switch-to-configuration would otherwise SIGTERM this unit (i.e.
-      # itself, mid-run) partway through, killing nixos-rebuild switch
-      # before it can restart whatever else it had queued to stop/start
-      # — leaving the system in a partially-activated state until the
-      # next externally triggered switch. stopIfChanged=false leaves an
-      # already-running instance alone; the new definition still takes
-      # effect next time it's freshly triggered.
-      stopIfChanged = false;
+      # service hit and fixed the hard way (twice — the first attempt,
+      # stopIfChanged=false, does NOT prevent this: it only controls how
+      # a restart happens, not whether one happens at all). This
+      # service's own job is to run `nixos-rebuild switch`, so its own
+      # unit definition is always part of the closure being switched to,
+      # and looks "changed" relative to the generation currently running
+      # it — switch-to-configuration would otherwise SIGTERM this unit
+      # (itself, mid-run) partway through, killing nixos-rebuild switch
+      # before it can restart whatever else it had queued to stop/start.
+      # restartIfChanged=false plus X-StopOnRemoval=false is nixpkgs' own
+      # solution to this exact problem for system.autoUpgrade.enable's
+      # built-in nixos-upgrade.service (nixos/modules/tasks/auto-upgrade.nix),
+      # which runs nixos-rebuild switch from inside itself the same way.
+      restartIfChanged = false;
+      unitConfig.X-StopOnRemoval = false;
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe applyScript;

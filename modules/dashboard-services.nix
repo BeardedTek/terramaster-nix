@@ -321,20 +321,25 @@ in
       # means its own unit definition is, by construction, part of the
       # closure that switch is switching *to*, and will always look
       # "changed" relative to the generation that's currently running it.
-      # Without this, switch-to-configuration correctly-but-disastrously
-      # notices that and sends this unit (i.e. itself, mid-run) a
-      # SIGTERM partway through — confirmed the hard way: the journal
-      # showed "stopping the following units: dashboard-services-apply
-      # .service, fcgiwrap-dashboard-services.socket, fcgiwrap-traefik
-      # -dns01.socket, traefik.service, ..." immediately followed by
-      # "Main process exited, code=killed, status=15/TERM", which killed
-      # nixos-rebuild switch before it could restart anything past that
-      # point — leaving every unit in that stop list down until the next
-      # *externally* triggered switch. stopIfChanged=false tells
-      # switch-to-configuration to leave an already-running instance of
-      # this unit alone; the new definition still takes effect
-      # (correctly) the next time it's freshly triggered.
-      stopIfChanged = false;
+      # Confirmed the hard way (twice): the journal showed "stopping the
+      # following units: dashboard-services-apply.service,
+      # fcgiwrap-dashboard-services.socket, fcgiwrap-traefik-dns01.socket,
+      # traefik.service, ..." immediately followed by "Main process
+      # exited, code=killed, status=15/TERM" — switch-to-configuration
+      # killing nixos-rebuild switch before it could restart anything
+      # past that point, leaving every unit in that stop list down until
+      # the next externally-triggered switch. stopIfChanged alone does
+      # NOT prevent this — it only controls *how* a restart happens
+      # (stop-then-start vs. a single `systemctl restart`), not whether
+      # one happens at all; that's what caused the first attempt at this
+      # fix to still get killed. restartIfChanged=false plus
+      # X-StopOnRemoval=false is the actual mechanism, and is exactly
+      # nixpkgs' own solution to this same problem for its built-in
+      # system.autoUpgrade.enable service — see
+      # nixos/modules/tasks/auto-upgrade.nix's own nixos-upgrade.service,
+      # which runs nixos-rebuild switch from inside itself the same way.
+      restartIfChanged = false;
+      unitConfig.X-StopOnRemoval = false;
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe applyScript;
