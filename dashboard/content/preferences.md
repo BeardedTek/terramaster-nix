@@ -17,7 +17,7 @@ title: System Preferences
   and the fields below it are live &mdash; saving rebuilds the system in
   place.
 </p>
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 preferences-dimmed">
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Hostname</span>
     <input type="text" value="young" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
