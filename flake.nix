@@ -63,6 +63,7 @@
           ./modules/dashboard-services.nix
           ./modules/dashboard-network.nix
           ./modules/dashboard-smtp.nix
+          ./modules/dashboard-nebula.nix
           ./modules/system-rebuild.nix
           ./modules/frigate.nix
           ./modules/home-assistant.nix

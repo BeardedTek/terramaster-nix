@@ -47,6 +47,7 @@ let
     [ "mediaAcquisition" "qbittorrent" "enable" ]
     [ "sso" "enable" ]
     [ "sso" "authelia" "enable" ]
+    [ "nebula" "enable" ]
   ];
 
   flagKey = path: lib.concatStringsSep "." path;

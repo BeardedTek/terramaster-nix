@@ -9,7 +9,7 @@
     if (!wrapper) return;
 
     function sync() {
-      wrapper.querySelectorAll("input").forEach(function (input) {
+      wrapper.querySelectorAll("input, textarea, select").forEach(function (input) {
         input.disabled = !toggle.checked;
       });
       wrapper.classList.toggle("preferences-dimmed", !toggle.checked);
