@@ -7,10 +7,22 @@ let
   loginEnabled = config.mySystem.features.sso.enable;
 
   overridesFile = "/persist/nixos-network-overrides.nix";
+  # Snapshot of whatever overridesFile held immediately before the
+  # currently-in-flight change — restored verbatim if nobody confirms
+  # reachability within the confirm window (see applyScript below).
+  backupFile = "/persist/nixos-network-overrides.nix.backup";
 
   runDir = "/run/dashboard-network";
   triggerFile = "${runDir}/trigger";
   pendingFile = "${runDir}/pending.json";
+  pendingConfirmFile = "${runDir}/pending-confirm";
+  confirmedFile = "${runDir}/confirmed";
+
+  # modules/traefik.nix's own plain-HTTP, DNS/TLS-independent path to
+  # this dashboard — exactly the address the confirm-reachability link
+  # needs, read from its actual configured value rather than
+  # hardcoding the port a second time.
+  lanLocalPort = lib.removePrefix ":" config.services.traefik.staticConfigOptions.entryPoints.lan-local.address;
 
   # Shared with modules/dashboard-services.nix and modules/self-update.nix
   # — see modules/system-rebuild.nix's own comment for why. Its request
@@ -107,6 +119,27 @@ let
     }
   '';
 
+  # Shared by applyScript's normal apply path and its own backup step
+  # (when no overrides file exists yet, "no static config" is written
+  # out as this exact DHCP content, so the backup is always valid,
+  # directly-restorable overrides content regardless of what state the
+  # box started in).
+  writeDhcpOverridesFn = ''
+    write_dhcp_overrides() {
+      local dest="$1"
+      {
+        echo "{ lib, ... }:"
+        echo "{"
+        echo "  config = {"
+        echo "    networking.interfaces.\"${lanIf}\".ipv4.addresses = lib.mkForce [ ];"
+        echo "    networking.defaultGateway = lib.mkForce null;"
+        echo "    networking.nameservers = lib.mkForce [ ];"
+        echo "  };"
+        echo "}"
+      } > "$dest"
+    }
+  '';
+
   saveCgi = pkgs.writeShellApplication {
     name = "dashboard-network-save-cgi";
     runtimeInputs = [ pkgs.jq pkgs.coreutils ];
@@ -122,6 +155,15 @@ let
         printf 'Status: 400 Bad Request\r\nContent-Type: application/json\r\n\r\n{"error":"%s"}\n' "$1"
         exit 0
       }
+
+      # A change is still waiting on its own 5-minute confirm-or-rollback
+      # window (see applyScript) — refuse a second one rather than let
+      # its pending.json sit there forever unpicked-up (dashboard-network
+      # -apply.service is a oneshot; a redundant trigger while it's
+      # already active is silently swallowed, not queued).
+      if [ -f ${pendingConfirmFile} ]; then
+        fail "a network change is still pending confirmation — confirm or wait for it to resolve before making another change"
+      fi
 
       mode=$(printf '%s' "$body" | jq -r '.mode // empty' 2>/dev/null || true)
       case "$mode" in
@@ -161,17 +203,21 @@ let
     '';
   };
 
-  # Privileged short pre-step — same shape and same reasoning as
-  # dashboard-services.nix's own applyScript: the only thing here that
-  # needs root is writing /persist/nixos-network-overrides.nix, the
-  # actual rebuild is handed off to modules/system-rebuild.nix. Never
-  # runs nixos-rebuild itself, so it isn't exposed to the self-kill
-  # problem that module already solved.
+  # Privileged pre-step — same reasoning as dashboard-services.nix's own
+  # applyScript for why writing /persist/nixos-network-overrides.nix
+  # needs root while the actual rebuild is handed off to
+  # modules/system-rebuild.nix. Unlike that module's script, though,
+  # this one now stays running *through* the whole confirm-or-rollback
+  # window (below) rather than exiting right after handoff — see the
+  # restartIfChanged/X-StopOnRemoval note on its systemd service for
+  # why that requires the same self-kill protection
+  # modules/system-rebuild.nix's own apply service already needed.
   applyScript = pkgs.writeShellApplication {
     name = "dashboard-network-apply";
     runtimeInputs = [ pkgs.jq pkgs.coreutils ];
     text = ''
       ${netValidationFns}
+      ${writeDhcpOverridesFn}
 
       rm -f ${triggerFile}
 
@@ -183,19 +229,21 @@ let
         exit 0
       fi
 
+      # Snapshot whatever's live right now, before touching anything —
+      # this is what gets restored if the change about to be applied
+      # is never confirmed. No overrides file existing yet is itself
+      # equivalent to DHCP (this module's own default posture), so the
+      # backup is always valid, directly-restorable content either way.
+      if [ -f ${overridesFile} ]; then
+        cp ${overridesFile} ${backupFile}
+      else
+        write_dhcp_overrides ${backupFile}
+      fi
+
       mode=$(jq -r '.mode' ${pendingFile})
       case "$mode" in
         dhcp)
-          {
-            echo "{ lib, ... }:"
-            echo "{"
-            echo "  config = {"
-            echo "    networking.interfaces.\"${lanIf}\".ipv4.addresses = lib.mkForce [ ];"
-            echo "    networking.defaultGateway = lib.mkForce null;"
-            echo "    networking.nameservers = lib.mkForce [ ];"
-            echo "  };"
-            echo "}"
-          } > ${overridesFile}.tmp
+          write_dhcp_overrides ${overridesFile}.tmp
           ;;
         static)
           ip_val=$(jq -r '.ip' ${pendingFile})
@@ -222,6 +270,7 @@ let
           } > ${overridesFile}.tmp
           ;;
         *)
+          rm -f ${backupFile}
           exit 0
           ;;
       esac
@@ -231,6 +280,79 @@ let
       printf '%s' '{"mode":"current","label":"Network updated","kind":"network"}' > ${sharedRequestFile}.tmp
       mv ${sharedRequestFile}.tmp ${sharedRequestFile}
       touch ${sharedTriggerFile}
+
+      # Wait for the rebuild this just triggered to actually finish —
+      # bounded at 10 minutes as a safety ceiling in case something
+      # hangs, well beyond how long any rebuild observed this session
+      # has ever taken. Polls the exact same file/shape statusCgi
+      # itself reads.
+      final_state=""
+      elapsed=0
+      while [ "$elapsed" -lt 600 ]; do
+        if [ -f ${sharedProgressFile} ] && [ ! -f ${sharedApplyingFile} ]; then
+          k=$(jq -r '.kind // empty' ${sharedProgressFile} 2>/dev/null || true)
+          s=$(jq -r '.state // empty' ${sharedProgressFile} 2>/dev/null || true)
+          if [ "$k" = "network" ] && { [ "$s" = "success" ] || [ "$s" = "failed" ]; }; then
+            final_state="$s"
+            break
+          fi
+        fi
+        sleep 2
+        elapsed=$((elapsed + 2))
+      done
+
+      if [ "$final_state" != "success" ]; then
+        # Failed, or timed out waiting — either way nothing was
+        # successfully switched to, so there's nothing to roll back.
+        rm -f ${backupFile}
+        exit 0
+      fi
+
+      # Applied successfully — wait up to 5 minutes for confirmation
+      # (dashboard-network-confirm-cgi touches confirmedFile) before
+      # automatically reverting.
+      rm -f ${confirmedFile}
+      touch ${pendingConfirmFile}
+      waited=0
+      confirmed=0
+      while [ "$waited" -lt 300 ]; do
+        if [ -f ${confirmedFile} ]; then
+          confirmed=1
+          break
+        fi
+        sleep 5
+        waited=$((waited + 5))
+      done
+      rm -f ${pendingConfirmFile} ${confirmedFile}
+
+      if [ "$confirmed" -eq 1 ]; then
+        rm -f ${backupFile}
+        exit 0
+      fi
+
+      # Not confirmed in time — restore the pre-change config and fire
+      # a fresh shared-runner request for it. Deliberately not waiting
+      # on *this* one: the frontend's existing progress polling picks
+      # up this new kind:"network" run the same way it would any other,
+      # so there's nothing left for this script to do but hand off and
+      # exit.
+      if [ -f ${backupFile} ]; then
+        cp ${backupFile} ${overridesFile}
+        rm -f ${backupFile}
+        printf '%s' '{"mode":"current","label":"Network change rolled back automatically (not confirmed within 5 minutes)","kind":"network"}' > ${sharedRequestFile}.tmp
+        mv ${sharedRequestFile}.tmp ${sharedRequestFile}
+        touch ${sharedTriggerFile}
+      fi
+    '';
+  };
+
+  confirmCgi = pkgs.writeShellApplication {
+    name = "dashboard-network-confirm-cgi";
+    runtimeInputs = [ pkgs.coreutils ];
+    text = ''
+      mkdir -p ${runDir}
+      touch ${confirmedFile}
+      printf 'Status: 200 OK\r\nContent-Type: application/json\r\n\r\n{"ok":true}\n'
     '';
   };
 
@@ -276,8 +398,8 @@ let
       # session (see modules/traefik-dns01.nix's env_get comment).
       live_ip=$( (ip -4 -o addr show dev ${lanIf} 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1) || true)
       live_gateway=$( (ip route show default dev ${lanIf} 2>/dev/null | awk '{print $3}' | head -n1) || true)
-      jq --arg liveIp "''${live_ip:-}" --arg liveGateway "''${live_gateway:-}" \
-        '. + {liveIp: $liveIp, liveGateway: $liveGateway}' ${configuredStateJson}
+      jq --arg liveIp "''${live_ip:-}" --arg liveGateway "''${live_gateway:-}" --arg lanLocalPort "${lanLocalPort}" \
+        '. + {liveIp: $liveIp, liveGateway: $liveGateway, lanLocalPort: $lanLocalPort}' ${configuredStateJson}
     '';
   };
 in
@@ -313,7 +435,15 @@ in
 
     # Never wantedBy anything — purely triggered by the path unit below.
     systemd.services.dashboard-network-apply = {
-      description = "Write network overrides and hand off to the shared rebuild runner";
+      description = "Write network overrides, hand off to the shared rebuild runner, and wait through the confirm-or-rollback window";
+      # This script now stays running through the rebuild it triggers
+      # (to time the confirm window afterward), so — same reasoning as
+      # modules/system-rebuild.nix's own apply service — it needs
+      # protecting from switch-to-configuration killing it mid-wait,
+      # since its own unit definition is part of the very closure that
+      # rebuild switches to and will always look "changed."
+      restartIfChanged = false;
+      unitConfig.X-StopOnRemoval = false;
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe applyScript;
@@ -370,6 +500,17 @@ in
           ${lib.optionalString loginEnabled "auth_request /internal/dashboard-admin-check;"}
           fastcgi_pass unix:/run/fcgiwrap-dashboard-network.sock;
           fastcgi_param SCRIPT_FILENAME ${lib.getExe statusCgi};
+          fastcgi_param REQUEST_METHOD $request_method;
+          fastcgi_param SERVER_PROTOCOL $server_protocol;
+          fastcgi_param GATEWAY_INTERFACE CGI/1.1;
+          fastcgi_param SERVER_SOFTWARE nginx;
+        '';
+      };
+      "= /preferences/network/confirm" = {
+        extraConfig = ''
+          ${lib.optionalString loginEnabled "auth_request /internal/dashboard-admin-check;"}
+          fastcgi_pass unix:/run/fcgiwrap-dashboard-network.sock;
+          fastcgi_param SCRIPT_FILENAME ${lib.getExe confirmCgi};
           fastcgi_param REQUEST_METHOD $request_method;
           fastcgi_param SERVER_PROTOCOL $server_protocol;
           fastcgi_param GATEWAY_INTERFACE CGI/1.1;

@@ -750,6 +750,20 @@ title: System Preferences
         <div id="network-log-stages" class="text-xs update-log-stages mb-2"></div>
         <pre id="network-log-build" class="update-log-output text-xs p-3 rounded-lg overflow-y-auto"></pre>
       </div>
+      <div id="network-confirm-reachability" class="hidden mt-4 rounded-lg p-3 bg-yellow-100 dark:bg-yellow-900">
+        <p class="text-sm text-yellow-800 dark:text-yellow-300 mb-2">
+          Applied. Verify you can still reach the dashboard, then confirm
+          below. If not confirmed within
+          <span id="network-confirm-countdown" class="font-mono">5:00</span>,
+          this change is rolled back automatically.
+        </p>
+        <p class="text-sm mb-3">
+          <a id="network-confirm-link" href="#" target="_blank" rel="noopener noreferrer" class="text-primary-700 dark:text-primary-500 hover:underline font-mono"></a>
+        </p>
+        <div class="flex justify-end">
+          <button id="network-confirm-reachability-btn" type="button" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Confirm &mdash; Keep This Configuration</button>
+        </div>
+      </div>
       <div class="flex justify-end mt-4">
         <button id="network-modal-close-btn" type="button" class="hidden text-white bg-primary-700 hover:bg-primary-800 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700">Close</button>
       </div>
@@ -1071,10 +1085,21 @@ title: System Preferences
   var logStagesEl = document.getElementById("network-log-stages");
   var logBuildEl = document.getElementById("network-log-build");
   var modalCloseBtn = document.getElementById("network-modal-close-btn");
+  var confirmReachabilityEl = document.getElementById("network-confirm-reachability");
+  var confirmCountdownEl = document.getElementById("network-confirm-countdown");
+  var confirmLinkEl = document.getElementById("network-confirm-link");
+  var confirmReachabilityBtn = document.getElementById("network-confirm-reachability-btn");
 
   var baseline = null;
   var polling = null;
   var pendingPayload = null;
+  // Set once the *original* change's own success has been shown, so a
+  // relaxed-interval poll that keeps seeing state:"success" afterward
+  // doesn't re-fetch/re-show the reachability block on every tick.
+  // Reset at the start of every new confirmBtn ("Continue Anyway") run.
+  var reachabilityShown = false;
+  var countdownInterval = null;
+  var countdownRemaining = 300;
 
   function modeInput() {
     return document.querySelector('input[name="net-mode"]:checked');
@@ -1170,34 +1195,49 @@ title: System Preferences
   // Pre-fills the form from the build-time-configured state, and shows
   // the live-active address (only knowable at request time, not build
   // time — see modules/dashboard-network.nix's currentCgi) regardless
-  // of mode. Falls back to leaving the form at its static defaults if
-  // this fails, same posture as the Services/Let's Encrypt forms.
-  fetch("/preferences/network/current", { cache: "no-store" })
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      var mode = data.mode === "static" ? "static" : "dhcp";
-      var radio = document.querySelector('input[name="net-mode"][value="' + mode + '"]');
-      if (radio) {
-        radio.checked = true;
-        radio.dispatchEvent(new Event("change"));
-      }
-      if (data.ip) { ipInput.value = data.ip; }
-      if (data.prefix !== null && data.prefix !== undefined) { prefixInput.value = data.prefix; }
-      if (data.gateway) { gatewayInput.value = data.gateway; }
-      if (data.dns && data.dns.length) { dnsInput.value = data.dns.join(", "); }
-      liveIpEl.textContent = data.liveIp
-        ? data.liveIp + (data.liveGateway ? " (gateway " + data.liveGateway + ")" : "")
-        : "unknown";
-      baseline = buildPayload();
-      refreshSaveVisibility();
-    })
-    .catch(function () {
-      baseline = buildPayload();
-      refreshSaveVisibility();
-    });
+  // of mode. Falls back to leaving the form/baseline as whatever's
+  // currently on screen if this fails, same posture as the
+  // Services/Let's Encrypt forms. Reused both on page load and after
+  // an automatic rollback, when the live config has just changed back
+  // out from under whatever the form was showing.
+  function refreshFormFromCurrent() {
+    return fetch("/preferences/network/current", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var mode = data.mode === "static" ? "static" : "dhcp";
+        var radio = document.querySelector('input[name="net-mode"][value="' + mode + '"]');
+        if (radio) {
+          radio.checked = true;
+          radio.dispatchEvent(new Event("change"));
+        }
+        if (data.ip) { ipInput.value = data.ip; }
+        if (data.prefix !== null && data.prefix !== undefined) { prefixInput.value = data.prefix; }
+        if (data.gateway) { gatewayInput.value = data.gateway; }
+        if (data.dns && data.dns.length) { dnsInput.value = data.dns.join(", "); }
+        liveIpEl.textContent = data.liveIp
+          ? data.liveIp + (data.liveGateway ? " (gateway " + data.liveGateway + ")" : "")
+          : "unknown";
+        baseline = buildPayload();
+        refreshSaveVisibility();
+        return data;
+      })
+      .catch(function () {
+        baseline = baseline || buildPayload();
+        refreshSaveVisibility();
+      });
+  }
+  refreshFormFromCurrent();
 
   function openModal() { modal.classList.remove("hidden"); }
-  function closeModal() { modal.classList.add("hidden"); }
+  function closeModal() {
+    modal.classList.add("hidden");
+    // Purely a display concern — the server-side rollback timer (if
+    // one is running) is completely independent of whether anything's
+    // still polling to show it, so it's safe to stop watching once the
+    // admin dismisses the modal.
+    stopPolling();
+    stopCountdown();
+  }
 
   function describeChange(payload) {
     if (payload.mode === "dhcp") { return "Switch Network Interface to DHCP (automatic addressing)."; }
@@ -1226,6 +1266,55 @@ title: System Preferences
     var terminal = state === "success" || state === "failed";
     modalCloseBtn.classList.toggle("hidden", !terminal);
     modalCloseX.classList.toggle("hidden", !terminal);
+  }
+
+  function renderCountdown() {
+    var m = Math.max(0, Math.floor(countdownRemaining / 60));
+    var s = Math.max(0, countdownRemaining % 60);
+    confirmCountdownEl.textContent = m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function stopCountdown() {
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  }
+
+  // Purely a display countdown — modules/dashboard-network.nix's own
+  // applyScript runs the real 5-minute confirm-or-rollback timer
+  // server-side, independent of whether this tab is even open, so
+  // this is never the source of truth for whether a rollback happens.
+  function startCountdown() {
+    countdownRemaining = 300;
+    renderCountdown();
+    stopCountdown();
+    countdownInterval = setInterval(function () {
+      countdownRemaining -= 1;
+      renderCountdown();
+      if (countdownRemaining <= 0) {
+        stopCountdown();
+        statusTextEl.textContent = "Confirmation window elapsed — this change may have been rolled back automatically. Reload to check.";
+      }
+    }, 1000);
+  }
+
+  function hideConfirmReachability() {
+    confirmReachabilityEl.classList.add("hidden");
+    confirmReachabilityBtn.disabled = false;
+    stopCountdown();
+  }
+
+  function showConfirmReachability() {
+    confirmReachabilityEl.classList.remove("hidden");
+    fetch("/preferences/network/current", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var port = data.lanLocalPort || "8090";
+        var ip = data.liveIp || (pendingPayload && pendingPayload.mode === "static" ? pendingPayload.ip : "");
+        var url = ip ? ("http://" + ip + ":" + port + "/") : "";
+        confirmLinkEl.href = url || "#";
+        confirmLinkEl.textContent = url || "(address unknown — check the dashboard directly)";
+      })
+      .catch(function () { /* link just stays at its placeholder */ });
+    startCountdown();
   }
 
   // Same shape as the Update/Services modals' own STEPS/renderSteps —
@@ -1293,6 +1382,16 @@ title: System Preferences
     if (polling) { clearInterval(polling); polling = null; }
   }
 
+  function switchToRelaxedPolling() {
+    // Down from every 3s during an active rebuild to every 10s once
+    // settled — this keeps watching through the whole confirm window
+    // so an automatic rollback (which is just another ordinary
+    // kind:"network" run) gets picked up and rendered the same way any
+    // other run would be, without hammering the endpoint for minutes.
+    stopPolling();
+    polling = setInterval(poll, 10000);
+  }
+
   function poll() {
     fetch("/preferences/network/status", { cache: "no-store" })
       .then(function (r) { return r.json(); })
@@ -1301,12 +1400,31 @@ title: System Preferences
         setTerminalIcon(data.state);
         statusTextEl.textContent = data.message || data.state;
         renderLog(data);
+
+        var isRollback = /rolled back automatically/i.test(data.message || "");
+
         if (data.state === "success") {
-          stopPolling();
-          baseline = pendingPayload || baseline;
-          refreshSaveVisibility();
+          if (isRollback) {
+            // The automatic rollback (if one fired) has now finished —
+            // the live config just changed back out from under
+            // whatever the form/baseline were showing.
+            stopPolling();
+            hideConfirmReachability();
+            refreshFormFromCurrent();
+          } else if (!reachabilityShown) {
+            reachabilityShown = true;
+            baseline = pendingPayload || baseline;
+            refreshSaveVisibility();
+            showConfirmReachability();
+            switchToRelaxedPolling();
+          }
         } else if (data.state === "failed") {
           stopPolling();
+          hideConfirmReachability();
+        } else if (data.state === "running" && reachabilityShown) {
+          // A rollback just started running — its own eventual
+          // success (handled above) closes things out.
+          hideConfirmReachability();
         }
       })
       .catch(function () { /* try again on next tick */ });
@@ -1334,7 +1452,21 @@ title: System Preferences
     logToggleBtn.querySelector("span").textContent = hidden ? "Show details" : "Hide details";
   });
 
+  confirmReachabilityBtn.addEventListener("click", function () {
+    confirmReachabilityBtn.disabled = true;
+    fetch("/preferences/network/confirm", { method: "POST" })
+      .then(function () {
+        hideConfirmReachability();
+        statusTextEl.textContent = "Confirmed — this configuration is now permanent.";
+      })
+      .catch(function () {
+        confirmReachabilityBtn.disabled = false;
+      });
+  });
+
   confirmBtn.addEventListener("click", function () {
+    reachabilityShown = false;
+    hideConfirmReachability();
     showProgressView();
     setTerminalIcon("running");
     statusTextEl.textContent = "Starting...";
