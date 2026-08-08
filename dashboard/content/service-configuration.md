@@ -3,10 +3,13 @@ title: Service Configuration
 ---
 
 <p class="text-gray-700 dark:text-gray-300 mb-8 leading-relaxed">
-  Placeholder scaffolding for per-service settings. Nothing on this page
-  is live yet &mdash; every field below is a preview of what will
-  eventually be configurable here, grouped the same way as the Services
-  accordion in <a href="/preferences/" class="text-primary-700 dark:text-primary-500 hover:underline">System Preferences</a>.
+  Per-service settings, grouped the same way as the Services accordion in
+  <a href="/preferences/" class="text-primary-700 dark:text-primary-500 hover:underline">System Preferences</a>.
+  Most services here don't have anything genuinely configurable through
+  this dashboard &mdash; they manage their own settings through their
+  own admin UI, so those blocks just link out instead of pretending to
+  offer controls that don't exist. Authelia and MinIO have a couple of
+  real, live settings; Nebula's config upload lives at the bottom.
 </p>
 
 <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
@@ -25,26 +28,12 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-jellyfin-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Preview only &mdash; not wired up yet.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Library Path</span>
-            <input type="text" value="/rust/media" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Transcode Path</span>
-            <input type="text" value="/var/cache/jellyfin/transcodes" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Hardware Acceleration</span>
-            <select disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-              <option>None</option>
-              <option selected>VAAPI</option>
-              <option>NVENC</option>
-              <option>QSV</option>
-            </select>
-          </div>
-        </div>
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          Jellyfin has no settings exposed here &mdash; manage libraries,
+          transcoding, and hardware acceleration directly in its own
+          admin UI.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
       </div>
     </div>
   </div>
@@ -66,19 +55,20 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-minio-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Preview only &mdash; not wired up yet.</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Root credentials are rewritten directly and MinIO is
+          restarted &mdash; no system rebuild needed. Console port and
+          data path are tied to firewall rules and this box's storage
+          layout, so they aren't editable here.
+        </p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Root User</span>
-            <input type="text" value="minioadmin" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Root Username</span>
+            <input type="text" id="svccfg-minio-user" data-svcfield="minio.rootUser" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
           </div>
           <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Console Port</span>
-            <input type="number" value="9001" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Data Path</span>
-            <input type="text" value="/rust/minio" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Root Password</span>
+            <input type="password" id="svccfg-minio-password" data-svcfield="minio.rootPassword" placeholder="Leave blank to keep the current password" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
           </div>
         </div>
       </div>
@@ -91,17 +81,12 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-filebrowser-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Preview only &mdash; not wired up yet.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Root Path</span>
-            <input type="text" value="/rust/data" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Listen Port</span>
-            <input type="number" value="8095" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-        </div>
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          FileBrowser's sources and admin account are set up once at
+          first boot. Manage users, permissions, and sharing directly
+          in its own UI.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
       </div>
     </div>
   </div>
@@ -123,25 +108,14 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-homeassistant-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Preview only &mdash; not wired up yet.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Config Path</span>
-            <input type="text" value="/var/lib/hass" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Timezone</span>
-            <input type="text" value="America/Chicago" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-        </div>
-        <div class="flex items-center justify-between py-2">
-          <span class="text-sm text-gray-700 dark:text-gray-300">Enable Z-Wave</span>
-          <label class="switch"><input type="checkbox" disabled><span class="slider"></span></label>
-        </div>
-        <div class="flex items-center justify-between py-2">
-          <span class="text-sm text-gray-700 dark:text-gray-300">Enable HACS</span>
-          <label class="switch"><input type="checkbox" checked disabled><span class="slider"></span></label>
-        </div>
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          Z-Wave and HACS are already toggleable &mdash; just not here.
+          Manage them on
+          <a href="/preferences/" class="text-primary-700 dark:text-primary-500 hover:underline">System Preferences</a>,
+          under Services &rarr; Home Automation. Everything else about
+          Home Assistant is managed in its own UI.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
       </div>
     </div>
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
@@ -152,26 +126,12 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-frigate-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Preview only &mdash; not wired up yet.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Camera Config Path</span>
-            <input type="text" value="/var/lib/frigate/config.yml" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Detector</span>
-            <select disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-              <option selected>CPU</option>
-              <option>Coral (USB)</option>
-              <option>Coral (PCIe)</option>
-              <option>OpenVINO</option>
-            </select>
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Retention (days)</span>
-            <input type="number" value="14" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-        </div>
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          Camera configuration lives entirely in Frigate's own config,
+          not here. Manage cameras, detection, and recording directly
+          in its own UI.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
       </div>
     </div>
   </div>
@@ -193,17 +153,11 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-seerr-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Preview only &mdash; not wired up yet.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Base URL</span>
-            <input type="text" value="http://127.0.0.1:5055" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">API Key</span>
-            <input type="password" placeholder="Not shown" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-        </div>
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          Seerr has no settings exposed here &mdash; manage requests,
+          users, and integrations directly in its own UI.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
       </div>
     </div>
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
@@ -214,25 +168,11 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-radarr-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Preview only &mdash; not wired up yet.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">API Key</span>
-            <input type="password" placeholder="Not shown" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Root Folder</span>
-            <input type="text" value="/rust/media/movies" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Quality Profile</span>
-            <select disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-              <option selected>HD-1080p</option>
-              <option>Ultra-HD</option>
-              <option>Any</option>
-            </select>
-          </div>
-        </div>
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          Radarr generates and manages its own API key and settings
+          &mdash; manage them directly in its own UI.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
       </div>
     </div>
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
@@ -243,25 +183,11 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-sonarr-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Preview only &mdash; not wired up yet.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">API Key</span>
-            <input type="password" placeholder="Not shown" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Root Folder</span>
-            <input type="text" value="/rust/media/tv" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Quality Profile</span>
-            <select disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-              <option selected>HD-1080p</option>
-              <option>Ultra-HD</option>
-              <option>Any</option>
-            </select>
-          </div>
-        </div>
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          Sonarr generates and manages its own API key and settings
+          &mdash; manage them directly in its own UI.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
       </div>
     </div>
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
@@ -272,17 +198,11 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-jackett-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Preview only &mdash; not wired up yet.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">API Key</span>
-            <input type="password" placeholder="Not shown" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Indexers</span>
-            <input type="text" value="1337x, rarbg-archive, thepiratebay" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-        </div>
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          Jackett's indexers and API key are managed entirely in its
+          own UI.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
       </div>
     </div>
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
@@ -293,17 +213,11 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-qbittorrent-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Preview only &mdash; not wired up yet.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Download Path</span>
-            <input type="text" value="/rust/media/downloads" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">WebUI Port</span>
-            <input type="number" value="8080" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-        </div>
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          qBittorrent's settings, including its WebUI password, are
+          managed entirely in its own interface.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
       </div>
     </div>
   </div>
@@ -325,18 +239,18 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-sso-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Preview only &mdash; not wired up yet.</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Authelia's own UI theme. Session, LDAP, and access-control
+          settings aren't editable here &mdash; they're derived from
+          this box's own domain and security setup.
+        </p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Session Domain</span>
-            <input type="text" value="beardedtek.com" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Default 2FA Method</span>
-            <select disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-              <option selected>TOTP</option>
-              <option>WebAuthn</option>
-              <option>None</option>
+            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Theme</span>
+            <select id="svccfg-authelia-theme" data-svcfield="authelia.theme" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+              <option value="auto">Auto</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
             </select>
           </div>
         </div>
@@ -344,6 +258,9 @@ title: Service Configuration
     </div>
   </div>
 </div>
+
+<div id="svccfg-message" class="mb-4 text-sm hidden"></div>
+<button id="svccfg-save-btn" type="button" class="hidden mb-8 text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Save Changes</button>
 
 <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
   <div class="flex items-center justify-between p-3">
@@ -387,6 +304,336 @@ title: Service Configuration
     </div>
   </div>
 </div>
+
+<!-- Save-changes modal (Authelia theme / MinIO credentials) -->
+<div id="svcconfig-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center update-modal-overlay p-4">
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl update-modal-panel w-full overflow-y-auto p-6 relative">
+    <button id="svcconfig-modal-close-x" type="button" class="hidden absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" aria-label="Close">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+    <!-- Confirm view -->
+    <div id="svcconfig-modal-confirm-view">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Apply these changes?</h3>
+      <ul id="svcconfig-modal-summary" class="text-sm text-gray-700 dark:text-gray-300 mb-6 list-disc pl-5"></ul>
+      <p class="text-sm text-gray-700 dark:text-gray-300 mb-6">MinIO changes take effect in a couple of seconds. Authelia changes rebuild the system in place, which can take several minutes.</p>
+      <div class="flex justify-end gap-2">
+        <button id="svcconfig-modal-cancel-btn" type="button" class="text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600">Cancel</button>
+        <button id="svcconfig-modal-confirm-btn" type="button" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Apply</button>
+      </div>
+    </div>
+    <!-- Progress view -->
+    <div id="svcconfig-modal-progress-view" class="hidden">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Applying changes</h3>
+      <div class="flex items-center gap-3 mb-4">
+        <div id="svcconfig-modal-spinner" class="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 dark:border-gray-600 border-t-primary-600 shrink-0"></div>
+        <svg id="svcconfig-modal-icon-success" class="hidden w-6 h-6 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <svg id="svcconfig-modal-icon-failed" class="hidden w-6 h-6 update-icon-failed shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <span id="svcconfig-modal-status-text" class="text-sm text-gray-700 dark:text-gray-300">Starting...</span>
+      </div>
+      <ul id="svcconfig-step-list" class="text-sm mb-4">
+        <li class="update-step" data-svcconfig-step="download"><span class="update-step-icon" data-svcconfig-step-icon="download">&#9675;</span>Downloading release</li>
+        <li class="update-step" data-svcconfig-step="rebuild"><span class="update-step-icon" data-svcconfig-step-icon="rebuild">&#9675;</span>Rebuilding<ul id="svcconfig-derivations-list" class="update-derivations-list hidden"></ul></li>
+        <li class="update-step" data-svcconfig-step="inhibitors"><span class="update-step-icon" data-svcconfig-step-icon="inhibitors">&#9675;</span>Check switch inhibitors</li>
+        <li class="update-step" data-svcconfig-step="activate"><span class="update-step-icon" data-svcconfig-step-icon="activate">&#9675;</span>Activate configuration</li>
+        <li class="update-step" data-svcconfig-step="etc"><span class="update-step-icon" data-svcconfig-step-icon="etc">&#9675;</span>Setting up /etc</li>
+        <li class="update-step" data-svcconfig-step="reload"><span class="update-step-icon" data-svcconfig-step-icon="reload">&#9675;</span>Reloading &amp; restarting units</li>
+        <li class="update-step" data-svcconfig-step="done"><span class="update-step-icon" data-svcconfig-step-icon="done">&#9675;</span>Done</li>
+      </ul>
+      <button id="svcconfig-log-toggle-btn" type="button" class="flex items-center gap-1 text-sm text-primary-700 dark:text-primary-500 hover:underline mb-2">
+        <svg id="svcconfig-log-toggle-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        <span>Show details</span>
+      </button>
+      <div id="svcconfig-log-panel" class="hidden">
+        <div id="svcconfig-log-stages" class="text-xs update-log-stages mb-2"></div>
+        <pre id="svcconfig-log-build" class="update-log-output text-xs p-3 rounded-lg overflow-y-auto"></pre>
+      </div>
+      <div class="flex justify-end mt-4">
+        <button id="svcconfig-modal-close-btn" type="button" class="hidden text-white bg-primary-700 hover:bg-primary-800 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var SVCFIELDS = {
+    "authelia.theme": { label: "Authelia theme", describe: function (v) { return "Change Authelia theme to " + v + "."; } },
+    "minio.rootUser": { label: "MinIO root username", describe: function (v) { return "Change MinIO root username to " + v + "."; } },
+    // Deliberately never echoes the typed password back into the
+    // confirm summary, even within the same page load — same
+    // never-round-trips posture as every other secret this dashboard
+    // handles.
+    "minio.rootPassword": { label: "MinIO root password", describe: function () { return "Update MinIO root password."; } }
+  };
+
+  var messageEl = document.getElementById("svccfg-message");
+  var saveBtn = document.getElementById("svccfg-save-btn");
+  var themeInput = document.getElementById("svccfg-authelia-theme");
+  var minioUserInput = document.getElementById("svccfg-minio-user");
+  var minioPasswordInput = document.getElementById("svccfg-minio-password");
+
+  var modal = document.getElementById("svcconfig-modal");
+  var modalCloseX = document.getElementById("svcconfig-modal-close-x");
+  var confirmView = document.getElementById("svcconfig-modal-confirm-view");
+  var progressView = document.getElementById("svcconfig-modal-progress-view");
+  var summaryEl = document.getElementById("svcconfig-modal-summary");
+  var cancelBtn = document.getElementById("svcconfig-modal-cancel-btn");
+  var confirmBtn = document.getElementById("svcconfig-modal-confirm-btn");
+  var spinnerEl = document.getElementById("svcconfig-modal-spinner");
+  var iconSuccessEl = document.getElementById("svcconfig-modal-icon-success");
+  var iconFailedEl = document.getElementById("svcconfig-modal-icon-failed");
+  var statusTextEl = document.getElementById("svcconfig-modal-status-text");
+  var logToggleBtn = document.getElementById("svcconfig-log-toggle-btn");
+  var logToggleChevron = document.getElementById("svcconfig-log-toggle-chevron");
+  var logPanel = document.getElementById("svcconfig-log-panel");
+  var logStagesEl = document.getElementById("svcconfig-log-stages");
+  var logBuildEl = document.getElementById("svcconfig-log-build");
+  var modalCloseBtn = document.getElementById("svcconfig-modal-close-btn");
+
+  function showMessage(text, kind) {
+    messageEl.textContent = text;
+    messageEl.classList.remove("hidden");
+    messageEl.className = "mb-4 text-sm rounded-lg p-3 " + (
+      kind === "error"
+        ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+        : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+    );
+  }
+  function hideMessage() { messageEl.classList.add("hidden"); }
+
+  var baseline = { "authelia.theme": "auto", "minio.rootUser": "" };
+  var minioPasswordSet = false;
+
+  function currentValue(key) {
+    if (key === "authelia.theme") { return themeInput.value; }
+    if (key === "minio.rootUser") { return minioUserInput.value.trim(); }
+    if (key === "minio.rootPassword") { return minioPasswordInput.value; }
+    return "";
+  }
+
+  // Only ever includes fields that actually changed — saveCgi accepts
+  // any subset of SVCFIELDS' keys, so a payload with just one field is
+  // exactly as valid as one with all three. minio.rootPassword is
+  // "changed" whenever it's non-empty (blank always means "keep"),
+  // every other field compares against its own fetched baseline.
+  function buildChanges() {
+    var changes = [];
+    Object.keys(SVCFIELDS).forEach(function (key) {
+      var val = currentValue(key);
+      if (key === "minio.rootPassword") {
+        if (val) { changes.push({ key: key, value: val }); }
+        return;
+      }
+      if (val !== baseline[key]) { changes.push({ key: key, value: val }); }
+    });
+    return changes;
+  }
+
+  function refreshSaveVisibility() {
+    saveBtn.classList.toggle("hidden", buildChanges().length === 0);
+  }
+
+  [themeInput, minioUserInput, minioPasswordInput].forEach(function (el) {
+    el.addEventListener("input", refreshSaveVisibility);
+    el.addEventListener("change", refreshSaveVisibility);
+  });
+
+  fetch("/preferences/svcconfig/current", { cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      baseline = {
+        "authelia.theme": data["authelia.theme"] || "auto",
+        "minio.rootUser": data["minio.rootUser"] || ""
+      };
+      minioPasswordSet = !!data["minio.rootPasswordSet"];
+      themeInput.value = baseline["authelia.theme"];
+      minioUserInput.value = baseline["minio.rootUser"];
+      minioPasswordInput.placeholder = minioPasswordSet
+        ? "Leave blank to keep the current password"
+        : "Required — no password set yet";
+      refreshSaveVisibility();
+    })
+    .catch(function () { refreshSaveVisibility(); });
+
+  function openModal() { modal.classList.remove("hidden"); }
+  function closeModal() { modal.classList.add("hidden"); }
+
+  function showConfirmView(changes) {
+    summaryEl.innerHTML = "";
+    changes.forEach(function (c) {
+      var li = document.createElement("li");
+      li.textContent = SVCFIELDS[c.key].describe(c.value);
+      summaryEl.appendChild(li);
+    });
+    confirmView.classList.remove("hidden");
+    progressView.classList.add("hidden");
+    modalCloseX.classList.add("hidden");
+    openModal();
+  }
+
+  function showProgressView() {
+    confirmView.classList.add("hidden");
+    progressView.classList.remove("hidden");
+    openModal();
+  }
+
+  function setTerminalIcon(state) {
+    spinnerEl.classList.toggle("hidden", state !== "running");
+    iconSuccessEl.classList.toggle("hidden", state !== "success");
+    iconFailedEl.classList.toggle("hidden", state !== "failed");
+    var terminal = state === "success" || state === "failed";
+    modalCloseBtn.classList.toggle("hidden", !terminal);
+    modalCloseX.classList.toggle("hidden", !terminal);
+  }
+
+  // Same shape as every other rebuild-driven modal on this site — see
+  // modules/system-rebuild.nix's applyScript for the literal log
+  // phrases these regexes match. A MinIO-only save never produces any
+  // of this text (it never touches the shared runner), so every step
+  // just stays unchecked and the modal resolves straight to "success"
+  // from the top status line alone — no special-casing needed here.
+  var SVCCONFIG_STEPS = [
+    { key: "download", re: /rebuilding \(this can take a while\)|checking switch inhibitors|activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "rebuild", re: /checking switch inhibitors|activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "inhibitors", re: /activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "activate", re: /setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "etc", re: /reloading|restarting|done\. the new configuration/i },
+    { key: "reload", re: /done\. the new configuration/i },
+    { key: "done", re: null }
+  ];
+
+  function renderSvcconfigSteps(data) {
+    var stageText = (data.log || []).map(function (e) { return e.message; }).join(" | ");
+    var buildLog = data.buildLog || "";
+    var combined = stageText + "\n" + buildLog;
+
+    SVCCONFIG_STEPS.forEach(function (step) {
+      var isDone = step.key === "done" ? data.state === "success" : step.re.test(combined);
+      var li = document.querySelector('[data-svcconfig-step="' + step.key + '"]');
+      var icon = document.querySelector('[data-svcconfig-step-icon="' + step.key + '"]');
+      if (!li || !icon) { return; }
+      li.classList.toggle("update-step-done", isDone);
+      icon.innerHTML = isDone ? "&#10003;" : "&#9675;";
+    });
+
+    var derivationsList = document.getElementById("svcconfig-derivations-list");
+    var match = buildLog.match(/these \d+ derivations?[^\n]*will be built:\r?\n((?:\s+\/nix\/store\/\S+\r?\n?)+)/i);
+    if (match) {
+      var lines = match[1].split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+      derivationsList.innerHTML = "";
+      lines.forEach(function (l) {
+        var short = l.replace(/^\/nix\/store\/[a-z0-9]+-/, "");
+        var item = document.createElement("li");
+        item.textContent = short;
+        derivationsList.appendChild(item);
+      });
+      derivationsList.classList.remove("hidden");
+    }
+  }
+
+  function renderLog(data) {
+    var stages = data.log || [];
+    logStagesEl.innerHTML = "";
+    stages.forEach(function (entry) {
+      var line = document.createElement("div");
+      var t = "";
+      try { t = new Date(entry.time).toLocaleTimeString(); } catch (e) { t = entry.time; }
+      line.textContent = "[" + t + "] " + entry.message;
+      logStagesEl.appendChild(line);
+    });
+    if (data.buildLog) {
+      logBuildEl.textContent = data.buildLog;
+      logBuildEl.scrollTop = logBuildEl.scrollHeight;
+    }
+    renderSvcconfigSteps(data);
+  }
+
+  var polling = null;
+  function stopPolling() {
+    if (polling) { clearInterval(polling); polling = null; }
+  }
+
+  var pendingChanges = null;
+
+  function poll() {
+    fetch("/preferences/svcconfig/status", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        showProgressView();
+        setTerminalIcon(data.state);
+        statusTextEl.textContent = data.message || data.state;
+        renderLog(data);
+        if (data.state === "success") {
+          stopPolling();
+          (pendingChanges || []).forEach(function (c) {
+            if (c.key === "minio.rootPassword") { return; }
+            baseline[c.key] = c.value;
+          });
+          minioPasswordInput.value = "";
+          if ((pendingChanges || []).some(function (c) { return c.key === "minio.rootPassword"; })) {
+            minioPasswordSet = true;
+            minioPasswordInput.placeholder = "Leave blank to keep the current password";
+          }
+          refreshSaveVisibility();
+        } else if (data.state === "failed") {
+          stopPolling();
+        }
+      })
+      .catch(function () { /* try again on next tick */ });
+  }
+
+  saveBtn.addEventListener("click", function () {
+    var changes = buildChanges();
+    if (changes.length === 0) { return; }
+    hideMessage();
+    pendingChanges = changes;
+    showConfirmView(changes);
+  });
+
+  cancelBtn.addEventListener("click", closeModal);
+  modalCloseX.addEventListener("click", closeModal);
+  modalCloseBtn.addEventListener("click", closeModal);
+
+  logToggleBtn.addEventListener("click", function () {
+    var hidden = logPanel.classList.toggle("hidden");
+    logToggleChevron.style.transform = hidden ? "" : "rotate(180deg)";
+    logToggleBtn.querySelector("span").textContent = hidden ? "Show details" : "Hide details";
+  });
+
+  confirmBtn.addEventListener("click", function () {
+    showProgressView();
+    setTerminalIcon("running");
+    statusTextEl.textContent = "Starting...";
+    logStagesEl.innerHTML = "";
+    logBuildEl.textContent = "";
+    document.getElementById("svcconfig-derivations-list").classList.add("hidden");
+    renderSvcconfigSteps({ log: [], buildLog: "", state: "running" });
+
+    var body = {};
+    (pendingChanges || []).forEach(function (c) { body[c.key] = c.value; });
+
+    fetch("/preferences/svcconfig/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+      .then(function (r) {
+        return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+      })
+      .then(function (result) {
+        if (!result.ok) {
+          throw new Error((result.data && result.data.error) || "Save failed.");
+        }
+        polling = setInterval(poll, 3000);
+        poll();
+      })
+      .catch(function (err) {
+        setTerminalIcon("failed");
+        statusTextEl.textContent = err.message || "Could not save.";
+      });
+  });
+})();
+</script>
 
 <script>
 (function () {

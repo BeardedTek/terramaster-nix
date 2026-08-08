@@ -237,7 +237,7 @@ in
       # doesn't hold up, split into two services.authelia.instances (one
       # per domain scheme) before protecting anything past Sonarr.
       settings = {
-        theme = "auto";
+        theme = cfg.theme;
 
         session.cookies = [{
           inherit domain;

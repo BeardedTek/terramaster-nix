@@ -203,6 +203,19 @@
           rollout discipline) before layering forward-auth on top.
         '';
       };
+      authelia.theme = lib.mkOption {
+        type = lib.types.enum [ "light" "dark" "auto" ];
+        default = "auto";
+        description = ''
+          Authelia's own UI theme — see modules/authelia.nix's
+          settings.theme and the "SSO / Authelia" block on the Service
+          Configuration page (modules/dashboard-svcconfig.nix). The one
+          Authelia setting in that file that's genuinely safe to expose
+          for editing — everything else there is either derived from
+          mySystem.domain/hostName or security-critical (session, LDAP,
+          access_control), left hardcoded on purpose.
+        '';
+      };
     };
     homeAssistant = {
       enable = lib.mkOption {
