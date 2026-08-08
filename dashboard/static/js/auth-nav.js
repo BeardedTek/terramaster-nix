@@ -26,6 +26,8 @@
     if (info.isAdmin) {
       items +=
         '<a href="/preferences/" class="auth-nav-item">System Preferences</a>';
+      items +=
+        '<a href="/service-configuration/" class="auth-nav-item">Service Configuration</a>';
     }
     items += '<a href="/logout" class="auth-nav-item">Logout</a>';
 
