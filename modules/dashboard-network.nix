@@ -277,6 +277,33 @@ let
       mv ${overridesFile}.tmp ${overridesFile}
       rm -f ${pendingFile}
 
+      # From here on, ${backupFile} existing means "an unconfirmed
+      # change is live — restore this if we don't get a clean chance to
+      # decide otherwise." A trap covers *every* exit path (normal
+      # completion, `exit`, or this process being killed by a signal
+      # for any reason) rather than only the "waited 5 minutes and
+      # nothing happened" branch — confirmed the hard way: this script
+      # was killed by something ("start operation timed out.
+      # Terminating." — root cause not fully pinned down, plausibly
+      # related to the double rebuild this exact run triggered) partway
+      # through its wait, and with no trap, ${pendingConfirmFile} was
+      # simply orphaned forever, permanently blocking every future save
+      # (saveCgi's own guard has no owner left to ever clear it). Both
+      # the "confirmed" and "not confirmed" branches below now just
+      # need to remove-or-leave ${backupFile} and let this handle the
+      # rest, including the case where neither branch ever gets to run
+      # at all.
+      rollback_if_unconfirmed() {
+        if [ -f ${backupFile} ]; then
+          cp ${backupFile} ${overridesFile}
+          rm -f ${backupFile} ${pendingConfirmFile} ${confirmedFile}
+          printf '%s' '{"mode":"current","label":"Network change rolled back automatically (not confirmed within 5 minutes)","kind":"network"}' > ${sharedRequestFile}.tmp
+          mv ${sharedRequestFile}.tmp ${sharedRequestFile}
+          touch ${sharedTriggerFile}
+        fi
+      }
+      trap rollback_if_unconfirmed EXIT
+
       printf '%s' '{"mode":"current","label":"Network updated","kind":"network"}' > ${sharedRequestFile}.tmp
       mv ${sharedRequestFile}.tmp ${sharedRequestFile}
       touch ${sharedTriggerFile}
@@ -303,46 +330,29 @@ let
 
       if [ "$final_state" != "success" ]; then
         # Failed, or timed out waiting — either way nothing was
-        # successfully switched to, so there's nothing to roll back.
+        # successfully switched to, so there's nothing to roll back:
+        # discard the backup before the trap fires so it's a no-op.
         rm -f ${backupFile}
         exit 0
       fi
 
       # Applied successfully — wait up to 5 minutes for confirmation
       # (dashboard-network-confirm-cgi touches confirmedFile) before
-      # automatically reverting.
+      # the trap above automatically reverts.
       rm -f ${confirmedFile}
       touch ${pendingConfirmFile}
       waited=0
-      confirmed=0
       while [ "$waited" -lt 300 ]; do
         if [ -f ${confirmedFile} ]; then
-          confirmed=1
-          break
+          rm -f ${backupFile} ${pendingConfirmFile} ${confirmedFile}
+          exit 0
         fi
         sleep 5
         waited=$((waited + 5))
       done
-      rm -f ${pendingConfirmFile} ${confirmedFile}
-
-      if [ "$confirmed" -eq 1 ]; then
-        rm -f ${backupFile}
-        exit 0
-      fi
-
-      # Not confirmed in time — restore the pre-change config and fire
-      # a fresh shared-runner request for it. Deliberately not waiting
-      # on *this* one: the frontend's existing progress polling picks
-      # up this new kind:"network" run the same way it would any other,
-      # so there's nothing left for this script to do but hand off and
-      # exit.
-      if [ -f ${backupFile} ]; then
-        cp ${backupFile} ${overridesFile}
-        rm -f ${backupFile}
-        printf '%s' '{"mode":"current","label":"Network change rolled back automatically (not confirmed within 5 minutes)","kind":"network"}' > ${sharedRequestFile}.tmp
-        mv ${sharedRequestFile}.tmp ${sharedRequestFile}
-        touch ${sharedTriggerFile}
-      fi
+      # Not confirmed in time — falling off the end here (or being
+      # killed at any earlier point above) both just let the EXIT trap
+      # do the actual rollback.
     '';
   };
 
@@ -447,6 +457,16 @@ in
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe applyScript;
+        # This run can legitimately take up to ~15 minutes (10min
+        # rebuild-wait ceiling + 5min confirm window) — confirmed the
+        # hard way that leaving this unset can get the unit killed
+        # ("start operation timed out. Terminating.") well before that,
+        # orphaning the confirm-window state with nothing left alive to
+        # ever clean it up (the applyScript's own EXIT trap above is
+        # the other half of the fix — this stops the premature kill
+        # from happening at all, that one makes sure a kill that
+        # happens anyway can't leave things stuck).
+        TimeoutStartSec = "infinity";
       };
     };
     systemd.paths.dashboard-network-apply = {

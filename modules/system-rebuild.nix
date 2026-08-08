@@ -179,6 +179,15 @@ in
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe applyScript;
+        # Every run observed this session finished in well under a
+        # minute, but a rebuild that needs to actually build new
+        # packages (not just switch config) could plausibly run much
+        # longer — set explicitly rather than trusting an ambient
+        # default after modules/dashboard-network.nix's own apply
+        # service (same shape, also waits through a rebuild) was
+        # unexpectedly killed mid-run with a message ("start operation
+        # timed out") whose root cause wasn't fully pinned down.
+        TimeoutStartSec = "infinity";
       };
     };
     systemd.paths.system-rebuild-apply = {
