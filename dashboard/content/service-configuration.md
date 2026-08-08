@@ -17,7 +17,6 @@ title: Service Configuration
     </button>
   </div>
   <div id="svccfg-category-playback-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
       <div class="flex items-center justify-between p-3">
         <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-jellyfin-panel">
@@ -48,7 +47,6 @@ title: Service Configuration
         </div>
       </div>
     </div>
-
   </div>
 </div>
 
@@ -60,7 +58,6 @@ title: Service Configuration
     </button>
   </div>
   <div id="svccfg-category-storage-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
       <div class="flex items-center justify-between p-3">
         <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-minio-panel">
@@ -86,7 +83,6 @@ title: Service Configuration
         </div>
       </div>
     </div>
-
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
       <div class="flex items-center justify-between p-3">
         <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-filebrowser-panel">
@@ -108,7 +104,6 @@ title: Service Configuration
         </div>
       </div>
     </div>
-
   </div>
 </div>
 
@@ -120,7 +115,6 @@ title: Service Configuration
     </button>
   </div>
   <div id="svccfg-category-homeauto-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
       <div class="flex items-center justify-between p-3">
         <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-homeassistant-panel">
@@ -150,7 +144,6 @@ title: Service Configuration
         </div>
       </div>
     </div>
-
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
       <div class="flex items-center justify-between p-3">
         <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-frigate-panel">
@@ -181,7 +174,6 @@ title: Service Configuration
         </div>
       </div>
     </div>
-
   </div>
 </div>
 
@@ -193,7 +185,6 @@ title: Service Configuration
     </button>
   </div>
   <div id="svccfg-category-acquisition-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
       <div class="flex items-center justify-between p-3">
         <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-seerr-panel">
@@ -215,7 +206,6 @@ title: Service Configuration
         </div>
       </div>
     </div>
-
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
       <div class="flex items-center justify-between p-3">
         <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-radarr-panel">
@@ -245,7 +235,6 @@ title: Service Configuration
         </div>
       </div>
     </div>
-
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
       <div class="flex items-center justify-between p-3">
         <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-sonarr-panel">
@@ -275,7 +264,6 @@ title: Service Configuration
         </div>
       </div>
     </div>
-
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
       <div class="flex items-center justify-between p-3">
         <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-jackett-panel">
@@ -297,7 +285,6 @@ title: Service Configuration
         </div>
       </div>
     </div>
-
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
       <div class="flex items-center justify-between p-3">
         <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-qbittorrent-panel">
@@ -319,7 +306,6 @@ title: Service Configuration
         </div>
       </div>
     </div>
-
   </div>
 </div>
 
@@ -331,7 +317,6 @@ title: Service Configuration
     </button>
   </div>
   <div id="svccfg-category-auth-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
       <div class="flex items-center justify-between p-3">
         <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-sso-panel">
@@ -357,7 +342,6 @@ title: Service Configuration
         </div>
       </div>
     </div>
-
   </div>
 </div>
 
@@ -369,7 +353,6 @@ title: Service Configuration
     </button>
   </div>
   <div id="svccfg-category-meshvpn-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
       <div class="flex items-center justify-between p-3">
         <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-nebula-panel">
@@ -396,6 +379,5 @@ title: Service Configuration
         </div>
       </div>
     </div>
-
   </div>
 </div>
