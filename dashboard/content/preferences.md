@@ -43,55 +43,78 @@ title: System Preferences
   installed release.
 </p>
 
-<div class="mb-4">
-  <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">Media Playback</h4>
-  <div class="flex items-center justify-between py-2">
-    <span class="text-sm text-gray-900 dark:text-white">Jellyfin</span>
-    <label class="switch"><input type="checkbox" checked data-flag="jellyfin.enable"><span class="slider"></span></label>
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-playback-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" style="transform: rotate(180deg)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Media Playback</span>
+    </button>
   </div>
-</div>
-
-<div class="mb-4">
-  <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">Storage</h4>
-  <div class="flex items-center justify-between py-2">
-    <span class="text-sm text-gray-900 dark:text-white">MinIO</span>
-    <label class="switch"><input type="checkbox" data-flag="minio.enable"><span class="slider"></span></label>
-  </div>
-  <div class="flex items-center justify-between py-2">
-    <span class="text-sm text-gray-900 dark:text-white">FileBrowser</span>
-    <label class="switch"><input type="checkbox" data-flag="filebrowser.enable"><span class="slider"></span></label>
-  </div>
-</div>
-
-<div class="mb-4">
-  <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">Home Automation</h4>
-  <div class="flex items-center justify-between py-2">
-    <span class="text-sm font-medium text-gray-900 dark:text-white">Home Assistant</span>
-    <label class="switch"><input type="checkbox" checked data-flag="homeAssistant.enable" data-group-toggle="homeassistant"><span class="slider"></span></label>
-  </div>
-  <div class="pl-6 space-y-2 mb-2" data-group="homeassistant">
+  <div id="services-group-playback-panel" class="border-t border-gray-200 dark:border-gray-700 p-3">
     <div class="flex items-center justify-between py-2">
-      <span class="text-sm text-gray-700 dark:text-gray-300">Z-Wave</span>
-      <label class="switch"><input type="checkbox" data-flag="homeAssistant.zwave.enable"><span class="slider"></span></label>
-    </div>
-    <div class="flex items-center justify-between py-2">
-      <span class="text-sm text-gray-700 dark:text-gray-300">HACS</span>
-      <label class="switch"><input type="checkbox" checked data-flag="homeAssistant.hacs.enable"><span class="slider"></span></label>
+      <span class="text-sm text-gray-900 dark:text-white">Jellyfin</span>
+      <label class="switch"><input type="checkbox" checked data-flag="jellyfin.enable"><span class="slider"></span></label>
     </div>
   </div>
-  <div class="flex items-center justify-between py-2">
-    <span class="text-sm text-gray-900 dark:text-white">Frigate</span>
-    <label class="switch"><input type="checkbox" checked data-flag="frigate.enable"><span class="slider"></span></label>
+</div>
+
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-storage-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" style="transform: rotate(180deg)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Storage</span>
+    </button>
+  </div>
+  <div id="services-group-storage-panel" class="border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-900 dark:text-white">MinIO</span>
+      <label class="switch"><input type="checkbox" data-flag="minio.enable"><span class="slider"></span></label>
+    </div>
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-900 dark:text-white">FileBrowser</span>
+      <label class="switch"><input type="checkbox" data-flag="filebrowser.enable"><span class="slider"></span></label>
+    </div>
   </div>
 </div>
 
-<div class="mb-4">
-  <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">Media Acquisition</h4>
-  <div class="flex items-center justify-between py-2">
-    <span class="text-sm font-medium text-gray-900 dark:text-white">Media Acquisition</span>
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-homeauto-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" style="transform: rotate(180deg)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Home Automation</span>
+    </button>
+  </div>
+  <div id="services-group-homeauto-panel" class="border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm font-medium text-gray-900 dark:text-white">Home Assistant</span>
+      <label class="switch"><input type="checkbox" checked data-flag="homeAssistant.enable" data-group-toggle="homeassistant"><span class="slider"></span></label>
+    </div>
+    <div class="pl-6 space-y-2 mb-2" data-group="homeassistant">
+      <div class="flex items-center justify-between py-2">
+        <span class="text-sm text-gray-700 dark:text-gray-300">Z-Wave</span>
+        <label class="switch"><input type="checkbox" data-flag="homeAssistant.zwave.enable"><span class="slider"></span></label>
+      </div>
+      <div class="flex items-center justify-between py-2">
+        <span class="text-sm text-gray-700 dark:text-gray-300">HACS</span>
+        <label class="switch"><input type="checkbox" checked data-flag="homeAssistant.hacs.enable"><span class="slider"></span></label>
+      </div>
+    </div>
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-900 dark:text-white">Frigate</span>
+      <label class="switch"><input type="checkbox" checked data-flag="frigate.enable"><span class="slider"></span></label>
+    </div>
+  </div>
+</div>
+
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-acquisition-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" style="transform: rotate(180deg)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Media Acquisition</span>
+    </button>
     <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.enable" data-group-toggle="mediaacquisition"><span class="slider"></span></label>
   </div>
-  <div class="pl-6 space-y-2 mb-2" data-group="mediaacquisition">
+  <div id="services-group-acquisition-panel" class="border-t border-gray-200 dark:border-gray-700 p-3 space-y-2" data-group="mediaacquisition">
     <div class="flex items-center justify-between py-2">
       <span class="text-sm text-gray-700 dark:text-gray-300">Seerr</span>
       <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.seerr.enable"><span class="slider"></span></label>
@@ -115,16 +138,23 @@ title: System Preferences
   </div>
 </div>
 
-<div class="mb-4">
-  <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">Authentication</h4>
-  <div class="flex items-center justify-between py-2">
-    <span class="text-sm font-medium text-gray-900 dark:text-white">SSO</span>
-    <label class="switch"><input type="checkbox" data-flag="sso.enable" data-group-toggle="sso"><span class="slider"></span></label>
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-auth-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" style="transform: rotate(180deg)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Authentication</span>
+    </button>
   </div>
-  <div class="pl-6 space-y-2 mb-2" data-group="sso">
+  <div id="services-group-auth-panel" class="border-t border-gray-200 dark:border-gray-700 p-3">
     <div class="flex items-center justify-between py-2">
-      <span class="text-sm text-gray-700 dark:text-gray-300">Authelia</span>
-      <label class="switch"><input type="checkbox" data-flag="sso.authelia.enable"><span class="slider"></span></label>
+      <span class="text-sm font-medium text-gray-900 dark:text-white">SSO</span>
+      <label class="switch"><input type="checkbox" data-flag="sso.enable" data-group-toggle="sso"><span class="slider"></span></label>
+    </div>
+    <div class="pl-6 space-y-2 mb-2" data-group="sso">
+      <div class="flex items-center justify-between py-2">
+        <span class="text-sm text-gray-700 dark:text-gray-300">Authelia</span>
+        <label class="switch"><input type="checkbox" data-flag="sso.authelia.enable"><span class="slider"></span></label>
+      </div>
     </div>
   </div>
 </div>

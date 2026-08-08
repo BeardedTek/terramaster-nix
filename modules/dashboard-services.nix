@@ -317,6 +317,24 @@ in
     # Never wantedBy anything — purely triggered by the path unit below.
     systemd.services.dashboard-services-apply = {
       description = "Apply a dashboard-submitted service enable/disable change";
+      # This service's own job is to run `nixos-rebuild switch` — which
+      # means its own unit definition is, by construction, part of the
+      # closure that switch is switching *to*, and will always look
+      # "changed" relative to the generation that's currently running it.
+      # Without this, switch-to-configuration correctly-but-disastrously
+      # notices that and sends this unit (i.e. itself, mid-run) a
+      # SIGTERM partway through — confirmed the hard way: the journal
+      # showed "stopping the following units: dashboard-services-apply
+      # .service, fcgiwrap-dashboard-services.socket, fcgiwrap-traefik
+      # -dns01.socket, traefik.service, ..." immediately followed by
+      # "Main process exited, code=killed, status=15/TERM", which killed
+      # nixos-rebuild switch before it could restart anything past that
+      # point — leaving every unit in that stop list down until the next
+      # *externally* triggered switch. stopIfChanged=false tells
+      # switch-to-configuration to leave an already-running instance of
+      # this unit alone; the new definition still takes effect
+      # (correctly) the next time it's freshly triggered.
+      stopIfChanged = false;
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe applyScript;

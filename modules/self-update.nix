@@ -272,6 +272,19 @@ in
     # Never wantedBy anything — purely triggered by the path unit below.
     systemd.services.nas-update-apply = {
       description = "Apply the latest Bearded NAS release";
+      # Same latent bug modules/dashboard-services.nix's own apply
+      # service hit and fixed the hard way: this service's own job is to
+      # run `nixos-rebuild switch`, so its own unit definition is always
+      # part of the closure being switched to, and looks "changed"
+      # relative to the generation currently running it.
+      # switch-to-configuration would otherwise SIGTERM this unit (i.e.
+      # itself, mid-run) partway through, killing nixos-rebuild switch
+      # before it can restart whatever else it had queued to stop/start
+      # — leaving the system in a partially-activated state until the
+      # next externally triggered switch. stopIfChanged=false leaves an
+      # already-running instance alone; the new definition still takes
+      # effect next time it's freshly triggered.
+      stopIfChanged = false;
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe applyScript;
