@@ -672,6 +672,15 @@ title: System Preferences
         <svg id="services-modal-icon-failed" class="hidden w-6 h-6 update-icon-failed shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         <span id="services-modal-status-text" class="text-sm text-gray-700 dark:text-gray-300">Starting...</span>
       </div>
+      <ul id="services-step-list" class="text-sm mb-4">
+        <li class="update-step" data-services-step="download"><span class="update-step-icon" data-services-step-icon="download">&#9675;</span>Downloading release</li>
+        <li class="update-step" data-services-step="rebuild"><span class="update-step-icon" data-services-step-icon="rebuild">&#9675;</span>Rebuilding<ul id="services-derivations-list" class="update-derivations-list hidden"></ul></li>
+        <li class="update-step" data-services-step="inhibitors"><span class="update-step-icon" data-services-step-icon="inhibitors">&#9675;</span>Check switch inhibitors</li>
+        <li class="update-step" data-services-step="activate"><span class="update-step-icon" data-services-step-icon="activate">&#9675;</span>Activate configuration</li>
+        <li class="update-step" data-services-step="etc"><span class="update-step-icon" data-services-step-icon="etc">&#9675;</span>Setting up /etc</li>
+        <li class="update-step" data-services-step="reload"><span class="update-step-icon" data-services-step-icon="reload">&#9675;</span>Reloading &amp; restarting units</li>
+        <li class="update-step" data-services-step="done"><span class="update-step-icon" data-services-step-icon="done">&#9675;</span>Done</li>
+      </ul>
       <button id="services-log-toggle-btn" type="button" class="flex items-center gap-1 text-sm text-primary-700 dark:text-primary-500 hover:underline mb-2">
         <svg id="services-log-toggle-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
         <span>Show details</span>
@@ -833,6 +842,57 @@ title: System Preferences
     modalCloseX.classList.toggle("hidden", !terminal);
   }
 
+  // Same shape as the Update modal's own STEPS/renderSteps (see the
+  // script at the bottom of this page) — duplicated rather than shared
+  // across the two modals' independent script blocks, matching how the
+  // rest of this feature deliberately doesn't share code with the
+  // Update flow. Each step's regex also matches every later step's own
+  // marker, so whichever marker is furthest along in the real
+  // nixos-rebuild output automatically marks everything before it done
+  // too. The "download" step's own completion trigger
+  // ("rebuilding (this can take a while)") is the literal phrase
+  // modules/system-rebuild.nix's applyScript writes — the same shared
+  // runner the Update flow uses, so these markers apply identically
+  // here.
+  var SERVICES_STEPS = [
+    { key: "download", re: /rebuilding \(this can take a while\)|checking switch inhibitors|activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "rebuild", re: /checking switch inhibitors|activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "inhibitors", re: /activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "activate", re: /setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "etc", re: /reloading|restarting|done\. the new configuration/i },
+    { key: "reload", re: /done\. the new configuration/i },
+    { key: "done", re: null }
+  ];
+
+  function renderServicesSteps(data) {
+    var stageText = (data.log || []).map(function (e) { return e.message; }).join(" | ");
+    var buildLog = data.buildLog || "";
+    var combined = stageText + "\n" + buildLog;
+
+    SERVICES_STEPS.forEach(function (step) {
+      var isDone = step.key === "done" ? data.state === "success" : step.re.test(combined);
+      var li = document.querySelector('[data-services-step="' + step.key + '"]');
+      var icon = document.querySelector('[data-services-step-icon="' + step.key + '"]');
+      if (!li || !icon) { return; }
+      li.classList.toggle("update-step-done", isDone);
+      icon.innerHTML = isDone ? "&#10003;" : "&#9675;";
+    });
+
+    var derivationsList = document.getElementById("services-derivations-list");
+    var match = buildLog.match(/these \d+ derivations?[^\n]*will be built:\r?\n((?:\s+\/nix\/store\/\S+\r?\n?)+)/i);
+    if (match) {
+      var lines = match[1].split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+      derivationsList.innerHTML = "";
+      lines.forEach(function (l) {
+        var short = l.replace(/^\/nix\/store\/[a-z0-9]+-/, "");
+        var item = document.createElement("li");
+        item.textContent = short;
+        derivationsList.appendChild(item);
+      });
+      derivationsList.classList.remove("hidden");
+    }
+  }
+
   function renderLog(data) {
     var stages = data.log || [];
     logStagesEl.innerHTML = "";
@@ -847,6 +907,7 @@ title: System Preferences
       logBuildEl.textContent = data.buildLog;
       logBuildEl.scrollTop = logBuildEl.scrollHeight;
     }
+    renderServicesSteps(data);
   }
 
   function stopPolling() {
@@ -898,6 +959,8 @@ title: System Preferences
     statusTextEl.textContent = "Starting...";
     logStagesEl.innerHTML = "";
     logBuildEl.textContent = "";
+    document.getElementById("services-derivations-list").classList.add("hidden");
+    renderServicesSteps({ log: [], buildLog: "", state: "running" });
 
     fetch("/preferences/services/save", {
       method: "POST",

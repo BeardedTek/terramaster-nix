@@ -111,8 +111,10 @@ let
       # %TAG% is a placeholder the shared runner substitutes with the
       # actual resolved tag once it knows it — this caller requests
       # mode:"latest" and doesn't find out which tag that is until the
-      # shared runner does.
-      printf '%s' '{"mode":"latest","label":"Updated to %TAG%"}' > ${sharedRequestFile}.tmp
+      # shared runner does. kind:"update" lets statusCgi below tell "my
+      # own run" apart from a dashboard-services run that happens to
+      # still be within its own settled-state window.
+      printf '%s' '{"mode":"latest","label":"Updated to %TAG%","kind":"update"}' > ${sharedRequestFile}.tmp
       mv ${sharedRequestFile}.tmp ${sharedRequestFile}
       touch ${sharedTriggerFile}
       printf 'Status: 200 OK\r\nContent-Type: text/plain\r\n\r\nUpdate triggered\n'
@@ -140,12 +142,19 @@ let
       # first poll ever lands, silently discarding the failure message.
       # Also treat a progress file written in the last 2 minutes as
       # current, so a fast-finished run's result is still visible for a
-      # bit rather than only during the run itself.
+      # bit rather than only during the run itself. Gated on
+      # kind:"update" specifically — otherwise a dashboard-services run
+      # still inside its own settled-state window would show up here
+      # too, reading as "it's updating again" when nothing update-related
+      # actually re-triggered.
       if [ -f ${sharedProgressFile} ] && { [ -f ${sharedApplyingFile} ] || [ -n "$(find ${sharedProgressFile} -mmin -2 2>/dev/null)" ]; }; then
-        build_log=""
-        [ -f ${sharedBuildLogFile} ] && build_log=$(tail -n 500 ${sharedBuildLogFile})
-        jq --arg buildLog "$build_log" '. + {buildLog: $buildLog}' ${sharedProgressFile}
-        exit 0
+        progress_kind=$(jq -r '.kind // empty' ${sharedProgressFile} 2>/dev/null || true)
+        if [ "$progress_kind" = "update" ]; then
+          build_log=""
+          [ -f ${sharedBuildLogFile} ] && build_log=$(tail -n 500 ${sharedBuildLogFile})
+          jq --arg buildLog "$build_log" '. + {buildLog: $buildLog}' ${sharedProgressFile}
+          exit 0
+        fi
       fi
       ${writeStatusFn}
       write_status

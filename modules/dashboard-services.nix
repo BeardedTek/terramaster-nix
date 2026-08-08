@@ -185,7 +185,7 @@ let
       mv ${overridesFile}.tmp ${overridesFile}
       rm -f ${pendingFile}
 
-      printf '%s' '{"mode":"current","label":"Services updated"}' > ${sharedRequestFile}.tmp
+      printf '%s' '{"mode":"current","label":"Services updated","kind":"services"}' > ${sharedRequestFile}.tmp
       mv ${sharedRequestFile}.tmp ${sharedRequestFile}
       touch ${sharedTriggerFile}
     '';
@@ -200,7 +200,15 @@ let
     runtimeInputs = [ pkgs.jq pkgs.coreutils pkgs.findutils ];
     text = ''
       printf 'Status: 200 OK\r\nContent-Type: application/json\r\n\r\n'
+      # Gated on kind:"services" specifically — otherwise a self-update
+      # run still inside its own settled-state window would show up
+      # here too, reading as "it's applying again" when nothing
+      # services-related actually re-triggered.
+      progress_kind=""
       if [ -f ${sharedProgressFile} ] && { [ -f ${sharedApplyingFile} ] || [ -n "$(find ${sharedProgressFile} -mmin -2 2>/dev/null)" ]; }; then
+        progress_kind=$(jq -r '.kind // empty' ${sharedProgressFile} 2>/dev/null || true)
+      fi
+      if [ "$progress_kind" = "services" ]; then
         build_log=""
         [ -f ${sharedBuildLogFile} ] && build_log=$(tail -n 500 ${sharedBuildLogFile})
         jq --arg buildLog "$build_log" '. + {buildLog: $buildLog}' ${sharedProgressFile}

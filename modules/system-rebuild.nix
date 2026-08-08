@@ -32,14 +32,24 @@ let
   # whether one happens), and a missing `jq` in a status CGI's
   # runtimeInputs. Fixing this once, here, means neither caller needs
   # to get any of that right again.
+  # References $kind from the enclosing script, not a parameter — every
+  # call site in applyScript runs after $kind is set from the request,
+  # so this stays simple rather than threading a third argument through
+  # every call. Lets each caller's own statusCgi tell "my flow is
+  # active" apart from "the other flow just finished" — before this,
+  # both statusCgis showed whichever flow's progress file was most
+  # recently written/still within its 2-minute settled-state window,
+  # regardless of which one the viewer actually triggered, which reads
+  # as "it's re-running" when it's really just the other feature's
+  # recent result bleeding through a shared file.
   writeProgressFn = ''
     write_progress() {
       local state="$1" message="$2" now log_json
       now=$(date -Is)
       log_json="[]"
       [ -f ${progressFile} ] && log_json=$(jq -c '.log // []' ${progressFile} 2>/dev/null || echo '[]')
-      jq -n --arg state "$state" --arg message "$message" --arg time "$now" --argjson log "$log_json" \
-        '{state:$state, message:$message, log: ($log + [{time:$time, message:$message}])}' \
+      jq -n --arg state "$state" --arg message "$message" --arg time "$now" --argjson log "$log_json" --arg kind "$kind" \
+        '{state:$state, message:$message, kind:$kind, log: ($log + [{time:$time, message:$message}])}' \
         > ${progressFile}.tmp
       mv ${progressFile}.tmp ${progressFile}
     }
@@ -77,6 +87,7 @@ let
 
       mode=$(jq -r '.mode' ${requestFile})
       label=$(jq -r '.label' ${requestFile})
+      kind=$(jq -r '.kind' ${requestFile})
       rm -f ${requestFile}
 
       # mode:"current" reads /persist/nixos-version (falling back to
