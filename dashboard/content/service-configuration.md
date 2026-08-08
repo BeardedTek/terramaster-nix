@@ -366,9 +366,11 @@ title: Service Configuration
           the same format the Nebula mobile apps use, with the CA/cert/key
           embedded directly in the file. Saving replaces the current
           config and restarts Nebula immediately; it does not require a
-          system rebuild. The existing config is never shown back here
-          (it contains this node's private key). Enabling/disabling the
-          Nebula service itself is still done on
+          system rebuild. The current config is loaded below since this
+          page is admin-only &mdash; note that it includes this node's
+          private key, same as reading the file directly on the box
+          would. Enabling/disabling the Nebula service itself is still
+          done on
           <a href="/preferences/" class="text-primary-700 dark:text-primary-500 hover:underline">System Preferences</a>,
           under Services &rarr; Mesh VPN Networks.
         </p>
@@ -406,18 +408,20 @@ title: Service Configuration
     );
   }
 
-  // Never fetches the config itself — modules/dashboard-nebula.nix's
-  // currentCgi deliberately only ever reports whether one's set (it
-  // embeds this node's private key). The textarea stays blank; this
-  // just tells the admin whether they're replacing something or
-  // starting fresh.
+  // Loads the actual config into the textarea (not just a "one's set"
+  // boolean) — this page is admin-only, so showing it back is the same
+  // trust boundary as an admin reading the file directly on the box.
+  // Only ever called on page load and right after a successful save
+  // (never on a timer), so this can't clobber an admin's in-progress
+  // edit mid-typing.
   function refreshStatusLine() {
     fetch("/preferences/nebula/current", { cache: "no-store" })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         statusEl.textContent = data.configSet
-          ? "A Nebula config is currently active."
+          ? "A Nebula config is currently active — shown below."
           : "No Nebula config uploaded yet.";
+        textarea.value = data.config || "";
       })
       .catch(function () { statusEl.textContent = ""; });
   }
@@ -456,7 +460,6 @@ title: Service Configuration
           if (status === "ok") {
             clearInterval(iv);
             showMessage("Saved — Nebula restarted with the new config.", "success");
-            textarea.value = "";
             saveBtn.disabled = false;
             refreshStatusLine();
           } else if (status.indexOf("error:") === 0) {

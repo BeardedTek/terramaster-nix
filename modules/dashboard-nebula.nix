@@ -84,10 +84,13 @@ let
       fi
 
       mkdir -p "$(dirname ${configFile})"
-      # 600 root:root — this embeds the node's private key. nebula.service
-      # itself runs as root (no User= set in modules/nebula.nix), so it
-      # can still read it.
-      install -m 600 -o root -g root ${pendingFile} ${configFile}
+      # 640 root:dashboard-nebula, not 600 root:root — this embeds the
+      # node's private key, so it still isn't world-readable, but
+      # currentCgi (running unprivileged as dashboard-nebula via
+      # fcgiwrap) needs to read it back to display it, admin-page-only
+      # rationale below. nebula.service itself runs as root (no User=
+      # set in modules/nebula.nix), so it can still read it either way.
+      install -m 640 -o root -g dashboard-nebula ${pendingFile} ${configFile}
       rm -f ${pendingFile}
 
       # mySystem.features.nebula.enable being off means the unit simply
@@ -122,21 +125,23 @@ let
     '';
   };
 
-  # Deliberately never echoes the saved config back — it embeds the
-  # node's private key, same secret-never-round-trips posture as
-  # modules/dashboard-smtp.nix's currentCgi/passwordSet. The frontend
-  # textarea is write-only, matching the Nebula mobile apps' own "paste
-  # a fresh config to replace the old one" model rather than an editor
-  # for the existing one.
+  # Echoes the saved config back (unlike modules/dashboard-smtp.nix's
+  # password, which never round-trips) — this whole page sits behind
+  # the same admin-only gate as every other preferences endpoint, so an
+  # admin reviewing/editing their own node's config here is the same
+  # trust boundary as them reading it off disk directly. --rawfile
+  # loads the file as a plain string (no attempt to parse it), so
+  # arbitrary YAML content (quotes, backslashes, embedded PEM) round-
+  # trips through JSON safely regardless of what it contains.
   currentCgi = pkgs.writeShellApplication {
     name = "dashboard-nebula-current-cgi";
-    runtimeInputs = [ pkgs.coreutils ];
+    runtimeInputs = [ pkgs.coreutils pkgs.jq ];
     text = ''
       printf 'Status: 200 OK\r\nContent-Type: application/json\r\n\r\n'
       if [ -s ${configFile} ]; then
-        echo '{"configSet":true}'
+        jq -n --rawfile config ${configFile} '{configSet:true, config:$config}'
       else
-        echo '{"configSet":false}'
+        echo '{"configSet":false,"config":""}'
       fi
     '';
   };
@@ -164,6 +169,14 @@ in
 
     systemd.tmpfiles.rules = [
       "d ${runDir} 0750 dashboard-nebula dashboard-nebula - -"
+      # Fixes ownership/permissions on every boot — a config saved
+      # before this file's own currentCgi started reading it back
+      # (600 root:root) would otherwise never get upgraded to 640
+      # root:dashboard-nebula on its own, same class of bug
+      # modules/traefik-dns01.nix's own tmpfiles fix addresses for
+      # exactly the same reason. `z` is a no-op if the file isn't there
+      # yet.
+      "z ${configFile} 0640 root dashboard-nebula - -"
     ];
 
     # Never wantedBy anything — purely triggered by the path unit below.
