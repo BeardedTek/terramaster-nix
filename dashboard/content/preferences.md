@@ -9,9 +9,9 @@ title: System Preferences
 <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm mb-4">
   <button type="button" class="accordion-toggle w-full flex items-center justify-between p-4 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="accordion-update-panel">
     <span>System Update</span>
-    <svg class="accordion-chevron w-4 h-4 transition-transform" style="transform: rotate(180deg)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+    <svg class="accordion-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
   </button>
-  <div id="accordion-update-panel" class="border-t border-gray-200 dark:border-gray-700 p-4">
+  <div id="accordion-update-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-4">
 <p class="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
   The current and latest available version are always shown below.
   Applying an update fetches the new release and rebuilds the system
@@ -27,182 +27,6 @@ title: System Preferences
 
 <button id="check-btn" type="button" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Check for updates</button>
 <button id="update-btn" type="button" disabled class="text-white bg-gray-400 cursor-not-allowed font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-600">Update now</button>
-  </div>
-</div>
-
-<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm mb-4">
-  <button type="button" class="accordion-toggle w-full flex items-center justify-between p-4 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="accordion-services-panel">
-    <span>Services</span>
-    <svg class="accordion-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-  </button>
-  <div id="accordion-services-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-4">
-<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-  Enable or disable optional services. Toggling a switch previews the
-  change only &mdash; nothing is applied until you click Save and confirm.
-  Applying rebuilds the system in place, pinned to the currently
-  installed release.
-</p>
-
-<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
-  <div class="flex items-center justify-between p-3">
-    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-playback-panel">
-      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" style="transform: rotate(180deg)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-      <span>Media Playback</span>
-    </button>
-  </div>
-  <div id="services-group-playback-panel" class="border-t border-gray-200 dark:border-gray-700 p-3">
-    <div class="flex items-center justify-between py-2">
-      <span class="text-sm text-gray-900 dark:text-white">Jellyfin</span>
-      <label class="switch"><input type="checkbox" checked data-flag="jellyfin.enable"><span class="slider"></span></label>
-    </div>
-  </div>
-</div>
-
-<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
-  <div class="flex items-center justify-between p-3">
-    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-storage-panel">
-      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" style="transform: rotate(180deg)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-      <span>Storage</span>
-    </button>
-  </div>
-  <div id="services-group-storage-panel" class="border-t border-gray-200 dark:border-gray-700 p-3">
-    <div class="flex items-center justify-between py-2">
-      <span class="text-sm text-gray-900 dark:text-white">MinIO</span>
-      <label class="switch"><input type="checkbox" data-flag="minio.enable"><span class="slider"></span></label>
-    </div>
-    <div class="flex items-center justify-between py-2">
-      <span class="text-sm text-gray-900 dark:text-white">FileBrowser</span>
-      <label class="switch"><input type="checkbox" data-flag="filebrowser.enable"><span class="slider"></span></label>
-    </div>
-  </div>
-</div>
-
-<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
-  <div class="flex items-center justify-between p-3">
-    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-homeauto-panel">
-      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" style="transform: rotate(180deg)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-      <span>Home Automation</span>
-    </button>
-  </div>
-  <div id="services-group-homeauto-panel" class="border-t border-gray-200 dark:border-gray-700 p-3">
-    <div class="flex items-center justify-between py-2">
-      <span class="text-sm font-medium text-gray-900 dark:text-white">Home Assistant</span>
-      <label class="switch"><input type="checkbox" checked data-flag="homeAssistant.enable" data-group-toggle="homeassistant"><span class="slider"></span></label>
-    </div>
-    <div class="pl-6 space-y-2 mb-2" data-group="homeassistant">
-      <div class="flex items-center justify-between py-2">
-        <span class="text-sm text-gray-700 dark:text-gray-300">Z-Wave</span>
-        <label class="switch"><input type="checkbox" data-flag="homeAssistant.zwave.enable"><span class="slider"></span></label>
-      </div>
-      <div class="flex items-center justify-between py-2">
-        <span class="text-sm text-gray-700 dark:text-gray-300">HACS</span>
-        <label class="switch"><input type="checkbox" checked data-flag="homeAssistant.hacs.enable"><span class="slider"></span></label>
-      </div>
-    </div>
-    <div class="flex items-center justify-between py-2">
-      <span class="text-sm text-gray-900 dark:text-white">Frigate</span>
-      <label class="switch"><input type="checkbox" checked data-flag="frigate.enable"><span class="slider"></span></label>
-    </div>
-  </div>
-</div>
-
-<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
-  <div class="flex items-center justify-between p-3">
-    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-acquisition-panel">
-      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" style="transform: rotate(180deg)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-      <span>Media Acquisition</span>
-    </button>
-    <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.enable" data-group-toggle="mediaacquisition"><span class="slider"></span></label>
-  </div>
-  <div id="services-group-acquisition-panel" class="border-t border-gray-200 dark:border-gray-700 p-3 space-y-2" data-group="mediaacquisition">
-    <div class="flex items-center justify-between py-2">
-      <span class="text-sm text-gray-700 dark:text-gray-300">Seerr</span>
-      <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.seerr.enable"><span class="slider"></span></label>
-    </div>
-    <div class="flex items-center justify-between py-2">
-      <span class="text-sm text-gray-700 dark:text-gray-300">Radarr</span>
-      <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.radarr.enable"><span class="slider"></span></label>
-    </div>
-    <div class="flex items-center justify-between py-2">
-      <span class="text-sm text-gray-700 dark:text-gray-300">Sonarr</span>
-      <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.sonarr.enable"><span class="slider"></span></label>
-    </div>
-    <div class="flex items-center justify-between py-2">
-      <span class="text-sm text-gray-700 dark:text-gray-300">Jackett</span>
-      <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.jackett.enable"><span class="slider"></span></label>
-    </div>
-    <div class="flex items-center justify-between py-2">
-      <span class="text-sm text-gray-700 dark:text-gray-300">qBittorrent</span>
-      <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.qbittorrent.enable"><span class="slider"></span></label>
-    </div>
-  </div>
-</div>
-
-<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
-  <div class="flex items-center justify-between p-3">
-    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-auth-panel">
-      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" style="transform: rotate(180deg)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-      <span>Authentication</span>
-    </button>
-  </div>
-  <div id="services-group-auth-panel" class="border-t border-gray-200 dark:border-gray-700 p-3">
-    <div class="flex items-center justify-between py-2">
-      <span class="text-sm font-medium text-gray-900 dark:text-white">SSO</span>
-      <label class="switch"><input type="checkbox" data-flag="sso.enable" data-group-toggle="sso"><span class="slider"></span></label>
-    </div>
-    <div class="pl-6 space-y-2 mb-2" data-group="sso">
-      <div class="flex items-center justify-between py-2">
-        <span class="text-sm text-gray-700 dark:text-gray-300">Authelia</span>
-        <label class="switch"><input type="checkbox" data-flag="sso.authelia.enable"><span class="slider"></span></label>
-      </div>
-    </div>
-  </div>
-</div>
-
-<button id="services-save-btn" type="button" class="hidden text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Save</button>
-  </div>
-</div>
-
-<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm mb-4">
-  <button type="button" class="accordion-toggle w-full flex items-center justify-between p-4 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="accordion-smtp-panel">
-    <span>OpenSMTP</span>
-    <svg class="accordion-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-  </button>
-  <div id="accordion-smtp-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-4">
-<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-  Mirrors mySystem.smtp in variables.nix. Preview only &mdash; this form
-  isn't wired up yet.
-</p>
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-  <div>
-    <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">SMTP Host</span>
-    <input type="text" value="mail.beardedtek.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-  </div>
-  <div>
-    <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Port</span>
-    <input type="number" value="465" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-  </div>
-  <div>
-    <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Encryption</span>
-    <select class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-      <option value="smtp">SMTP (none)</option>
-      <option value="submission">Submission (STARTTLS)</option>
-      <option value="submissions" selected>Submissions (implicit TLS)</option>
-    </select>
-  </div>
-  <div>
-    <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Sender Address</span>
-    <input type="email" value="NO-REPLY@beardedtek.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-  </div>
-  <div>
-    <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Username</span>
-    <input type="text" value="no-reply@beardedtek.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-  </div>
-  <div>
-    <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Password</span>
-    <input type="password" placeholder="Not shown — stored outside git" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-  </div>
-</div>
   </div>
 </div>
 
@@ -254,6 +78,138 @@ title: System Preferences
     <input type="text" placeholder="1.1.1.1, 8.8.8.8" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
 </div>
+  </div>
+</div>
+
+<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm mb-4">
+  <button type="button" class="accordion-toggle w-full flex items-center justify-between p-4 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="accordion-services-panel">
+    <span>Services</span>
+    <svg class="accordion-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+  </button>
+  <div id="accordion-services-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-4">
+<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+  Enable or disable optional services. Toggling a switch previews the
+  change only &mdash; nothing is applied until you click Save and confirm.
+  Applying rebuilds the system in place, pinned to the currently
+  installed release.
+</p>
+
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-playback-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Media Playback</span>
+    </button>
+  </div>
+  <div id="services-group-playback-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-900 dark:text-white">Jellyfin</span>
+      <label class="switch"><input type="checkbox" checked data-flag="jellyfin.enable"><span class="slider"></span></label>
+    </div>
+  </div>
+</div>
+
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-storage-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Storage</span>
+    </button>
+  </div>
+  <div id="services-group-storage-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-900 dark:text-white">MinIO</span>
+      <label class="switch"><input type="checkbox" data-flag="minio.enable"><span class="slider"></span></label>
+    </div>
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-900 dark:text-white">FileBrowser</span>
+      <label class="switch"><input type="checkbox" data-flag="filebrowser.enable"><span class="slider"></span></label>
+    </div>
+  </div>
+</div>
+
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-homeauto-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Home Automation</span>
+    </button>
+  </div>
+  <div id="services-group-homeauto-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm font-medium text-gray-900 dark:text-white">Home Assistant</span>
+      <label class="switch"><input type="checkbox" checked data-flag="homeAssistant.enable" data-group-toggle="homeassistant"><span class="slider"></span></label>
+    </div>
+    <div class="pl-6 space-y-2 mb-2" data-group="homeassistant">
+      <div class="flex items-center justify-between py-2">
+        <span class="text-sm text-gray-700 dark:text-gray-300">Z-Wave</span>
+        <label class="switch"><input type="checkbox" data-flag="homeAssistant.zwave.enable"><span class="slider"></span></label>
+      </div>
+      <div class="flex items-center justify-between py-2">
+        <span class="text-sm text-gray-700 dark:text-gray-300">HACS</span>
+        <label class="switch"><input type="checkbox" checked data-flag="homeAssistant.hacs.enable"><span class="slider"></span></label>
+      </div>
+    </div>
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-900 dark:text-white">Frigate</span>
+      <label class="switch"><input type="checkbox" checked data-flag="frigate.enable"><span class="slider"></span></label>
+    </div>
+  </div>
+</div>
+
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-acquisition-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Media Acquisition</span>
+    </button>
+  </div>
+  <div id="services-group-acquisition-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3 space-y-2">
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-700 dark:text-gray-300">Seerr</span>
+      <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.seerr.enable"><span class="slider"></span></label>
+    </div>
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-700 dark:text-gray-300">Radarr</span>
+      <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.radarr.enable"><span class="slider"></span></label>
+    </div>
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-700 dark:text-gray-300">Sonarr</span>
+      <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.sonarr.enable"><span class="slider"></span></label>
+    </div>
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-700 dark:text-gray-300">Jackett</span>
+      <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.jackett.enable"><span class="slider"></span></label>
+    </div>
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-700 dark:text-gray-300">qBittorrent</span>
+      <label class="switch"><input type="checkbox" checked data-flag="mediaAcquisition.qbittorrent.enable"><span class="slider"></span></label>
+    </div>
+  </div>
+</div>
+
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-auth-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Authentication</span>
+    </button>
+  </div>
+  <div id="services-group-auth-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm font-medium text-gray-900 dark:text-white">SSO</span>
+      <label class="switch"><input type="checkbox" data-flag="sso.enable" data-group-toggle="sso"><span class="slider"></span></label>
+    </div>
+    <div class="pl-6 space-y-2 mb-2" data-group="sso">
+      <div class="flex items-center justify-between py-2">
+        <span class="text-sm text-gray-700 dark:text-gray-300">Authelia</span>
+        <label class="switch"><input type="checkbox" data-flag="sso.authelia.enable"><span class="slider"></span></label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<button id="services-save-btn" type="button" class="hidden text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Save</button>
   </div>
 </div>
 
@@ -599,6 +555,49 @@ title: System Preferences
   </div>
 </div>
 
+<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm mb-4">
+  <button type="button" class="accordion-toggle w-full flex items-center justify-between p-4 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="accordion-smtp-panel">
+    <span>OpenSMTP</span>
+    <svg class="accordion-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+  </button>
+  <div id="accordion-smtp-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-4">
+<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+  Mirrors mySystem.smtp in variables.nix. Preview only &mdash; this form
+  isn't wired up yet.
+</p>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <div>
+    <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">SMTP Host</span>
+    <input type="text" value="mail.beardedtek.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+  </div>
+  <div>
+    <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Port</span>
+    <input type="number" value="465" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+  </div>
+  <div>
+    <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Encryption</span>
+    <select class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+      <option value="smtp">SMTP (none)</option>
+      <option value="submission">Submission (STARTTLS)</option>
+      <option value="submissions" selected>Submissions (implicit TLS)</option>
+    </select>
+  </div>
+  <div>
+    <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Sender Address</span>
+    <input type="email" value="NO-REPLY@beardedtek.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+  </div>
+  <div>
+    <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Username</span>
+    <input type="text" value="no-reply@beardedtek.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+  </div>
+  <div>
+    <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Password</span>
+    <input type="password" placeholder="Not shown — stored outside git" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+  </div>
+</div>
+  </div>
+</div>
+
 <!-- Modal -->
 <div id="update-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center update-modal-overlay p-4">
   <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl update-modal-panel w-full overflow-y-auto p-6 relative">
@@ -753,17 +752,15 @@ title: System Preferences
       var input = flagInput(key);
       payload[key] = !!(input && input.checked);
     });
+    // Media Acquisition has no master toggle in the UI anymore — always
+    // send true; the five services below it are independently
+    // controlled, and there's no "disable the whole group at once"
+    // control to read a value from.
+    payload["mediaAcquisition.enable"] = true;
     if (!payload["sso.enable"]) { payload["sso.authelia.enable"] = false; }
     if (!payload["homeAssistant.enable"]) {
       payload["homeAssistant.zwave.enable"] = false;
       payload["homeAssistant.hacs.enable"] = false;
-    }
-    if (!payload["mediaAcquisition.enable"]) {
-      payload["mediaAcquisition.seerr.enable"] = false;
-      payload["mediaAcquisition.radarr.enable"] = false;
-      payload["mediaAcquisition.sonarr.enable"] = false;
-      payload["mediaAcquisition.jackett.enable"] = false;
-      payload["mediaAcquisition.qbittorrent.enable"] = false;
     }
     return payload;
   }
