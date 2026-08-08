@@ -54,6 +54,7 @@
           ./modules/traefik-dns01.nix
           ./modules/dashboard.nix
           ./modules/dashboard-services.nix
+          ./modules/system-rebuild.nix
           ./modules/frigate.nix
           ./modules/home-assistant.nix
           ./modules/minio.nix

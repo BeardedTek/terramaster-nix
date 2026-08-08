@@ -2,26 +2,28 @@
 
 let
   cfg = config.mySystem.features.dashboardServices;
-  hostName = config.networking.hostName;
   f = config.mySystem.features;
 
   loginEnabled = config.mySystem.features.sso.enable;
 
-  repo = "BeardedTek/terramaster-nix";
-  apiLatest = "https://api.github.com/repos/${repo}/releases/latest";
-
-  versionFile = "/persist/nixos-version";
-  secretsEnv = "/persist/secrets/initial-passwords.env";
   overridesFile = "/persist/nixos-service-overrides.nix";
-  stagingDir = "/persist/nixos-dashboard-services-staging";
 
   runDir = "/run/dashboard-services";
   triggerFile = "${runDir}/trigger";
   pendingFile = "${runDir}/pending.json";
-  progressFile = "${runDir}/progress.json";
-  buildLogFile = "${runDir}/build.log";
-  applyingFile = "${runDir}/applying";
-  selfUpdateApplyingFile = "/run/nas-update/applying";
+
+  # The actual fetch/extract/nixos-rebuild-switch/progress-tracking work
+  # is shared with modules/self-update.nix via modules/system-rebuild.nix
+  # — see that file's own comment for why (this module used to carry an
+  # independent copy of all of that, which is what originally hit the
+  # apply-service-kills-itself and missing-jq bugs; only the shared copy
+  # needs to get that right now).
+  sharedRunDir = "/run/system-rebuild";
+  sharedRequestFile = "${sharedRunDir}/request.json";
+  sharedTriggerFile = "${sharedRunDir}/trigger";
+  sharedProgressFile = "${sharedRunDir}/progress.json";
+  sharedBuildLogFile = "${sharedRunDir}/build.log";
+  sharedApplyingFile = "${sharedRunDir}/applying";
 
   # Every flag the Services accordion can toggle — the single source of
   # truth this whole module works from. Order matches
@@ -134,99 +136,41 @@ let
     '';
   };
 
-  writeProgressFn = ''
-    write_progress() {
-      local state="$1" message="$2" now log_json
-      now=$(date -Is)
-      log_json="[]"
-      [ -f ${progressFile} ] && log_json=$(jq -c '.log // []' ${progressFile} 2>/dev/null || echo '[]')
-      jq -n --arg state "$state" --arg message "$message" --arg time "$now" --argjson log "$log_json" \
-        '{state:$state, message:$message, log: ($log + [{time:$time, message:$message}])}' \
-        > ${progressFile}.tmp
-      mv ${progressFile}.tmp ${progressFile}
-    }
-  '';
-
   # Privileged oneshot, triggered by the path unit below — same
   # "unprivileged writer (saveCgi), privileged watcher" shape
   # modules/self-update.nix and modules/traefik-dns01.nix already
-  # establish. Deliberately duplicates self-update.nix's fetch/extract
-  # shape rather than sharing code with it (see the plan's Design
-  # decision 2) — touching that separate, already-working, deployed
-  # module to extract shared plumbing carries more risk than the ~20
-  # duplicated lines here.
+  # establish. Short-lived: the only thing it does that genuinely needs
+  # root is writing /persist/nixos-service-overrides.nix (the
+  # unprivileged dashboard-services user can't write to /persist); the
+  # actual fetch/rebuild is handed off to modules/system-rebuild.nix's
+  # shared runner. Never itself runs nixos-rebuild, so — unlike that
+  # shared runner — it isn't exposed to the "own unit definition always
+  # looks changed" self-kill problem and doesn't need
+  # restartIfChanged/X-StopOnRemoval.
   applyScript = pkgs.writeShellApplication {
     name = "dashboard-services-apply";
-    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.gnutar pkgs.gzip pkgs.coreutils pkgs.nixos-rebuild ];
+    runtimeInputs = [ pkgs.jq pkgs.coreutils ];
     text = ''
       rm -f ${triggerFile}
-
-      # Both features ultimately call nixos-rebuild switch, which cannot
-      # safely run twice at once — refuse to start if self-update's own
-      # apply is in flight rather than racing it. self-update.nix carries
-      # the matching check against our own applyingFile in the other
-      # direction.
-      if [ -f ${selfUpdateApplyingFile} ]; then
-        echo "error: a system update is currently in progress — try again in a moment" > ${runDir}/result
-        exit 0
-      fi
 
       if [ ! -f ${pendingFile} ]; then
         exit 0
       fi
 
-      rm -f ${progressFile} ${buildLogFile} ${runDir}/result
-      touch ${applyingFile}
-      trap 'rm -f ${applyingFile}' EXIT
-      ${writeProgressFn}
-
-      # Pinned to the currently-installed release, not "latest" — a
-      # service toggle should never silently also pull in an unrelated
-      # version bump (confirmed with the user). Falls back to fetching
-      # the latest tagged release if /persist/nixos-version doesn't
-      # exist yet: that file is only ever written after a successful
-      # self-update run (modules/self-update.nix), so any box that's
-      # never been through one — every fresh install, and any
-      # already-deployed box that hasn't self-updated since first boot —
-      # has no such record. Whichever tag this run resolves gets written
-      # back to that same file on success, so the very first use of
-      # either feature on an old box self-heals the gap going forward.
-      write_progress "running" "Determining current release..."
-      if [ -f ${versionFile} ]; then
-        tag=$(cat ${versionFile})
-      else
-        tag=$(curl -fsSL ${apiLatest} | jq -r .tag_name)
-      fi
-      if [ -z "$tag" ] || [ "$tag" = "null" ]; then
-        write_progress "failed" "Could not determine which release to rebuild from"
-        exit 1
-      fi
-
-      write_progress "running" "Downloading $tag..."
-      rm -rf ${stagingDir}
-      mkdir -p ${stagingDir}
-      if ! curl -fsSL "https://github.com/${repo}/archive/refs/tags/$tag.tar.gz" -o ${stagingDir}/src.tar.gz; then
-        write_progress "failed" "Download failed for $tag"
-        exit 1
-      fi
-      tar xzf ${stagingDir}/src.tar.gz -C ${stagingDir}
-      rm -f ${stagingDir}/src.tar.gz
-
-      src_dir=$(find ${stagingDir} -mindepth 1 -maxdepth 1 -type d | head -n1)
-      if [ -z "$src_dir" ]; then
-        write_progress "failed" "Downloaded archive had no source directory"
-        exit 1
-      fi
-
-      if [ ! -f ${secretsEnv} ]; then
-        write_progress "failed" "${secretsEnv} is missing — see docs/DEPLOYMENT.md"
-        exit 1
+      # Both this and self-update.nix ultimately hand off to the same
+      # shared rebuild runner, which can't safely run twice at once —
+      # leave pendingFile in place if it's already busy; the next
+      # successful save naturally picks it back up (this apply script
+      # itself carries no state across runs, so there's nothing here to
+      # roll back).
+      if [ -f ${sharedApplyingFile} ]; then
+        exit 0
       fi
 
       # Full-file overwrite, every known flag — not just the ones that
-      # changed (Design decision 4). Harmless: an unchanged flag forced
-      # to its current value evaluates identically to leaving it alone.
-      write_progress "running" "Writing service overrides..."
+      # changed (Design decision 4 from the original plan). Harmless:
+      # an unchanged flag forced to its current value evaluates
+      # identically to leaving it alone.
       {
         echo "{ lib, ... }:"
         echo "{"
@@ -239,40 +183,27 @@ let
         echo "}"
       } > ${overridesFile}.tmp
       mv ${overridesFile}.tmp ${overridesFile}
+      rm -f ${pendingFile}
 
-      write_progress "running" "Rebuilding (this can take a while)..."
-      set -a
-      # shellcheck disable=SC1091
-      source ${secretsEnv}
-      set +a
-      : > ${buildLogFile}
-      chmod 644 ${buildLogFile}
-      if nixos-rebuild switch --flake "$src_dir#${hostName}" --impure 2>&1 | tee -a ${buildLogFile}; then
-        echo "$tag" > ${versionFile}
-        rm -rf ${stagingDir}
-        rm -f ${pendingFile}
-        write_progress "success" "Services updated"
-      else
-        write_progress "failed" "nixos-rebuild failed — see the log below"
-        exit 1
-      fi
+      printf '%s' '{"mode":"current","label":"Services updated"}' > ${sharedRequestFile}.tmp
+      mv ${sharedRequestFile}.tmp ${sharedRequestFile}
+      touch ${sharedTriggerFile}
     '';
   };
 
+  # While the shared runner is active (or finished within the last
+  # couple of minutes), serves its live progress. Otherwise falls back
+  # to "running" for the brief window between saveCgi's own trigger and
+  # the shared runner actually picking it up, or "idle".
   statusCgi = pkgs.writeShellApplication {
     name = "dashboard-services-status-cgi";
     runtimeInputs = [ pkgs.jq pkgs.coreutils pkgs.findutils ];
     text = ''
       printf 'Status: 200 OK\r\nContent-Type: application/json\r\n\r\n'
-      if [ -f ${runDir}/result ]; then
-        jq -n --arg msg "$(cat ${runDir}/result)" '{state:"failed", message:$msg, log:[]}' 2>/dev/null \
-          || echo '{"state":"failed","message":"error","log":[]}'
-        exit 0
-      fi
-      if [ -f ${progressFile} ] && { [ -f ${applyingFile} ] || [ -n "$(find ${progressFile} -mmin -2 2>/dev/null)" ]; }; then
+      if [ -f ${sharedProgressFile} ] && { [ -f ${sharedApplyingFile} ] || [ -n "$(find ${sharedProgressFile} -mmin -2 2>/dev/null)" ]; }; then
         build_log=""
-        [ -f ${buildLogFile} ] && build_log=$(tail -n 500 ${buildLogFile})
-        jq --arg buildLog "$build_log" '. + {buildLog: $buildLog}' ${progressFile}
+        [ -f ${sharedBuildLogFile} ] && build_log=$(tail -n 500 ${sharedBuildLogFile})
+        jq --arg buildLog "$build_log" '. + {buildLog: $buildLog}' ${sharedProgressFile}
       elif [ -f ${triggerFile} ] || [ -f ${pendingFile} ]; then
         echo '{"state":"running","message":"Starting...","log":[]}'
       else
@@ -298,14 +229,25 @@ in
       Dashboard-driven service enable/disable toggles — see
       modules/dashboard-services.nix and the "Services" accordion on the
       System Preferences page. Saving triggers a real nixos-rebuild
-      switch pinned to the currently-installed release, via a
-      /persist-backed overrides file (mySystem.features.dashboardServices
-      itself is not one of the 15 toggleable flags).
+      switch (via modules/system-rebuild.nix's shared runner) pinned to
+      the currently-installed release, via a /persist-backed overrides
+      file (mySystem.features.dashboardServices itself is not one of
+      the 15 toggleable flags).
     '';
   };
 
   config = lib.mkIf cfg.enable {
-    users.users.dashboard-services = { isSystemUser = true; group = "dashboard-services"; };
+    users.users.dashboard-services = {
+      isSystemUser = true;
+      group = "dashboard-services";
+      # Lets statusCgi (running as this user) traverse into
+      # modules/system-rebuild.nix's shared run directory (0770
+      # root:system-rebuild) to read its progress file and check its
+      # applying lock. progress.json/build.log are separately made
+      # world-readable by the shared runner's own umask, but that's
+      # moot without traversal into the directory in the first place.
+      extraGroups = [ "system-rebuild" ];
+    };
     users.groups.dashboard-services = { };
 
     environment.etc."dashboard-services-state.json".source = stateJson;
@@ -316,30 +258,7 @@ in
 
     # Never wantedBy anything — purely triggered by the path unit below.
     systemd.services.dashboard-services-apply = {
-      description = "Apply a dashboard-submitted service enable/disable change";
-      # This service's own job is to run `nixos-rebuild switch` — which
-      # means its own unit definition is, by construction, part of the
-      # closure that switch is switching *to*, and will always look
-      # "changed" relative to the generation that's currently running it.
-      # Confirmed the hard way (twice): the journal showed "stopping the
-      # following units: dashboard-services-apply.service,
-      # fcgiwrap-dashboard-services.socket, fcgiwrap-traefik-dns01.socket,
-      # traefik.service, ..." immediately followed by "Main process
-      # exited, code=killed, status=15/TERM" — switch-to-configuration
-      # killing nixos-rebuild switch before it could restart anything
-      # past that point, leaving every unit in that stop list down until
-      # the next externally-triggered switch. stopIfChanged alone does
-      # NOT prevent this — it only controls *how* a restart happens
-      # (stop-then-start vs. a single `systemctl restart`), not whether
-      # one happens at all; that's what caused the first attempt at this
-      # fix to still get killed. restartIfChanged=false plus
-      # X-StopOnRemoval=false is the actual mechanism, and is exactly
-      # nixpkgs' own solution to this same problem for its built-in
-      # system.autoUpgrade.enable service — see
-      # nixos/modules/tasks/auto-upgrade.nix's own nixos-upgrade.service,
-      # which runs nixos-rebuild switch from inside itself the same way.
-      restartIfChanged = false;
-      unitConfig.X-StopOnRemoval = false;
+      description = "Write service overrides and hand off to the shared rebuild runner";
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe applyScript;

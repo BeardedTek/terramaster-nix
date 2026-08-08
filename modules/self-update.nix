@@ -2,7 +2,6 @@
 
 let
   cfg = config.mySystem.features.selfUpdate;
-  hostName = config.networking.hostName;
 
   # /update/status and /update/trigger below now rely entirely on
   # modules/dashboard-login.nix's auth_request checks for protection —
@@ -19,15 +18,20 @@ let
   apiLatest = "https://api.github.com/repos/${repo}/releases/latest";
 
   versionFile = "/persist/nixos-version";
-  secretsEnv = "/persist/secrets/initial-passwords.env";
-  stagingDir = "/persist/nixos-update-staging";
-  triggerFile = "/run/nas-update/trigger-update";
-  applyingFile = "/run/nas-update/applying";
-  # Both this module and modules/dashboard-services.nix ultimately call
-  # nixos-rebuild switch, which cannot safely run twice at once —
-  # dashboard-services.nix carries the matching check against our own
-  # applyingFile in the other direction.
-  dashboardServicesApplyingFile = "/run/dashboard-services/applying";
+
+  # The actual fetch/extract/nixos-rebuild-switch/progress-tracking work
+  # is shared with modules/dashboard-services.nix via
+  # modules/system-rebuild.nix — see that file's own comment for why
+  # (this module used to carry an independent copy of all of that,
+  # which is what originally hit the apply-service-kills-itself and
+  # missing-jq bugs; only the shared copy needs to get that right now).
+  sharedRunDir = "/run/system-rebuild";
+  sharedRequestFile = "${sharedRunDir}/request.json";
+  sharedTriggerFile = "${sharedRunDir}/trigger";
+  sharedProgressFile = "${sharedRunDir}/progress.json";
+  sharedBuildLogFile = "${sharedRunDir}/build.log";
+  sharedApplyingFile = "${sharedRunDir}/applying";
+
   # Under /run/nas-update (tmpfs, owned by the unprivileged nas-update
   # user — see below), not /var/lib/dashboard: confirmed the hard way
   # that nas-update-status-cgi, invoked via fcgiwrap as that user, can't
@@ -41,13 +45,12 @@ let
   # metrics.json already uses, just a level up in /run instead of
   # /var/lib.
   statusFile = "/run/nas-update/update-status.json";
-  progressFile = "/run/nas-update/update-progress.json";
-  buildLogFile = "/run/nas-update/build.log";
 
-  # Shared between checkScript and the end of applyScript, so both ever
-  # write the exact same {current, latest, updateAvailable, releaseUrl}
-  # shape into statusFile — the frontend only has to understand one
-  # settled-state format, regardless of which of the two wrote it last.
+  # Shared between checkScript and statusCgi's own fallback path, so
+  # both ever write the exact same {current, latest, updateAvailable,
+  # releaseUrl} shape into statusFile — the frontend only has to
+  # understand one settled-state format, regardless of which of the two
+  # wrote it last.
   writeStatusFn = ''
     write_status() {
       local current latest_json
@@ -76,166 +79,72 @@ let
   '';
 
   # Periodic check only — never touches the system. Skips entirely while
-  # an apply is in flight (applyingFile present) so it can't clobber
-  # statusFile with a stale "no update available" read mid-rebuild —
-  # nas-update-apply refreshes statusFile itself once it's done, so
+  # a rebuild (from either this feature or dashboard-services') is in
+  # flight, so it can't clobber statusFile with a stale "no update
+  # available" read mid-rebuild — the shared runner refreshes
+  # statusFile-equivalent state itself via the progress file, so
   # nothing is lost by skipping here.
   checkScript = pkgs.writeShellApplication {
     name = "nas-update-check";
     runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils ];
     text = ''
-      [ -f ${applyingFile} ] && exit 0
+      [ -f ${sharedApplyingFile} ] && exit 0
       ${writeStatusFn}
       write_status
     '';
   };
 
-  # The actual privileged work — fetch the latest tagged release's source
-  # (GitHub's auto-generated archive/refs/tags/<tag>.tar.gz, not the ISO
-  # release asset — much smaller, and it's exactly what
-  # nixos-rebuild --flake needs), stage it on /persist (survives the
-  # tmpfs root if the box reboots mid-download, deleted again on
-  # success), and switch to it. Runs as root — no sudo, no password
-  # prompt, since this is a systemd-triggered service, not an
-  # interactive shell (see the trigger mechanism below for how it's
-  # actually invoked without giving the trigger itself root).
-  #
-  # applyingFile brackets the whole run (trap removes it no matter how
-  # the script exits) so nas-update-check knows to stay out of the way,
-  # and statusCgi below knows whether to serve the live progressFile or
-  # the settled statusFile.
-  applyScript = pkgs.writeShellApplication {
-    name = "nas-update-apply";
-    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.gnutar pkgs.gzip pkgs.coreutils pkgs.nixos-rebuild ];
-    text = ''
-      rm -f ${triggerFile}
-
-      if [ -f ${dashboardServicesApplyingFile} ]; then
-        jq -n '{state:"failed", message:"A service change is currently being applied — try again in a moment.", log:[]}' \
-          > ${progressFile}.tmp
-        mv ${progressFile}.tmp ${progressFile}
-        exit 0
-      fi
-
-      rm -f ${progressFile} ${buildLogFile}
-      touch ${applyingFile}
-      trap 'rm -f ${applyingFile}' EXIT
-
-      ${writeStatusFn}
-
-      # Appends to a running log (stage transitions, not the raw build
-      # output — that's buildLogFile, tailed in separately by statusCgi)
-      # instead of just overwriting the one current message, so the
-      # frontend's log accordion can show the whole run's history, not
-      # just whatever the last poll happened to catch.
-      write_progress() {
-        local state="$1" message="$2" now log_json
-        now=$(date -Is)
-        log_json="[]"
-        [ -f ${progressFile} ] && log_json=$(jq -c '.log // []' ${progressFile} 2>/dev/null || echo '[]')
-        jq -n --arg state "$state" --arg message "$message" --arg time "$now" --argjson log "$log_json" \
-          '{state:$state, message:$message, log: ($log + [{time:$time, message:$message}])}' \
-          > ${progressFile}.tmp
-        mv ${progressFile}.tmp ${progressFile}
-      }
-
-      write_progress "running" "Checking latest release..."
-      latest=$(curl -fsSL ${apiLatest} | jq -r .tag_name)
-      if [ -z "$latest" ] || [ "$latest" = "null" ]; then
-        write_progress "failed" "Could not determine the latest release from GitHub"
-        write_status
-        exit 1
-      fi
-
-      write_progress "running" "Downloading $latest..."
-      rm -rf ${stagingDir}
-      mkdir -p ${stagingDir}
-      if ! curl -fsSL "https://github.com/${repo}/archive/refs/tags/$latest.tar.gz" -o ${stagingDir}/src.tar.gz; then
-        write_progress "failed" "Download failed for $latest"
-        write_status
-        exit 1
-      fi
-      tar xzf ${stagingDir}/src.tar.gz -C ${stagingDir}
-      rm -f ${stagingDir}/src.tar.gz
-
-      src_dir=$(find ${stagingDir} -mindepth 1 -maxdepth 1 -type d | head -n1)
-      if [ -z "$src_dir" ]; then
-        write_progress "failed" "Downloaded archive had no source directory"
-        write_status
-        exit 1
-      fi
-
-      if [ ! -f ${secretsEnv} ]; then
-        write_progress "failed" "${secretsEnv} is missing — see docs/DEPLOYMENT.md"
-        write_status
-        exit 1
-      fi
-
-      write_progress "running" "Rebuilding (this can take a while)..."
-      set -a
-      # shellcheck disable=SC1091
-      source ${secretsEnv}
-      set +a
-      # Real nixos-rebuild output, not just our own stage messages —
-      # captured to buildLogFile (world-readable, see below) so
-      # statusCgi can tail it into the response while this is still
-      # running, for the frontend's log accordion.
-      : > ${buildLogFile}
-      chmod 644 ${buildLogFile}
-      if nixos-rebuild switch --flake "$src_dir#${hostName}" --impure 2>&1 | tee -a ${buildLogFile}; then
-        echo "$latest" > ${versionFile}
-        rm -rf ${stagingDir}
-        write_progress "success" "Updated to $latest"
-        write_status
-      else
-        write_progress "failed" "nixos-rebuild failed — see the log below"
-        write_status
-        exit 1
-      fi
-    '';
-  };
-
-  # Just sets a trigger file and returns — runs as the unprivileged
-  # nas-update user (see below), not root. The actual privileged work
-  # happens in nas-update-apply, started by the path unit below once it
-  # sees this file — same "unprivileged writer, privileged watcher" shape
-  # nixpkgs' own services.minio module uses for restart-on-credential-
-  # change (systemd.paths.minio-root-credentials -> minio-restart.service).
+  # Just writes a request for the shared rebuild runner
+  # (modules/system-rebuild.nix) and returns — runs as the unprivileged
+  # nas-update user (see below), not root. Needs write access to
+  # ${sharedRunDir}, granted via the system-rebuild group (see
+  # extraGroups below) since the actual privileged work happens
+  # entirely in system-rebuild-apply.service now.
   triggerCgi = pkgs.writeShellApplication {
     name = "nas-update-trigger-cgi";
     runtimeInputs = [ pkgs.coreutils ];
     text = ''
-      touch ${triggerFile}
+      if [ -f ${sharedApplyingFile} ]; then
+        printf 'Status: 409 Conflict\r\nContent-Type: text/plain\r\n\r\nA rebuild is already in progress — try again in a moment.\n'
+        exit 0
+      fi
+      # %TAG% is a placeholder the shared runner substitutes with the
+      # actual resolved tag once it knows it — this caller requests
+      # mode:"latest" and doesn't find out which tag that is until the
+      # shared runner does.
+      printf '%s' '{"mode":"latest","label":"Updated to %TAG%"}' > ${sharedRequestFile}.tmp
+      mv ${sharedRequestFile}.tmp ${sharedRequestFile}
+      touch ${sharedTriggerFile}
       printf 'Status: 200 OK\r\nContent-Type: text/plain\r\n\r\nUpdate triggered\n'
     '';
   };
 
-  # While applyingFile exists, serves the live progressFile. Otherwise
-  # runs a fresh GitHub check on every single request rather than
-  # trusting nas-update-check's hourly cache — confirmed the hard way,
-  # the "Check for updates" button read straight from that cache and
-  # kept reporting the previous release as latest for up to an hour
-  # after a new one actually went out. A live check here is one fast
-  # HTTP GET, well within GitHub's unauthenticated rate limit for
-  # something only a human clicks occasionally — the hourly timer still
-  # runs too, mainly so statusFile has *something* in it before anyone's
-  # ever opened the page.
+  # While a rebuild is active (or finished within the last couple of
+  # minutes), serves the shared runner's live progress. Otherwise runs
+  # a fresh GitHub check on every single request rather than trusting
+  # nas-update-check's hourly cache — confirmed the hard way, the
+  # "Check for updates" button read straight from that cache and kept
+  # reporting the previous release as latest for up to an hour after a
+  # new one actually went out. A live check here is one fast HTTP GET,
+  # well within GitHub's unauthenticated rate limit for something only
+  # a human clicks occasionally — the hourly timer still runs too,
+  # mainly so statusFile has *something* in it before anyone's ever
+  # opened the page.
   statusCgi = pkgs.writeShellApplication {
     name = "nas-update-status-cgi";
     runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils pkgs.findutils ];
     text = ''
       printf 'Status: 200 OK\r\nContent-Type: application/json\r\n\r\n'
       # Not just "is applyingFile still there" — a run that fails fast
-      # (confirmed the hard way: a bad PATH inside nas-update-apply made
-      # it fail in under a second) can finish and clean up applyingFile
-      # before the frontend's first poll ever lands, silently discarding
-      # the failure message. Also treat a progressFile written in the
-      # last 2 minutes as current, so a fast-finished run's result is
-      # still visible for a bit rather than only during the run itself.
-      if [ -f ${progressFile} ] && { [ -f ${applyingFile} ] || [ -n "$(find ${progressFile} -mmin -2 2>/dev/null)" ]; }; then
+      # can finish and clean up applyingFile before the frontend's
+      # first poll ever lands, silently discarding the failure message.
+      # Also treat a progress file written in the last 2 minutes as
+      # current, so a fast-finished run's result is still visible for a
+      # bit rather than only during the run itself.
+      if [ -f ${sharedProgressFile} ] && { [ -f ${sharedApplyingFile} ] || [ -n "$(find ${sharedProgressFile} -mmin -2 2>/dev/null)" ]; }; then
         build_log=""
-        [ -f ${buildLogFile} ] && build_log=$(tail -n 500 ${buildLogFile})
-        jq --arg buildLog "$build_log" '. + {buildLog: $buildLog}' ${progressFile}
+        [ -f ${sharedBuildLogFile} ] && build_log=$(tail -n 500 ${sharedBuildLogFile})
+        jq --arg buildLog "$build_log" '. + {buildLog: $buildLog}' ${sharedProgressFile}
         exit 0
       fi
       ${writeStatusFn}
@@ -246,7 +155,17 @@ let
 in
 {
   config = lib.mkIf cfg.enable {
-    users.users.nas-update = { isSystemUser = true; group = "nas-update"; };
+    users.users.nas-update = {
+      isSystemUser = true;
+      group = "nas-update";
+      # Lets triggerCgi write directly into modules/system-rebuild.nix's
+      # shared run directory (0770 root:system-rebuild) without needing
+      # its own privileged relay step — unlike dashboard-services.nix's
+      # own pre-step, this feature has no root-only work to do before
+      # handing off (no overrides file to write), so there's nothing
+      # else a privileged step would be for.
+      extraGroups = [ "system-rebuild" ];
+    };
     users.groups.nas-update = { };
 
     systemd.tmpfiles.rules = [
@@ -267,36 +186,6 @@ in
         OnBootSec = "1m";
         OnUnitActiveSec = "1h";
       };
-    };
-
-    # Never wantedBy anything — purely triggered by the path unit below.
-    systemd.services.nas-update-apply = {
-      description = "Apply the latest Bearded NAS release";
-      # Same latent bug modules/dashboard-services.nix's own apply
-      # service hit and fixed the hard way (twice — the first attempt,
-      # stopIfChanged=false, does NOT prevent this: it only controls how
-      # a restart happens, not whether one happens at all). This
-      # service's own job is to run `nixos-rebuild switch`, so its own
-      # unit definition is always part of the closure being switched to,
-      # and looks "changed" relative to the generation currently running
-      # it — switch-to-configuration would otherwise SIGTERM this unit
-      # (itself, mid-run) partway through, killing nixos-rebuild switch
-      # before it can restart whatever else it had queued to stop/start.
-      # restartIfChanged=false plus X-StopOnRemoval=false is nixpkgs' own
-      # solution to this exact problem for system.autoUpgrade.enable's
-      # built-in nixos-upgrade.service (nixos/modules/tasks/auto-upgrade.nix),
-      # which runs nixos-rebuild switch from inside itself the same way.
-      restartIfChanged = false;
-      unitConfig.X-StopOnRemoval = false;
-      serviceConfig = {
-        Type = "oneshot";
-        ExecStart = lib.getExe applyScript;
-      };
-    };
-    systemd.paths.nas-update-apply = {
-      description = "Watch for a web-triggered update request";
-      wantedBy = [ "multi-user.target" ];
-      pathConfig.PathExists = triggerFile;
     };
 
     services.fcgiwrap.instances.nas-update = {
