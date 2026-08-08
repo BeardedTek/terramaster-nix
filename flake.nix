@@ -24,6 +24,9 @@
       # never saw a local variables.nix edit). A no-op import on any box
       # that's never touched that feature.
       serviceOverridesPath = /persist/nixos-service-overrides.nix;
+      # Same shape, for modules/dashboard-network.nix's DHCP/Static IP
+      # toggle.
+      networkOverridesPath = /persist/nixos-network-overrides.nix;
     in
     {
       # Attribute name follows variables.nix's own hostName rather than
@@ -54,6 +57,7 @@
           ./modules/traefik-dns01.nix
           ./modules/dashboard.nix
           ./modules/dashboard-services.nix
+          ./modules/dashboard-network.nix
           ./modules/system-rebuild.nix
           ./modules/frigate.nix
           ./modules/home-assistant.nix
@@ -65,7 +69,8 @@
           ./modules/smtp-relay.nix
           ./modules/dashboard-login.nix
           ./modules/unix-ldap-login.nix
-        ] ++ (if builtins.pathExists serviceOverridesPath then [ serviceOverridesPath ] else [ ]);
+        ] ++ (if builtins.pathExists serviceOverridesPath then [ serviceOverridesPath ] else [ ])
+          ++ (if builtins.pathExists networkOverridesPath then [ networkOverridesPath ] else [ ]);
       };
 
       nixosConfigurations.installer = nixpkgs.lib.nixosSystem {

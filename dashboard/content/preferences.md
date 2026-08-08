@@ -13,16 +13,18 @@ title: System Preferences
   </button>
   <div id="accordion-network-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-4">
 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-  Preview only &mdash; this form isn't wired up yet.
+  Hostname and Domain below are preview only for now. Network Interface
+  and the fields below it are live &mdash; saving rebuilds the system in
+  place.
 </p>
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Hostname</span>
-    <input type="text" value="young" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+    <input type="text" value="young" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Domain</span>
-    <input type="text" value="beardedtek.com" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+    <input type="text" value="beardedtek.com" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
 </div>
 <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Network Interface</span>
@@ -36,24 +38,29 @@ title: System Preferences
     Static
   </label>
 </div>
+<p id="network-current-info" class="text-sm text-gray-700 dark:text-gray-300 mb-4">
+  Current address: <span id="network-live-ip" class="font-mono">&mdash;</span>
+</p>
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" data-mode="net-mode:static">
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">IP Address</span>
-    <input type="text" placeholder="192.168.3.181" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+    <input type="text" id="network-ip" placeholder="192.168.3.181" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Subnet Mask / CIDR</span>
-    <input type="text" placeholder="255.255.255.0" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+    <input type="text" id="network-prefix" placeholder="255.255.255.0" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Gateway</span>
-    <input type="text" placeholder="192.168.3.1" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+    <input type="text" id="network-gateway" placeholder="192.168.3.1" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">DNS Servers</span>
-    <input type="text" placeholder="1.1.1.1, 8.8.8.8" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+    <input type="text" id="network-dns" placeholder="1.1.1.1, 8.8.8.8" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
 </div>
+<div id="network-message" class="mb-4 text-sm hidden mt-4"></div>
+<button id="network-save-btn" type="button" class="hidden text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 mt-4 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Save</button>
   </div>
 </div>
 
@@ -695,6 +702,61 @@ title: System Preferences
   </div>
 </div>
 
+<!-- Network Modal -->
+<div id="network-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center update-modal-overlay p-4">
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl update-modal-panel w-full overflow-y-auto p-6 relative">
+    <button id="network-modal-close-x" type="button" class="hidden absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" aria-label="Close">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+    <!-- Confirm / warning view -->
+    <div id="network-modal-confirm-view">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Apply network changes?</h3>
+      <p id="network-modal-summary" class="text-sm text-gray-700 dark:text-gray-300 mb-4"></p>
+      <div class="mb-6 text-sm rounded-lg p-3 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+        Changing how this box gets its IP address may require updating DNS
+        records or other systems that point at its current address, and
+        can disrupt reachability to every service on this box if
+        something here is wrong. Make sure you can reach this box another
+        way (console, Nebula) before continuing.
+      </div>
+      <div class="flex justify-end gap-2">
+        <button id="network-modal-cancel-btn" type="button" class="text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600">Cancel</button>
+        <button id="network-modal-confirm-btn" type="button" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Continue Anyway</button>
+      </div>
+    </div>
+    <!-- Progress view -->
+    <div id="network-modal-progress-view" class="hidden">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Applying network changes</h3>
+      <div class="flex items-center gap-3 mb-4">
+        <div id="network-modal-spinner" class="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 dark:border-gray-600 border-t-primary-600 shrink-0"></div>
+        <svg id="network-modal-icon-success" class="hidden w-6 h-6 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <svg id="network-modal-icon-failed" class="hidden w-6 h-6 update-icon-failed shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <span id="network-modal-status-text" class="text-sm text-gray-700 dark:text-gray-300">Starting...</span>
+      </div>
+      <ul id="network-step-list" class="text-sm mb-4">
+        <li class="update-step" data-network-step="download"><span class="update-step-icon" data-network-step-icon="download">&#9675;</span>Downloading release</li>
+        <li class="update-step" data-network-step="rebuild"><span class="update-step-icon" data-network-step-icon="rebuild">&#9675;</span>Rebuilding<ul id="network-derivations-list" class="update-derivations-list hidden"></ul></li>
+        <li class="update-step" data-network-step="inhibitors"><span class="update-step-icon" data-network-step-icon="inhibitors">&#9675;</span>Check switch inhibitors</li>
+        <li class="update-step" data-network-step="activate"><span class="update-step-icon" data-network-step-icon="activate">&#9675;</span>Activate configuration</li>
+        <li class="update-step" data-network-step="etc"><span class="update-step-icon" data-network-step-icon="etc">&#9675;</span>Setting up /etc</li>
+        <li class="update-step" data-network-step="reload"><span class="update-step-icon" data-network-step-icon="reload">&#9675;</span>Reloading &amp; restarting units</li>
+        <li class="update-step" data-network-step="done"><span class="update-step-icon" data-network-step-icon="done">&#9675;</span>Done</li>
+      </ul>
+      <button id="network-log-toggle-btn" type="button" class="flex items-center gap-1 text-sm text-primary-700 dark:text-primary-500 hover:underline mb-2">
+        <svg id="network-log-toggle-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        <span>Show details</span>
+      </button>
+      <div id="network-log-panel" class="hidden">
+        <div id="network-log-stages" class="text-xs update-log-stages mb-2"></div>
+        <pre id="network-log-build" class="update-log-output text-xs p-3 rounded-lg overflow-y-auto"></pre>
+      </div>
+      <div class="flex justify-end mt-4">
+        <button id="network-modal-close-btn" type="button" class="hidden text-white bg-primary-700 hover:bg-primary-800 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   var FLAG_LABELS = {
@@ -960,6 +1022,328 @@ title: System Preferences
     renderServicesSteps({ log: [], buildLog: "", state: "running" });
 
     fetch("/preferences/services/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pendingPayload)
+    })
+      .then(function (r) {
+        return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+      })
+      .then(function (result) {
+        if (!result.ok) {
+          throw new Error((result.data && result.data.error) || "Save failed.");
+        }
+        polling = setInterval(poll, 3000);
+        poll();
+      })
+      .catch(function (err) {
+        setTerminalIcon("failed");
+        statusTextEl.textContent = err.message || "Could not save.";
+      });
+  });
+})();
+</script>
+
+<script>
+(function () {
+  var ipInput = document.getElementById("network-ip");
+  var prefixInput = document.getElementById("network-prefix");
+  var gatewayInput = document.getElementById("network-gateway");
+  var dnsInput = document.getElementById("network-dns");
+  var liveIpEl = document.getElementById("network-live-ip");
+  var messageEl = document.getElementById("network-message");
+  var saveBtn = document.getElementById("network-save-btn");
+
+  var modal = document.getElementById("network-modal");
+  var modalCloseX = document.getElementById("network-modal-close-x");
+  var confirmView = document.getElementById("network-modal-confirm-view");
+  var progressView = document.getElementById("network-modal-progress-view");
+  var summaryEl = document.getElementById("network-modal-summary");
+  var cancelBtn = document.getElementById("network-modal-cancel-btn");
+  var confirmBtn = document.getElementById("network-modal-confirm-btn");
+  var spinnerEl = document.getElementById("network-modal-spinner");
+  var iconSuccessEl = document.getElementById("network-modal-icon-success");
+  var iconFailedEl = document.getElementById("network-modal-icon-failed");
+  var statusTextEl = document.getElementById("network-modal-status-text");
+  var logToggleBtn = document.getElementById("network-log-toggle-btn");
+  var logToggleChevron = document.getElementById("network-log-toggle-chevron");
+  var logPanel = document.getElementById("network-log-panel");
+  var logStagesEl = document.getElementById("network-log-stages");
+  var logBuildEl = document.getElementById("network-log-build");
+  var modalCloseBtn = document.getElementById("network-modal-close-btn");
+
+  var baseline = null;
+  var polling = null;
+  var pendingPayload = null;
+
+  function modeInput() {
+    return document.querySelector('input[name="net-mode"]:checked');
+  }
+
+  // Mirrors modules/dashboard-network.nix's own saveCgi validation
+  // (valid_ipv4/resolve_prefix) — catching bad input here means the
+  // confirm/warning modal never opens for a request that was always
+  // going to be rejected server-side.
+  function isValidIPv4(s) {
+    var parts = (s || "").split(".");
+    if (parts.length !== 4) { return false; }
+    return parts.every(function (p) {
+      if (!/^\d{1,3}$/.test(p)) { return false; }
+      if (p.length > 1 && p[0] === "0") { return false; }
+      var n = parseInt(p, 10);
+      return n >= 0 && n <= 255;
+    });
+  }
+
+  var MASK_BITS = { 255: 8, 254: 7, 252: 6, 248: 5, 240: 4, 224: 3, 192: 2, 128: 1, 0: 0 };
+  function resolvePrefix(s) {
+    s = (s || "").trim();
+    if (/^\d{1,2}$/.test(s)) {
+      var n = parseInt(s, 10);
+      return (n >= 0 && n <= 32) ? n : null;
+    }
+    var parts = s.split(".");
+    if (parts.length !== 4) { return null; }
+    var bits = [];
+    var seenPartial = false;
+    for (var i = 0; i < 4; i++) {
+      if (!/^\d{1,3}$/.test(parts[i]) || !(parseInt(parts[i], 10) in MASK_BITS)) { return null; }
+      var b = MASK_BITS[parseInt(parts[i], 10)];
+      if (seenPartial && b !== 0) { return null; }
+      if (b < 8) { seenPartial = true; }
+      bits.push(b);
+    }
+    return bits[0] + bits[1] + bits[2] + bits[3];
+  }
+
+  function buildPayload() {
+    var mode = modeInput() ? modeInput().value : "dhcp";
+    if (mode === "dhcp") { return { mode: "dhcp" }; }
+    var dns = dnsInput.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    return {
+      mode: "static",
+      ip: ipInput.value.trim(),
+      prefix: prefixInput.value.trim(),
+      gateway: gatewayInput.value.trim(),
+      dns: dns
+    };
+  }
+
+  function validationError(payload) {
+    if (payload.mode === "dhcp") { return null; }
+    if (!isValidIPv4(payload.ip)) { return "Invalid IP address."; }
+    if (!isValidIPv4(payload.gateway)) { return "Invalid gateway."; }
+    if (resolvePrefix(payload.prefix) === null) { return "Invalid subnet mask / prefix."; }
+    if (payload.dns.length === 0) { return "At least one DNS server is required."; }
+    for (var i = 0; i < payload.dns.length; i++) {
+      if (!isValidIPv4(payload.dns[i])) { return "Invalid DNS server: " + payload.dns[i]; }
+    }
+    return null;
+  }
+
+  function payloadsEqual(a, b) {
+    if (!a || !b) { return false; }
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  function showMessage(text, kind) {
+    messageEl.textContent = text;
+    messageEl.className = "mb-4 text-sm rounded-lg p-3 mt-4 " + (
+      kind === "error"
+        ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+        : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+    );
+  }
+
+  function refreshSaveVisibility() {
+    var dirty = !payloadsEqual(buildPayload(), baseline);
+    saveBtn.classList.toggle("hidden", !dirty);
+  }
+
+  [ipInput, prefixInput, gatewayInput, dnsInput].forEach(function (input) {
+    input.addEventListener("input", refreshSaveVisibility);
+  });
+  document.querySelectorAll('input[name="net-mode"]').forEach(function (input) {
+    input.addEventListener("change", refreshSaveVisibility);
+  });
+
+  // Pre-fills the form from the build-time-configured state, and shows
+  // the live-active address (only knowable at request time, not build
+  // time — see modules/dashboard-network.nix's currentCgi) regardless
+  // of mode. Falls back to leaving the form at its static defaults if
+  // this fails, same posture as the Services/Let's Encrypt forms.
+  fetch("/preferences/network/current", { cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var mode = data.mode === "static" ? "static" : "dhcp";
+      var radio = document.querySelector('input[name="net-mode"][value="' + mode + '"]');
+      if (radio) {
+        radio.checked = true;
+        radio.dispatchEvent(new Event("change"));
+      }
+      if (data.ip) { ipInput.value = data.ip; }
+      if (data.prefix !== null && data.prefix !== undefined) { prefixInput.value = data.prefix; }
+      if (data.gateway) { gatewayInput.value = data.gateway; }
+      if (data.dns && data.dns.length) { dnsInput.value = data.dns.join(", "); }
+      liveIpEl.textContent = data.liveIp
+        ? data.liveIp + (data.liveGateway ? " (gateway " + data.liveGateway + ")" : "")
+        : "unknown";
+      baseline = buildPayload();
+      refreshSaveVisibility();
+    })
+    .catch(function () {
+      baseline = buildPayload();
+      refreshSaveVisibility();
+    });
+
+  function openModal() { modal.classList.remove("hidden"); }
+  function closeModal() { modal.classList.add("hidden"); }
+
+  function describeChange(payload) {
+    if (payload.mode === "dhcp") { return "Switch Network Interface to DHCP (automatic addressing)."; }
+    return "Set a static address: " + payload.ip + "/" + resolvePrefix(payload.prefix) +
+      ", gateway " + payload.gateway + ", DNS " + payload.dns.join(", ") + ".";
+  }
+
+  function showConfirmView(payload) {
+    summaryEl.textContent = describeChange(payload);
+    confirmView.classList.remove("hidden");
+    progressView.classList.add("hidden");
+    modalCloseX.classList.add("hidden");
+    openModal();
+  }
+
+  function showProgressView() {
+    confirmView.classList.add("hidden");
+    progressView.classList.remove("hidden");
+    openModal();
+  }
+
+  function setTerminalIcon(state) {
+    spinnerEl.classList.toggle("hidden", state !== "running");
+    iconSuccessEl.classList.toggle("hidden", state !== "success");
+    iconFailedEl.classList.toggle("hidden", state !== "failed");
+    var terminal = state === "success" || state === "failed";
+    modalCloseBtn.classList.toggle("hidden", !terminal);
+    modalCloseX.classList.toggle("hidden", !terminal);
+  }
+
+  // Same shape as the Update/Services modals' own STEPS/renderSteps —
+  // duplicated per this repo's established "don't share code across
+  // independent modal scripts" posture. The shared runner
+  // (modules/system-rebuild.nix) writes the exact same progress
+  // messages regardless of caller, so these markers apply unchanged.
+  var NETWORK_STEPS = [
+    { key: "download", re: /rebuilding \(this can take a while\)|checking switch inhibitors|activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "rebuild", re: /checking switch inhibitors|activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "inhibitors", re: /activating the configuration|setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "activate", re: /setting up .etc|reloading|restarting|done\. the new configuration/i },
+    { key: "etc", re: /reloading|restarting|done\. the new configuration/i },
+    { key: "reload", re: /done\. the new configuration/i },
+    { key: "done", re: null }
+  ];
+
+  function renderNetworkSteps(data) {
+    var stageText = (data.log || []).map(function (e) { return e.message; }).join(" | ");
+    var buildLog = data.buildLog || "";
+    var combined = stageText + "\n" + buildLog;
+
+    NETWORK_STEPS.forEach(function (step) {
+      var isDone = step.key === "done" ? data.state === "success" : step.re.test(combined);
+      var li = document.querySelector('[data-network-step="' + step.key + '"]');
+      var icon = document.querySelector('[data-network-step-icon="' + step.key + '"]');
+      if (!li || !icon) { return; }
+      li.classList.toggle("update-step-done", isDone);
+      icon.innerHTML = isDone ? "&#10003;" : "&#9675;";
+    });
+
+    var derivationsList = document.getElementById("network-derivations-list");
+    var match = buildLog.match(/these \d+ derivations?[^\n]*will be built:\r?\n((?:\s+\/nix\/store\/\S+\r?\n?)+)/i);
+    if (match) {
+      var lines = match[1].split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+      derivationsList.innerHTML = "";
+      lines.forEach(function (l) {
+        var short = l.replace(/^\/nix\/store\/[a-z0-9]+-/, "");
+        var item = document.createElement("li");
+        item.textContent = short;
+        derivationsList.appendChild(item);
+      });
+      derivationsList.classList.remove("hidden");
+    }
+  }
+
+  function renderLog(data) {
+    var stages = data.log || [];
+    logStagesEl.innerHTML = "";
+    stages.forEach(function (entry) {
+      var line = document.createElement("div");
+      var t = "";
+      try { t = new Date(entry.time).toLocaleTimeString(); } catch (e) { t = entry.time; }
+      line.textContent = "[" + t + "] " + entry.message;
+      logStagesEl.appendChild(line);
+    });
+    if (data.buildLog) {
+      logBuildEl.textContent = data.buildLog;
+      logBuildEl.scrollTop = logBuildEl.scrollHeight;
+    }
+    renderNetworkSteps(data);
+  }
+
+  function stopPolling() {
+    if (polling) { clearInterval(polling); polling = null; }
+  }
+
+  function poll() {
+    fetch("/preferences/network/status", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        showProgressView();
+        setTerminalIcon(data.state);
+        statusTextEl.textContent = data.message || data.state;
+        renderLog(data);
+        if (data.state === "success") {
+          stopPolling();
+          baseline = pendingPayload || baseline;
+          refreshSaveVisibility();
+        } else if (data.state === "failed") {
+          stopPolling();
+        }
+      })
+      .catch(function () { /* try again on next tick */ });
+  }
+
+  saveBtn.addEventListener("click", function () {
+    var payload = buildPayload();
+    var err = validationError(payload);
+    if (err) {
+      showMessage(err, "error");
+      return;
+    }
+    messageEl.classList.add("hidden");
+    pendingPayload = payload;
+    showConfirmView(payload);
+  });
+
+  cancelBtn.addEventListener("click", closeModal);
+  modalCloseX.addEventListener("click", closeModal);
+  modalCloseBtn.addEventListener("click", closeModal);
+
+  logToggleBtn.addEventListener("click", function () {
+    var hidden = logPanel.classList.toggle("hidden");
+    logToggleChevron.style.transform = hidden ? "" : "rotate(180deg)";
+    logToggleBtn.querySelector("span").textContent = hidden ? "Show details" : "Hide details";
+  });
+
+  confirmBtn.addEventListener("click", function () {
+    showProgressView();
+    setTerminalIcon("running");
+    statusTextEl.textContent = "Starting...";
+    logStagesEl.innerHTML = "";
+    logBuildEl.textContent = "";
+    document.getElementById("network-derivations-list").classList.add("hidden");
+    renderNetworkSteps({ log: [], buildLog: "", state: "running" });
+
+    fetch("/preferences/network/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(pendingPayload)
