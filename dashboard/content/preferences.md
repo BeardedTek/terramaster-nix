@@ -394,8 +394,39 @@ title: System Preferences
   // which — for up to two minutes after a run finishes (see
   // nas-update-status-cgi's freshness window) — still reports
   // state:"success", so applyProgress ran again, called showProgressView()
-  // again, and reopened the modal a moment after Close was clicked.
+  // again, and reopened the modal a moment after Close was clicked. Only
+  // covers the current page load, though: lastRenderedTerminal resets to
+  // null on every fresh load, so a reload *within* that same two-minute
+  // window still walked straight back into the same reopen — confirmed
+  // the hard way (the "Close" the user just clicked didn't survive so
+  // much as one reload). DISMISS_KEY below extends the same guard across
+  // reloads/sessions via localStorage instead of an in-memory variable.
   var lastRenderedTerminal = null;
+  var lastRenderedData = null;
+  var DISMISS_KEY = "nas-update-dismissed-run";
+
+  // Identifies *this* run, not just "the last known terminal state" — a
+  // later run's own first log entry gets a fresh timestamp the moment
+  // nas-update-apply starts (it deletes progressFile up front), so this
+  // naturally stops matching once a new update actually runs, with no
+  // separate cleanup needed.
+  function runId(data) {
+    var log = data.log || [];
+    return log.length ? log[0].time : (data.message || "");
+  }
+
+  function isDismissed(data) {
+    var id = runId(data);
+    return !!id && localStorage.getItem(DISMISS_KEY) === id;
+  }
+
+  function dismissCurrentRun() {
+    if (lastRenderedTerminal && lastRenderedData) {
+      var id = runId(lastRenderedData);
+      if (id) { localStorage.setItem(DISMISS_KEY, id); }
+    }
+    closeModal();
+  }
 
   function applyProgress(data) {
     var terminal = data.state === "success" || data.state === "failed";
@@ -404,6 +435,28 @@ title: System Preferences
     }
     if (!terminal) {
       lastRenderedTerminal = null;
+    }
+    lastRenderedData = data;
+
+    // A closed modal reopening itself on the very next poll is the bug
+    // above; a closed modal staying closed on the *next page load* for a
+    // run the user already dismissed is the fix. Doesn't apply while the
+    // modal's already open (an update actively being watched should keep
+    // updating normally) — only to the "walked back onto this page"
+    // case, which is exactly the state a hidden modal + terminal data
+    // describes.
+    if (terminal && modal.classList.contains("hidden") && isDismissed(data)) {
+      if (data.state === "success") {
+        lastRenderedTerminal = "success";
+        stopPolling();
+        currentEl.textContent = latestKnown || currentEl.textContent;
+        setUpdateEnabled(false);
+      } else {
+        lastRenderedTerminal = "failed";
+        stopPolling();
+        setUpdateEnabled(true);
+      }
+      return;
     }
 
     showProgressView();
@@ -466,9 +519,14 @@ title: System Preferences
     showConfirmView();
   });
 
+  // cancelBtn only ever appears on the pre-run confirmation screen (see
+  // confirmView above) — nothing to dismiss yet, so it's a plain close,
+  // not dismissCurrentRun. modalCloseX/modalCloseBtn only show once
+  // setTerminalIcon marks the run terminal, which is exactly what needs
+  // remembering across a reload.
   cancelBtn.addEventListener("click", closeModal);
-  modalCloseX.addEventListener("click", closeModal);
-  modalCloseBtn.addEventListener("click", closeModal);
+  modalCloseX.addEventListener("click", dismissCurrentRun);
+  modalCloseBtn.addEventListener("click", dismissCurrentRun);
 
   logToggleBtn.addEventListener("click", function () {
     var hidden = logPanel.classList.toggle("hidden");
