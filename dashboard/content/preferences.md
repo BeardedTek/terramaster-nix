@@ -7,30 +7,6 @@ title: System Preferences
 </p>
 
 <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm mb-4">
-  <button type="button" class="accordion-toggle w-full flex items-center justify-between p-4 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="accordion-update-panel">
-    <span>System Update</span>
-    <svg class="accordion-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-  </button>
-  <div id="accordion-update-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-4">
-<p class="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
-  The current and latest available version are always shown below.
-  Applying an update fetches the new release and rebuilds the system
-  in place.
-</p>
-
-<div id="update-info" class="mb-4 text-sm text-gray-700 dark:text-gray-300">
-  <p>Current version: <span id="current-version" class="font-mono">&mdash;</span></p>
-  <p>Latest release: <span id="latest-version" class="font-mono">&mdash;</span> <a id="release-link" href="#" target="_blank" rel="noopener noreferrer" class="text-primary-700 dark:text-primary-500 hover:underline hidden">(notes)</a></p>
-</div>
-
-<div id="update-message" class="mb-4 text-sm hidden"></div>
-
-<button id="check-btn" type="button" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Check for updates</button>
-<button id="update-btn" type="button" disabled class="text-white bg-gray-400 cursor-not-allowed font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-600">Update now</button>
-  </div>
-</div>
-
-<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm mb-4">
   <button type="button" class="accordion-toggle w-full flex items-center justify-between p-4 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="accordion-network-panel">
     <span>Network</span>
     <svg class="accordion-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -78,6 +54,30 @@ title: System Preferences
     <input type="text" placeholder="1.1.1.1, 8.8.8.8" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
   </div>
 </div>
+  </div>
+</div>
+
+<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm mb-4">
+  <button type="button" class="accordion-toggle w-full flex items-center justify-between p-4 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="accordion-update-panel">
+    <span>System Update</span>
+    <svg class="accordion-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+  </button>
+  <div id="accordion-update-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-4">
+<p class="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
+  The current and latest available version are always shown below.
+  Applying an update fetches the new release and rebuilds the system
+  in place.
+</p>
+
+<div id="update-info" class="mb-4 text-sm text-gray-700 dark:text-gray-300">
+  <p>Current version: <span id="current-version" class="font-mono">&mdash;</span></p>
+  <p>Latest release: <span id="latest-version" class="font-mono">&mdash;</span> <a id="release-link" href="#" target="_blank" rel="noopener noreferrer" class="text-primary-700 dark:text-primary-500 hover:underline hidden">(notes)</a></p>
+</div>
+
+<div id="update-message" class="mb-4 text-sm hidden"></div>
+
+<button id="check-btn" type="button" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Check for updates</button>
+<button id="update-btn" type="button" disabled class="text-white bg-gray-400 cursor-not-allowed font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-600">Update now</button>
   </div>
 </div>
 
