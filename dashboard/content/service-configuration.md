@@ -362,22 +362,150 @@ title: Service Configuration
       </div>
       <div id="svccfg-nebula-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-          Preview only &mdash; not wired up yet. Uploading a full config
-          is already available on the
-          <a href="/preferences/" class="text-primary-700 dark:text-primary-500 hover:underline">System Preferences</a>
-          page, under Services &rarr; Mesh VPN Networks.
+          Upload or paste a complete Nebula <code>config.yaml</code> &mdash;
+          the same format the Nebula mobile apps use, with the CA/cert/key
+          embedded directly in the file. Saving replaces the current
+          config and restarts Nebula immediately; it does not require a
+          system rebuild. The existing config is never shown back here
+          (it contains this node's private key). Enabling/disabling the
+          Nebula service itself is still done on
+          <a href="/preferences/" class="text-primary-700 dark:text-primary-500 hover:underline">System Preferences</a>,
+          under Services &rarr; Mesh VPN Networks.
         </p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Lighthouse IP</span>
-            <input type="text" value="10.100.0.1" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Listen Port</span>
-            <input type="number" value="4242" disabled class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
+        <div id="svccfg-nebula-status" class="text-xs text-gray-500 dark:text-gray-400 mb-2"></div>
+        <div class="mb-3">
+          <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Upload a config file</span>
+          <input type="file" id="svccfg-nebula-file" accept=".yaml,.yml,text/yaml,text/x-yaml,text/plain" class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600" />
         </div>
+        <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">...or paste it directly</span>
+        <textarea id="svccfg-nebula-config" rows="10" placeholder="pki:&#10;  ca: ...&#10;  cert: ...&#10;  key: ...&#10;static_host_map:&#10;  ..." class="font-mono text-xs bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white"></textarea>
+        <div id="svccfg-nebula-message" class="mt-2 text-sm hidden"></div>
+        <button id="svccfg-nebula-save-btn" type="button" class="mt-2 text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Save Config</button>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  var fileInput = document.getElementById("svccfg-nebula-file");
+  var textarea = document.getElementById("svccfg-nebula-config");
+  var statusEl = document.getElementById("svccfg-nebula-status");
+  var messageEl = document.getElementById("svccfg-nebula-message");
+  var saveBtn = document.getElementById("svccfg-nebula-save-btn");
+
+  function showMessage(text, kind) {
+    messageEl.textContent = text;
+    messageEl.classList.remove("hidden");
+    messageEl.className = "mt-2 text-sm rounded-lg p-3 " + (
+      kind === "error"
+        ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+        : kind === "success"
+        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+        : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+    );
+  }
+
+  // Never fetches the config itself — modules/dashboard-nebula.nix's
+  // currentCgi deliberately only ever reports whether one's set (it
+  // embeds this node's private key). The textarea stays blank; this
+  // just tells the admin whether they're replacing something or
+  // starting fresh.
+  function refreshStatusLine() {
+    fetch("/preferences/nebula/current", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        statusEl.textContent = data.configSet
+          ? "A Nebula config is currently active."
+          : "No Nebula config uploaded yet.";
+      })
+      .catch(function () { statusEl.textContent = ""; });
+  }
+  refreshStatusLine();
+
+  // Reads the selected file and drops its contents into the same
+  // textarea the Save button reads from — one save path regardless of
+  // whether the config got there by typing/pasting or by picking a
+  // file, so nothing else here needs to know which happened.
+  fileInput.addEventListener("change", function () {
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) { return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      textarea.value = String(reader.result || "");
+      fileInput.value = "";
+    };
+    reader.onerror = function () {
+      showMessage("Could not read that file.", "error");
+      fileInput.value = "";
+    };
+    reader.readAsText(file);
+  });
+
+  // Same bounded-attempts poll shape as the Let's Encrypt accordion's
+  // own pollStatus() — this never touches a rebuild (nebula.service is
+  // just restarted), so a handful of 1s polls is generous, not tight.
+  function pollStatus() {
+    var attempts = 0;
+    var iv = setInterval(function () {
+      attempts++;
+      fetch("/preferences/nebula/status", { cache: "no-store" })
+        .then(function (r) { return r.text(); })
+        .then(function (text) {
+          var status = text.trim();
+          if (status === "ok") {
+            clearInterval(iv);
+            showMessage("Saved — Nebula restarted with the new config.", "success");
+            textarea.value = "";
+            saveBtn.disabled = false;
+            refreshStatusLine();
+          } else if (status.indexOf("error:") === 0) {
+            clearInterval(iv);
+            showMessage(status.replace(/^error:\s*/, ""), "error");
+            saveBtn.disabled = false;
+          } else if (attempts >= 15) {
+            clearInterval(iv);
+            showMessage("Still applying — check back in a moment.", "info");
+            saveBtn.disabled = false;
+          }
+        })
+        .catch(function () {
+          if (attempts >= 15) {
+            clearInterval(iv);
+            saveBtn.disabled = false;
+          }
+        });
+    }, 1000);
+  }
+
+  saveBtn.addEventListener("click", function () {
+    var body = textarea.value;
+    if (!body.trim()) {
+      showMessage("Upload or paste a config.yaml first.", "error");
+      return;
+    }
+
+    saveBtn.disabled = true;
+    showMessage("Saving and restarting Nebula...", "info");
+
+    fetch("/preferences/nebula/save", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: body
+    })
+      .then(function (r) {
+        return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+      })
+      .then(function (result) {
+        if (!result.ok) {
+          throw new Error((result.data && result.data.error) || "Save failed.");
+        }
+        pollStatus();
+      })
+      .catch(function (err) {
+        showMessage(err.message || "Could not save.", "error");
+        saveBtn.disabled = false;
+      });
+  });
+})();
+</script>
