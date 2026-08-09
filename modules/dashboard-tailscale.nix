@@ -148,7 +148,14 @@ let
         exit 0
       fi
 
-      tailscale up >> ${loginLogFile} 2>&1 || true
+      # Once a box has ever connected, tailscaled carries a non-default
+      # --operator setting (see modules/tailscale.nix's extraSetFlags —
+      # same literal, duplicated here for the same reason authKeyFile is
+      # above). A bare `tailscale up` on a box in that state refuses to
+      # run at all ("requires mentioning all non-default flags") rather
+      # than printing a login URL, so it must be repeated on every call,
+      # not just the one that originally set it.
+      tailscale up --operator=dashboard-tailscale >> ${loginLogFile} 2>&1 || true
     '';
   };
 
