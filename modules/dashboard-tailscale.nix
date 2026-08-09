@@ -20,6 +20,17 @@ let
   pendingFile = "${runDir}/pending.txt";
   resultFile = "${runDir}/result";
 
+  # The interactive-login half — a genuinely different mechanism from
+  # the auth-key flow above, not a variation of it: `tailscale up` with
+  # no key blocks for as long as it takes the admin to click the
+  # printed link and finish the browser flow (could be minutes), so
+  # nothing here can synchronously wait on it the way saveCgi/applyScript
+  # do. loginCgi is fire-and-forget; the frontend polls loginStatusCgi
+  # for the URL to appear, then separately polls the already-built
+  # currentCgi for BackendState to flip to Running.
+  loginTriggerFile = "${runDir}/login-trigger";
+  loginLogFile = "${runDir}/login.log";
+
   saveCgi = pkgs.writeShellApplication {
     name = "dashboard-tailscale-save-cgi";
     runtimeInputs = [ pkgs.coreutils ];
@@ -93,6 +104,70 @@ let
         echo "ok" > ${resultFile}
       else
         echo "error: authentication failed — check the auth key and try again (see journalctl -u tailscaled-autoconnect)" > ${resultFile}
+      fi
+    '';
+  };
+
+  # Fire-and-forget — unlike saveCgi, nothing here waits on a result via
+  # statusCgi; the frontend polls loginStatusCgi for the URL instead.
+  # Clears any previous run's log first so a stale link from an earlier
+  # attempt can never be shown for a fresh click.
+  loginCgi = pkgs.writeShellApplication {
+    name = "dashboard-tailscale-login-cgi";
+    runtimeInputs = [ pkgs.coreutils ];
+    text = ''
+      mkdir -p ${runDir}
+      rm -f ${loginLogFile}
+      touch ${loginTriggerFile}
+      printf 'Status: 200 OK\r\nContent-Type: application/json\r\n\r\n{"ok":true}\n'
+    '';
+  };
+
+  # Privileged oneshot, triggered by its own path unit below — deliberately
+  # a *separate* trigger/unit pair from dashboard-tailscale-apply, since
+  # this one can legitimately run for minutes (however long the admin
+  # takes to click the link and finish the browser flow) while that one
+  # is bounded to ~60s. `|| true` on the tailscale invocation itself is
+  # intentional: a non-zero exit here just means the browser flow wasn't
+  # completed or the daemon's own default timeout hit, not a bug in this
+  # script — the frontend finds out either way by polling currentCgi for
+  # BackendState, not this unit's own exit status.
+  loginApplyScript = pkgs.writeShellApplication {
+    name = "dashboard-tailscale-login-apply";
+    runtimeInputs = [ pkgs.coreutils pkgs.systemd pkgs.tailscale ];
+    text = ''
+      rm -f ${loginTriggerFile}
+
+      : > ${loginLogFile}.tmp
+      mv ${loginLogFile}.tmp ${loginLogFile}
+      chown dashboard-tailscale:dashboard-tailscale ${loginLogFile}
+      chmod 640 ${loginLogFile}
+
+      if ! systemctl cat tailscaled.service >/dev/null 2>&1; then
+        echo "Tailscale isn't enabled yet — turn it on from System Preferences first." >> ${loginLogFile}
+        exit 0
+      fi
+
+      tailscale up >> ${loginLogFile} 2>&1 || true
+    '';
+  };
+
+  # Matches just the URL itself, not the surrounding "To authenticate,
+  # visit:" text — robust to that wording shifting between Tailscale
+  # versions, since only the URL shape is actually load-bearing here.
+  loginStatusCgi = pkgs.writeShellApplication {
+    name = "dashboard-tailscale-login-status-cgi";
+    runtimeInputs = [ pkgs.coreutils pkgs.gnugrep pkgs.jq ];
+    text = ''
+      printf 'Status: 200 OK\r\nContent-Type: application/json\r\n\r\n'
+      url=""
+      if [ -f ${loginLogFile} ]; then
+        url=$(grep -oE 'https://login\.tailscale\.com/a/[A-Za-z0-9]+' ${loginLogFile} | head -n1 || true)
+      fi
+      if [ -n "$url" ]; then
+        jq -n --arg u "$url" '{loginUrl: $u}'
+      else
+        echo '{"loginUrl": null}'
       fi
     '';
   };
@@ -214,6 +289,26 @@ in
       pathConfig.PathExists = triggerFile;
     };
 
+    # Never wantedBy anything — purely triggered by the path unit below.
+    # A much longer TimeoutStartSec than dashboard-tailscale-apply's
+    # (60s): nothing waits on this unit synchronously (the frontend
+    # polls loginStatusCgi/currentCgi instead), so there's no cost to
+    # giving the admin several real minutes to click the link and
+    # finish the browser flow before this gets killed.
+    systemd.services.dashboard-tailscale-login-apply = {
+      description = "Run `tailscale up` interactively and log the resulting login URL";
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = lib.getExe loginApplyScript;
+        TimeoutStartSec = 300;
+      };
+    };
+    systemd.paths.dashboard-tailscale-login-apply = {
+      description = "Watch for a web-triggered interactive Tailscale login";
+      wantedBy = [ "multi-user.target" ];
+      pathConfig.PathExists = loginTriggerFile;
+    };
+
     services.fcgiwrap.instances.dashboard-tailscale = {
       process = {
         user = "dashboard-tailscale";
@@ -258,6 +353,28 @@ in
           ${lib.optionalString loginEnabled "auth_request /internal/dashboard-admin-check;"}
           fastcgi_pass unix:/run/fcgiwrap-dashboard-tailscale.sock;
           fastcgi_param SCRIPT_FILENAME ${lib.getExe statusCgi};
+          fastcgi_param REQUEST_METHOD $request_method;
+          fastcgi_param SERVER_PROTOCOL $server_protocol;
+          fastcgi_param GATEWAY_INTERFACE CGI/1.1;
+          fastcgi_param SERVER_SOFTWARE nginx;
+        '';
+      };
+      "= /preferences/tailscale/login" = {
+        extraConfig = ''
+          ${lib.optionalString loginEnabled "auth_request /internal/dashboard-admin-check;"}
+          fastcgi_pass unix:/run/fcgiwrap-dashboard-tailscale.sock;
+          fastcgi_param SCRIPT_FILENAME ${lib.getExe loginCgi};
+          fastcgi_param REQUEST_METHOD $request_method;
+          fastcgi_param SERVER_PROTOCOL $server_protocol;
+          fastcgi_param GATEWAY_INTERFACE CGI/1.1;
+          fastcgi_param SERVER_SOFTWARE nginx;
+        '';
+      };
+      "= /preferences/tailscale/login-status" = {
+        extraConfig = ''
+          ${lib.optionalString loginEnabled "auth_request /internal/dashboard-admin-check;"}
+          fastcgi_pass unix:/run/fcgiwrap-dashboard-tailscale.sock;
+          fastcgi_param SCRIPT_FILENAME ${lib.getExe loginStatusCgi};
           fastcgi_param REQUEST_METHOD $request_method;
           fastcgi_param SERVER_PROTOCOL $server_protocol;
           fastcgi_param GATEWAY_INTERFACE CGI/1.1;

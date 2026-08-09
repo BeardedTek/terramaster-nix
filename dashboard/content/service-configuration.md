@@ -355,7 +355,14 @@ title: Service Configuration
         <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Auth Key</span>
         <input type="password" id="svccfg-tailscale-key" placeholder="tskey-auth-..." class="font-mono text-xs bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
         <div id="svccfg-tailscale-message" class="mt-2 text-sm hidden"></div>
-        <button id="svccfg-tailscale-save-btn" type="button" class="mt-2 text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Authenticate</button>
+        <button id="svccfg-tailscale-save-btn" type="button" class="mt-2 text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Authenticate with Key</button>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-4 mb-2">
+          ...or authenticate interactively, the same way <code>tailscale up</code>
+          works from a terminal &mdash; get a one-time login link and
+          approve this device in your browser.
+        </p>
+        <button id="svccfg-tailscale-login-btn" type="button" class="text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium rounded-lg text-sm px-4 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600">Get Login Link</button>
+        <div id="svccfg-tailscale-login-message" class="mt-2 text-sm hidden"></div>
       </div>
     </div>
   </div>
@@ -841,6 +848,8 @@ title: Service Configuration
   var statusEl = document.getElementById("svccfg-tailscale-status");
   var messageEl = document.getElementById("svccfg-tailscale-message");
   var saveBtn = document.getElementById("svccfg-tailscale-save-btn");
+  var loginBtn = document.getElementById("svccfg-tailscale-login-btn");
+  var loginMessageEl = document.getElementById("svccfg-tailscale-login-message");
 
   function showMessage(text, kind) {
     messageEl.textContent = text;
@@ -875,6 +884,109 @@ title: Service Configuration
       .catch(function () { statusEl.textContent = ""; });
   }
   refreshStatusLine();
+
+  function showLoginMessage(text, kind) {
+    loginMessageEl.innerHTML = "";
+    loginMessageEl.textContent = text;
+    loginMessageEl.classList.remove("hidden");
+    loginMessageEl.className = "mt-2 text-sm rounded-lg p-3 " + (
+      kind === "error"
+        ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+        : kind === "success"
+        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+        : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+    );
+  }
+
+  // Relaxed, long-bounded poll of the *existing* status endpoint
+  // (same one refreshStatusLine() already uses) — this is what
+  // actually detects the admin finishing the browser flow, completely
+  // independent of whether dashboard-tailscale-login-apply.service
+  // itself is still running. Bound (100 * 3s = 5 minutes) matches
+  // modules/dashboard-tailscale.nix's own TimeoutStartSec on that unit.
+  function pollForConnected() {
+    var attempts = 0;
+    var iv = setInterval(function () {
+      attempts++;
+      fetch("/preferences/tailscale/current", { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.backendState === "Running") {
+            clearInterval(iv);
+            showLoginMessage("Connected.", "success");
+            refreshStatusLine();
+            loginBtn.disabled = false;
+          } else if (attempts >= 100) {
+            clearInterval(iv);
+            loginBtn.disabled = false;
+          }
+        })
+        .catch(function () {
+          if (attempts >= 100) {
+            clearInterval(iv);
+            loginBtn.disabled = false;
+          }
+        });
+    }, 3000);
+  }
+
+  // Short bounded poll waiting for dashboard-tailscale-login-apply.service
+  // to actually print the login URL — this typically appears within a
+  // second or two of the service starting, well before the admin has
+  // had any chance to click it, so 15s is generous, not tight.
+  function pollLoginLink() {
+    var attempts = 0;
+    var iv = setInterval(function () {
+      attempts++;
+      fetch("/preferences/tailscale/login-status", { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.loginUrl) {
+            clearInterval(iv);
+            loginMessageEl.innerHTML = "";
+            loginMessageEl.classList.remove("hidden");
+            loginMessageEl.className = "mt-2 text-sm rounded-lg p-3 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+            var p = document.createElement("p");
+            p.className = "mb-2";
+            p.textContent = "Click this link to authorize this device, then this page will update automatically.";
+            var a = document.createElement("a");
+            a.href = data.loginUrl;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            a.className = "font-mono hover:underline";
+            a.textContent = data.loginUrl;
+            loginMessageEl.appendChild(p);
+            loginMessageEl.appendChild(a);
+            pollForConnected();
+          } else if (attempts >= 15) {
+            clearInterval(iv);
+            showLoginMessage("Could not get a login link — check journalctl -u dashboard-tailscale-login-apply on the box.", "error");
+            loginBtn.disabled = false;
+          }
+        })
+        .catch(function () {
+          if (attempts >= 15) {
+            clearInterval(iv);
+            loginBtn.disabled = false;
+          }
+        });
+    }, 1000);
+  }
+
+  loginBtn.addEventListener("click", function () {
+    loginBtn.disabled = true;
+    showLoginMessage("Requesting a login link...", "info");
+
+    fetch("/preferences/tailscale/login", { method: "POST" })
+      .then(function (r) {
+        if (!r.ok) { throw new Error("Could not start the login flow."); }
+        pollLoginLink();
+      })
+      .catch(function (err) {
+        showLoginMessage(err.message || "Could not start the login flow.", "error");
+        loginBtn.disabled = false;
+      });
+  });
 
   // Same bounded-attempts poll shape as the Nebula block's own
   // pollStatus() — generous enough (60 * 1s) to cover
