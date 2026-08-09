@@ -121,6 +121,11 @@
       # entry — without it, every SMART history graph would reset on
       # each reboot.
       "/var/lib/influxdb2"
+      # scrutiny-collector-bootstrap's own stamp file (see
+      # modules/scrutiny.nix) — without persisting this, the "only ever
+      # once" guard would instead become "once every reboot", since a
+      # tmpfs root wipes it on every restart.
+      "/var/lib/scrutiny-collector-state"
     ];
     files = [
       "/etc/machine-id"
