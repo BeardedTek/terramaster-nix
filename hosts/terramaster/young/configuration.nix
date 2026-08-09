@@ -68,7 +68,18 @@
       "/etc/traefik"
       "/var/lib/samba"
       "/var/lib/jellyfin"
-      "/var/lib/plex"
+      # Not a plain string like the others: nixpkgs' own Plex module
+      # only chowns /var/lib/plex to plex:plex the *first* time it's
+      # created (guarded on `! test -d "$PLEX_DATADIR"` in its
+      # ExecStartPre) — impermanence creating it first (root:root 0755,
+      # the plain-string default) means that guard sees it already
+      # exists and skips the chown, leaving Plex's own unprivileged
+      # `plex` user unable to write into its own data directory.
+      # Confirmed the hard way: "mkdir: cannot create directory
+      # '/var/lib/plex/.skeleton': Permission denied". Matches Plex's
+      # own `install -d -m 0755 -o plex -g plex` exactly, so its guard
+      # sees correct ownership already in place and no-ops cleanly.
+      { directory = "/var/lib/plex"; user = "plex"; group = "plex"; mode = "0755"; }
       "/var/lib/sonarr"
       "/var/lib/radarr"
       "/var/lib/jackett"
