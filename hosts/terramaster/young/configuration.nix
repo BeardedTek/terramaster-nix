@@ -111,6 +111,8 @@
       "/etc/unix-ldap-login"
       "/etc/vaultwarden"
       "/var/lib/vaultwarden"
+      "/etc/tailscale"
+      "/var/lib/tailscale"
     ];
     files = [
       "/etc/machine-id"

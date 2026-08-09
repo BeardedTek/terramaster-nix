@@ -333,6 +333,31 @@ title: Service Configuration
         <button id="svccfg-nebula-save-btn" type="button" class="mt-2 text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Save Config</button>
       </div>
     </div>
+    <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+      <div class="flex items-center justify-between p-3">
+        <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-tailscale-panel">
+          <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          <span>Tailscale</span>
+        </button>
+      </div>
+      <div id="svccfg-tailscale-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Authenticate this box against your tailnet by pasting an auth
+          key generated at
+          <span class="font-mono">login.tailscale.com/admin/settings/keys</span>.
+          Applying restarts the Tailscale connection immediately; it
+          does not require a system rebuild. Enabling/disabling
+          Tailscale itself is still done on
+          <a href="/preferences/" class="text-primary-700 dark:text-primary-500 hover:underline">System Preferences</a>,
+          under Services &rarr; Mesh VPN Networks.
+        </p>
+        <div id="svccfg-tailscale-status" class="text-xs text-gray-500 dark:text-gray-400 mb-2"></div>
+        <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Auth Key</span>
+        <input type="password" id="svccfg-tailscale-key" placeholder="tskey-auth-..." class="font-mono text-xs bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+        <div id="svccfg-tailscale-message" class="mt-2 text-sm hidden"></div>
+        <button id="svccfg-tailscale-save-btn" type="button" class="mt-2 text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Authenticate</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -789,6 +814,116 @@ title: Service Configuration
     showMessage("Saving and restarting Nebula...", "info");
 
     fetch("/preferences/nebula/save", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: body
+    })
+      .then(function (r) {
+        return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+      })
+      .then(function (result) {
+        if (!result.ok) {
+          throw new Error((result.data && result.data.error) || "Save failed.");
+        }
+        pollStatus();
+      })
+      .catch(function (err) {
+        showMessage(err.message || "Could not save.", "error");
+        saveBtn.disabled = false;
+      });
+  });
+})();
+</script>
+
+<script>
+(function () {
+  var keyInput = document.getElementById("svccfg-tailscale-key");
+  var statusEl = document.getElementById("svccfg-tailscale-status");
+  var messageEl = document.getElementById("svccfg-tailscale-message");
+  var saveBtn = document.getElementById("svccfg-tailscale-save-btn");
+
+  function showMessage(text, kind) {
+    messageEl.textContent = text;
+    messageEl.classList.remove("hidden");
+    messageEl.className = "mt-2 text-sm rounded-lg p-3 " + (
+      kind === "error"
+        ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+        : kind === "success"
+        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+        : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+    );
+  }
+
+  // Never fetches or shows the auth key itself — modules/dashboard-tailscale.nix's
+  // currentCgi only ever reports connection status via `tailscale
+  // status` (the operator-granted CLI), never anything from the key
+  // file on disk. Only ever called on load and right after a save
+  // resolves, so it can't clobber an admin mid-paste.
+  function refreshStatusLine() {
+    fetch("/preferences/tailscale/current", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.backendState === "Running") {
+          var where = data.tailscaleIp ? " (" + data.tailscaleIp + ")" : "";
+          statusEl.textContent = "Connected" + where + (data.dnsName ? " — " + data.dnsName : "") + ".";
+        } else if (data.backendState === "NotEnabled") {
+          statusEl.textContent = "Tailscale isn't running yet — enable it on System Preferences first.";
+        } else {
+          statusEl.textContent = "Not authenticated.";
+        }
+      })
+      .catch(function () { statusEl.textContent = ""; });
+  }
+  refreshStatusLine();
+
+  // Same bounded-attempts poll shape as the Nebula block's own
+  // pollStatus() — generous enough (60 * 1s) to cover
+  // modules/tailscale.nix's own TimeoutStartSec=60 on the restart this
+  // triggers.
+  function pollStatus() {
+    var attempts = 0;
+    var iv = setInterval(function () {
+      attempts++;
+      fetch("/preferences/tailscale/status", { cache: "no-store" })
+        .then(function (r) { return r.text(); })
+        .then(function (text) {
+          var status = text.trim();
+          if (status === "ok") {
+            clearInterval(iv);
+            showMessage("Saved — Tailscale restarted with the new key.", "success");
+            keyInput.value = "";
+            saveBtn.disabled = false;
+            refreshStatusLine();
+          } else if (status.indexOf("error:") === 0) {
+            clearInterval(iv);
+            showMessage(status.replace(/^error:\s*/, ""), "error");
+            saveBtn.disabled = false;
+          } else if (attempts >= 60) {
+            clearInterval(iv);
+            showMessage("Still applying — check back in a moment.", "info");
+            saveBtn.disabled = false;
+          }
+        })
+        .catch(function () {
+          if (attempts >= 60) {
+            clearInterval(iv);
+            saveBtn.disabled = false;
+          }
+        });
+    }, 1000);
+  }
+
+  saveBtn.addEventListener("click", function () {
+    var body = keyInput.value.trim();
+    if (!body) {
+      showMessage("Paste an auth key first.", "error");
+      return;
+    }
+
+    saveBtn.disabled = true;
+    showMessage("Authenticating...", "info");
+
+    fetch("/preferences/tailscale/save", {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
       body: body

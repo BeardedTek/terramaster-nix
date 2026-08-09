@@ -48,6 +48,7 @@ let
     [ "sso" "enable" ]
     [ "sso" "authelia" "enable" ]
     [ "nebula" "enable" ]
+    [ "tailscale" "enable" ]
     [ "vaultwarden" "enable" ]
   ];
 

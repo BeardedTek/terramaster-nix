@@ -248,6 +248,15 @@ title: System Preferences
       <a href="/service-configuration/" class="text-primary-700 dark:text-primary-500 hover:underline">Service Configuration</a>
       page.
     </p>
+    <div class="flex items-center justify-between py-2 mt-2">
+      <span class="text-sm font-medium text-gray-900 dark:text-white">Tailscale</span>
+      <label class="switch"><input type="checkbox" data-flag="tailscale.enable"><span class="slider"></span></label>
+    </div>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+      Authenticate (or check connection status) on the
+      <a href="/service-configuration/" class="text-primary-700 dark:text-primary-500 hover:underline">Service Configuration</a>
+      page.
+    </p>
   </div>
 </div>
 
@@ -897,6 +906,7 @@ title: System Preferences
     "sso.enable": "SSO",
     "sso.authelia.enable": "Authelia",
     "nebula.enable": "Nebula",
+    "tailscale.enable": "Tailscale",
     "vaultwarden.enable": "Vaultwarden"
   };
 

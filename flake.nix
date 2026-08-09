@@ -74,6 +74,8 @@
           ./modules/dashboard-nebula.nix
           ./modules/dashboard-svcconfig.nix
           ./modules/vaultwarden.nix
+          ./modules/tailscale.nix
+          ./modules/dashboard-tailscale.nix
           ./modules/system-rebuild.nix
           ./modules/frigate.nix
           ./modules/home-assistant.nix

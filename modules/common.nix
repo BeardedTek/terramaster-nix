@@ -157,6 +157,18 @@
         setting (see hosts/installer/wizard/stages/70-secrets.sh).
       '';
     };
+    tailscale.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Tailscale mesh VPN — see modules/tailscale.nix. Sits alongside
+        Nebula under the "Mesh VPN Networks" group; unlike Nebula,
+        authentication is entirely dashboard-driven (paste an auth key
+        generated at login.tailscale.com/admin/settings/keys on the
+        Service Configuration page — modules/dashboard-tailscale.nix),
+        no out-of-band secret delivery needed.
+      '';
+    };
     minio.enable = lib.mkOption {
       type = lib.types.bool;
       default = false;
