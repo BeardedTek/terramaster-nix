@@ -138,6 +138,17 @@
       type = lib.types.bool;
       default = true;
     };
+    plex.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Plex Media Server — see modules/plex.nix. Sits alongside
+        Jellyfin under "Media Playback"; authentication is a real
+        plex.tv account (set up through Plex's own first-run web
+        wizard), so — same posture as Jellyfin's own LDAP auth — it's
+        not in mySystem.sso.protectedServices.
+      '';
+    };
     frigate.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;

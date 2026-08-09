@@ -18,6 +18,21 @@ title: Services
       </div>
     </div>
   </a>
+  <a data-service="plex" href="#" target="_blank" rel="noopener noreferrer" class="flex flex-col aspect-square p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:border-primary-500 dark:hover:border-primary-500 text-center transition-opacity">
+    <div class="flex justify-end">
+      <span class="status-badge inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+        <span class="status-dot w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+        <span class="status-text">&hellip;</span>
+      </span>
+    </div>
+    <div class="flex-1 flex items-center justify-center gap-3">
+      <img src="/images/services/plex.svg" alt="" class="w-10 h-10 shrink-0" />
+      <div class="flex flex-col items-start text-left">
+        <span class="text-lg font-semibold text-gray-900 dark:text-white">Plex</span>
+        <span class="text-sm text-gray-500 dark:text-gray-400">Movies &amp; TV</span>
+      </div>
+    </div>
+  </a>
   <a data-service="hass" href="#" target="_blank" rel="noopener noreferrer" class="flex flex-col aspect-square p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:border-primary-500 dark:hover:border-primary-500 text-center transition-opacity">
     <div class="flex justify-end">
       <span class="status-badge inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">

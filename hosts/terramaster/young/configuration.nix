@@ -68,6 +68,7 @@
       "/etc/traefik"
       "/var/lib/samba"
       "/var/lib/jellyfin"
+      "/var/lib/plex"
       "/var/lib/sonarr"
       "/var/lib/radarr"
       "/var/lib/jackett"

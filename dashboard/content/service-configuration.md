@@ -36,6 +36,22 @@ title: Service Configuration
         </p>
       </div>
     </div>
+    <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+      <div class="flex items-center justify-between p-3">
+        <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-plex-panel">
+          <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          <span>Plex</span>
+        </button>
+      </div>
+      <div id="svccfg-plex-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          Plex has no settings exposed here &mdash; libraries, transcoding,
+          and remote access are all managed directly in its own admin
+          UI, signed in with your plex.tv account.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
+      </div>
+    </div>
   </div>
 </div>
 

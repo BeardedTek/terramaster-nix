@@ -8,6 +8,7 @@ let
 
   backends = {
     jellyfin = 8096;
+    plex = 32400;
     sonarr = 8989;
     radarr = 7878;
     jackett = 9117;
@@ -30,6 +31,7 @@ let
 
   backendEnabled = {
     jellyfin = f.jellyfin.enable;
+    plex = f.plex.enable;
     frigate = f.frigate.enable;
     hass = f.homeAssistant.enable;
     sonarr = f.mediaAcquisition.enable && f.mediaAcquisition.sonarr.enable;

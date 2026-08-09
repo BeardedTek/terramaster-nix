@@ -113,6 +113,10 @@ title: System Preferences
       <span class="text-sm text-gray-900 dark:text-white">Jellyfin</span>
       <label class="switch"><input type="checkbox" checked data-flag="jellyfin.enable"><span class="slider"></span></label>
     </div>
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm text-gray-900 dark:text-white">Plex</span>
+      <label class="switch"><input type="checkbox" data-flag="plex.enable"><span class="slider"></span></label>
+    </div>
   </div>
 </div>
 
@@ -911,6 +915,7 @@ title: System Preferences
 (function () {
   var FLAG_LABELS = {
     "jellyfin.enable": "Jellyfin",
+    "plex.enable": "Plex",
     "minio.enable": "MinIO",
     "filebrowser.enable": "FileBrowser",
     "homeAssistant.enable": "Home Assistant",

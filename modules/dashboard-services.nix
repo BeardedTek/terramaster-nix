@@ -33,6 +33,7 @@ let
   # nebula, or traefikDns01 — those aren't represented in this accordion.
   flagPaths = [
     [ "jellyfin" "enable" ]
+    [ "plex" "enable" ]
     [ "minio" "enable" ]
     [ "filebrowser" "enable" ]
     [ "homeAssistant" "enable" ]
