@@ -7,16 +7,24 @@ let
 in
 {
   config = lib.mkIf f.vaultwarden.enable {
+    # ADMIN_TOKEN, delivered out-of-repo — see
+    # secrets/extra-files/persist/etc/vaultwarden/admin.env.example.
+    # Genuinely optional per Vaultwarden's own docs (no token = no
+    # /admin panel, everything else still works) — but
+    # services.vaultwarden.environmentFile only accepts a real Nix
+    # `path`, which systemd's EnvironmentFile= then treats as
+    # *mandatory* (a missing file fails the whole unit: "Failed to
+    # load environment files", confirmed the hard way on young).
+    # Setting the raw systemd option directly instead, with the "-"
+    # prefix systemd's own EnvironmentFile= syntax uses for "load if
+    # present, ignore if not," sidesteps that type restriction — NixOS
+    # merges this with vaultwarden's own module-generated
+    # serviceConfig.EnvironmentFile list rather than replacing it, so
+    # the base env file it always writes still loads too.
+    systemd.services.vaultwarden.serviceConfig.EnvironmentFile = [ "-/etc/vaultwarden/admin.env" ];
+
     services.vaultwarden = {
       enable = true;
-      # ADMIN_TOKEN, delivered out-of-repo — see
-      # secrets/extra-files/persist/etc/vaultwarden/admin.env.example.
-      # Optional per Vaultwarden's own docs (no token = no /admin panel,
-      # everything else still works), but nixpkgs' own option type only
-      # accepts a real path here, not systemd's "-optional" EnvironmentFile
-      # syntax, so a missing file is a clean no-start for this unit —
-      # same posture as modules/minio.nix's rootCredentialsFile.
-      environmentFile = "/etc/vaultwarden/admin.env";
       config = {
         # Loopback-only + fronted by the same shared Traefik backend
         # mechanism every other service here uses (modules/traefik.nix's
