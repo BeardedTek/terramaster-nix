@@ -36,6 +36,9 @@
       # rebuild — MinIO's root credentials are a plain runtime file, no
       # overrides path needed for those).
       autheliaOverridesPath = /persist/nixos-authelia-overrides.nix;
+      # Same shape, for modules/dashboard-svcconfig.nix's Vaultwarden
+      # signupsAllowed setting.
+      vaultwardenOverridesPath = /persist/nixos-vaultwarden-overrides.nix;
     in
     {
       # Attribute name follows variables.nix's own hostName rather than
@@ -70,6 +73,7 @@
           ./modules/dashboard-smtp.nix
           ./modules/dashboard-nebula.nix
           ./modules/dashboard-svcconfig.nix
+          ./modules/vaultwarden.nix
           ./modules/system-rebuild.nix
           ./modules/frigate.nix
           ./modules/home-assistant.nix
@@ -84,7 +88,8 @@
         ] ++ (if builtins.pathExists serviceOverridesPath then [ serviceOverridesPath ] else [ ])
           ++ (if builtins.pathExists networkOverridesPath then [ networkOverridesPath ] else [ ])
           ++ (if builtins.pathExists smtpOverridesPath then [ smtpOverridesPath ] else [ ])
-          ++ (if builtins.pathExists autheliaOverridesPath then [ autheliaOverridesPath ] else [ ]);
+          ++ (if builtins.pathExists autheliaOverridesPath then [ autheliaOverridesPath ] else [ ])
+          ++ (if builtins.pathExists vaultwardenOverridesPath then [ vaultwardenOverridesPath ] else [ ]);
       };
 
       nixosConfigurations.installer = nixpkgs.lib.nixosSystem {

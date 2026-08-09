@@ -12,6 +12,10 @@ let
   # modules/authelia.nix stays hardcoded).
   overridesFile = "/persist/nixos-authelia-overrides.nix";
 
+  # Same shape, for the one Vaultwarden setting genuinely safe to
+  # expose — see modules/common.nix's vaultwarden.signupsAllowed option.
+  vaultwardenOverridesFile = "/persist/nixos-vaultwarden-overrides.nix";
+
   # The literal path modules/minio.nix's rootCredentialsFile already
   # points at — a plain runtime secrets file (systemd EnvironmentFile=),
   # not baked into the Nix store, so rewriting it only needs a service
@@ -32,6 +36,7 @@ let
 
   currentState = {
     "authelia.theme" = f.sso.authelia.theme;
+    "vaultwarden.signupsAllowed" = f.vaultwarden.signupsAllowed;
   };
   stateJson = pkgs.writeText "dashboard-svcconfig-state.json" (builtins.toJSON currentState);
 
@@ -97,7 +102,7 @@ let
       while IFS= read -r k; do
         [ -z "$k" ] && continue
         case "$k" in
-          authelia.theme|minio.rootUser|minio.rootPassword) ;;
+          authelia.theme|minio.rootUser|minio.rootPassword|vaultwarden.signupsAllowed) ;;
           *) fail "unknown field: $k" ;;
         esac
       done <<< "$keys"
@@ -111,6 +116,15 @@ let
           *) fail "invalid authelia.theme" ;;
         esac
         request_json=$(printf '%s' "$request_json" | jq --arg v "$theme_val" '.["authelia.theme"] = $v')
+      fi
+
+      if printf '%s' "$body" | jq -e 'has("vaultwarden.signupsAllowed")' >/dev/null 2>&1; then
+        signups_val=$(printf '%s' "$body" | jq -r '.["vaultwarden.signupsAllowed"]')
+        case "$signups_val" in
+          true|false) ;;
+          *) fail "invalid vaultwarden.signupsAllowed" ;;
+        esac
+        request_json=$(printf '%s' "$request_json" | jq --argjson v "$signups_val" '.["vaultwarden.signupsAllowed"] = $v')
       fi
 
       minio_user_present=false
@@ -155,14 +169,16 @@ let
     '';
   };
 
-  # Privileged oneshot, triggered by the path unit below. Two
-  # independent concerns in one script/one trigger, so a single Save
-  # click can change both at once: MinIO's credentials are rewritten
+  # Privileged oneshot, triggered by the path unit below. Independent
+  # concerns in one script/one trigger, so a single Save click can
+  # change any combination at once: MinIO's credentials are rewritten
   # and the service restarted *synchronously* here (no rebuild
   # involved — modules/minio.nix's rootCredentialsFile is a plain
-  # runtime file); Authelia's theme, if present, is handed off to
-  # modules/system-rebuild.nix's shared runner and NOT waited on here,
-  # matching dashboard-services-apply's own fire-and-forget shape.
+  # runtime file); Authelia's theme and Vaultwarden's signupsAllowed,
+  # if present, each write their own overrides file and share exactly
+  # one handoff to modules/system-rebuild.nix's shared runner, NOT
+  # waited on here, matching dashboard-services-apply's own
+  # fire-and-forget shape.
   applyScript = pkgs.writeShellApplication {
     name = "dashboard-svcconfig-apply";
     runtimeInputs = [ pkgs.jq pkgs.coreutils pkgs.systemd pkgs.gnugrep ];
@@ -256,14 +272,30 @@ let
         mv ${overridesFile}.tmp ${overridesFile}
       fi
 
+      vaultwarden_present=$(jq -r 'has("vaultwarden.signupsAllowed") | tostring' ${pendingFile})
+      if [ "$vaultwarden_present" = "true" ]; then
+        signups_val=$(jq -r '.["vaultwarden.signupsAllowed"]' ${pendingFile})
+        {
+          echo "{ lib, ... }:"
+          echo "{"
+          echo "  config.mySystem.features.vaultwarden.signupsAllowed = lib.mkForce $signups_val;"
+          echo "}"
+        } > ${vaultwardenOverridesFile}.tmp
+        mv ${vaultwardenOverridesFile}.tmp ${vaultwardenOverridesFile}
+      fi
+
       rm -f ${pendingFile}
 
-      if [ "$theme_present" = "true" ]; then
+      # theme_present/vaultwarden_present are the two rebuild-driven
+      # concerns — either one (or both, in the same save) triggers
+      # exactly one shared-runner handoff. MinIO's own outcome is
+      # already final by this point (synchronous, above); if it failed,
+      # surface that directly instead of also kicking off an unrelated
+      # rebuild — the overrides file(s) are still written either way, so
+      # a pending rebuild-driven change takes effect on whatever rebuild
+      # happens next instead of being lost.
+      if [ "$theme_present" = "true" ] || [ "$vaultwarden_present" = "true" ]; then
         if [ -n "$minio_result" ] && [ "$minio_result" != "ok" ]; then
-          # Something already went wrong — report that directly rather
-          # than also kicking off an unrelated rebuild. The overrides
-          # file is still written, so the theme change takes effect on
-          # whatever rebuild happens next instead of being lost.
           write_local_result "$minio_result"
         else
           printf '%s' '{"mode":"current","label":"Service configuration updated","kind":"svcconfig"}' > ${sharedRequestFile}.tmp
@@ -328,10 +360,11 @@ in
     default = true;
     description = ''
       Dashboard-driven Service Configuration save pipeline — see
-      modules/dashboard-svcconfig.nix and the Authelia/MinIO blocks on
-      the Service Configuration page. One batch save endpoint covering
-      two different underlying mechanisms: Authelia's theme goes
-      through a /persist-backed overrides file and
+      modules/dashboard-svcconfig.nix and the Authelia/MinIO/Vaultwarden
+      blocks on the Service Configuration page. One batch save endpoint
+      covering two different underlying mechanisms: Authelia's theme
+      and Vaultwarden's signupsAllowed each go through their own
+      /persist-backed overrides file and
       modules/system-rebuild.nix's shared rebuild runner (kind:
       "svcconfig"); MinIO's root credentials are rewritten directly
       into modules/minio.nix's rootCredentialsFile and the service

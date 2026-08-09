@@ -18,6 +18,7 @@ let
     minio = 9000;
     "minio-console" = 9001;
     files = 8095;
+    vaultwarden = 8222;
     # "auth", not "authelia": modules/authelia.nix's own
     # session.cookies[0].authelia_url points at auth.${hostName}.${domain}
     # (confirmed the hard way — a mismatched name here means Authelia
@@ -38,6 +39,7 @@ let
     minio = f.minio.enable;
     "minio-console" = f.minio.enable;
     files = f.filebrowser.enable;
+    vaultwarden = f.vaultwarden.enable;
     auth = f.sso.authelia.enable;
   };
 

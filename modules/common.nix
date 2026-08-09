@@ -171,6 +171,33 @@
         Traefik backend.
       '';
     };
+    vaultwarden = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Vaultwarden (self-hosted Bitwarden-compatible password
+          manager) — see modules/vaultwarden.nix. No OIDC/SSO support in
+          the open-source build, so unlike most other services here
+          it's deliberately never added to
+          mySystem.sso.protectedServices — its own master-password +
+          TOTP/WebAuthn login is the trust boundary, reached directly
+          through Traefik.
+        '';
+      };
+      signupsAllowed = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Whether new accounts can self-register. The one Vaultwarden
+          setting genuinely safe to expose for editing — see the
+          "Password Manager" block on the Service Configuration page
+          (modules/dashboard-svcconfig.nix). Defaults to false
+          (invite-only via the ADMIN_TOKEN-gated /admin panel) since
+          this box may be reachable outside the LAN.
+        '';
+      };
+    };
     selfUpdate.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;

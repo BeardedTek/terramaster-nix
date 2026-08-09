@@ -218,6 +218,21 @@ title: System Preferences
 
 <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
   <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-password-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Password Manager</span>
+    </button>
+  </div>
+  <div id="services-group-password-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm font-medium text-gray-900 dark:text-white">Vaultwarden</span>
+      <label class="switch"><input type="checkbox" data-flag="vaultwarden.enable"><span class="slider"></span></label>
+    </div>
+  </div>
+</div>
+
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
     <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-meshvpn-panel">
       <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
       <span>Mesh VPN Networks</span>
@@ -881,7 +896,8 @@ title: System Preferences
     "mediaAcquisition.qbittorrent.enable": "qBittorrent",
     "sso.enable": "SSO",
     "sso.authelia.enable": "Authelia",
-    "nebula.enable": "Nebula"
+    "nebula.enable": "Nebula",
+    "vaultwarden.enable": "Vaultwarden"
   };
 
   var saveBtn = document.getElementById("services-save-btn");

@@ -259,6 +259,37 @@ title: Service Configuration
   </div>
 </div>
 
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="svccfg-category-password-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Password Manager</span>
+    </button>
+  </div>
+  <div id="svccfg-category-password-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+      <div class="flex items-center justify-between p-3">
+        <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-vaultwarden-panel">
+          <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          <span>Vaultwarden</span>
+        </button>
+      </div>
+      <div id="svccfg-vaultwarden-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          User accounts, vault items, and everything else are managed
+          through Vaultwarden's own ADMIN_TOKEN-gated <code>/admin</code>
+          panel, not here.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
+        <div class="flex items-center justify-between py-2">
+          <span class="text-sm text-gray-700 dark:text-gray-300">Allow new signups</span>
+          <label class="switch"><input type="checkbox" id="svccfg-vaultwarden-signups" data-svcfield="vaultwarden.signupsAllowed"><span class="slider"></span></label>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="svccfg-message" class="mb-4 text-sm hidden"></div>
 <button id="svccfg-save-btn" type="button" class="hidden mb-8 text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Save Changes</button>
 
@@ -315,7 +346,7 @@ title: Service Configuration
     <div id="svcconfig-modal-confirm-view">
       <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Apply these changes?</h3>
       <ul id="svcconfig-modal-summary" class="text-sm text-gray-700 dark:text-gray-300 mb-6 list-disc pl-5"></ul>
-      <p class="text-sm text-gray-700 dark:text-gray-300 mb-6">MinIO changes take effect in a couple of seconds. Authelia changes rebuild the system in place, which can take several minutes.</p>
+      <p class="text-sm text-gray-700 dark:text-gray-300 mb-6">MinIO changes take effect in a couple of seconds. Authelia and Vaultwarden changes rebuild the system in place, which can take several minutes.</p>
       <div class="flex justify-end gap-2">
         <button id="svcconfig-modal-cancel-btn" type="button" class="text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600">Cancel</button>
         <button id="svcconfig-modal-confirm-btn" type="button" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Apply</button>
@@ -357,13 +388,18 @@ title: Service Configuration
 <script>
 (function () {
   var SVCFIELDS = {
-    "authelia.theme": { label: "Authelia theme", describe: function (v) { return "Change Authelia theme to " + v + "."; } },
-    "minio.rootUser": { label: "MinIO root username", describe: function (v) { return "Change MinIO root username to " + v + "."; } },
+    "authelia.theme": { type: "text", label: "Authelia theme", describe: function (v) { return "Change Authelia theme to " + v + "."; } },
+    "minio.rootUser": { type: "text", label: "MinIO root username", describe: function (v) { return "Change MinIO root username to " + v + "."; } },
     // Deliberately never echoes the typed password back into the
     // confirm summary, even within the same page load — same
     // never-round-trips posture as every other secret this dashboard
     // handles.
-    "minio.rootPassword": { label: "MinIO root password", describe: function () { return "Update MinIO root password."; } }
+    "minio.rootPassword": { type: "text", label: "MinIO root password", describe: function () { return "Update MinIO root password."; } },
+    "vaultwarden.signupsAllowed": {
+      type: "checkbox",
+      label: "Vaultwarden signups",
+      describe: function (v) { return (v ? "Enable" : "Disable") + " new signups on Vaultwarden."; }
+    }
   };
 
   var messageEl = document.getElementById("svccfg-message");
@@ -371,6 +407,7 @@ title: Service Configuration
   var themeInput = document.getElementById("svccfg-authelia-theme");
   var minioUserInput = document.getElementById("svccfg-minio-user");
   var minioPasswordInput = document.getElementById("svccfg-minio-password");
+  var vaultwardenSignupsInput = document.getElementById("svccfg-vaultwarden-signups");
 
   var modal = document.getElementById("svcconfig-modal");
   var modalCloseX = document.getElementById("svcconfig-modal-close-x");
@@ -401,14 +438,25 @@ title: Service Configuration
   }
   function hideMessage() { messageEl.classList.add("hidden"); }
 
-  var baseline = { "authelia.theme": "auto", "minio.rootUser": "" };
+  var baseline = { "authelia.theme": "auto", "minio.rootUser": "", "vaultwarden.signupsAllowed": false };
   var minioPasswordSet = false;
 
+  // One place to add a new field's input element — currentValue() reads
+  // it according to SVCFIELDS[key].type rather than a growing chain of
+  // per-key special cases, so a future checkbox/select/text field needs
+  // no changes here at all, just a registry entry + this one line.
+  var fieldInputs = {
+    "authelia.theme": themeInput,
+    "minio.rootUser": minioUserInput,
+    "minio.rootPassword": minioPasswordInput,
+    "vaultwarden.signupsAllowed": vaultwardenSignupsInput
+  };
+
   function currentValue(key) {
-    if (key === "authelia.theme") { return themeInput.value; }
-    if (key === "minio.rootUser") { return minioUserInput.value.trim(); }
-    if (key === "minio.rootPassword") { return minioPasswordInput.value; }
-    return "";
+    var el = fieldInputs[key];
+    if (!el) { return ""; }
+    if (SVCFIELDS[key].type === "checkbox") { return el.checked; }
+    return key === "minio.rootUser" ? el.value.trim() : el.value;
   }
 
   // Only ever includes fields that actually changed — saveCgi accepts
@@ -433,7 +481,7 @@ title: Service Configuration
     saveBtn.classList.toggle("hidden", buildChanges().length === 0);
   }
 
-  [themeInput, minioUserInput, minioPasswordInput].forEach(function (el) {
+  [themeInput, minioUserInput, minioPasswordInput, vaultwardenSignupsInput].forEach(function (el) {
     el.addEventListener("input", refreshSaveVisibility);
     el.addEventListener("change", refreshSaveVisibility);
   });
@@ -443,7 +491,8 @@ title: Service Configuration
     .then(function (data) {
       baseline = {
         "authelia.theme": data["authelia.theme"] || "auto",
-        "minio.rootUser": data["minio.rootUser"] || ""
+        "minio.rootUser": data["minio.rootUser"] || "",
+        "vaultwarden.signupsAllowed": !!data["vaultwarden.signupsAllowed"]
       };
       minioPasswordSet = !!data["minio.rootPasswordSet"];
       themeInput.value = baseline["authelia.theme"];
@@ -451,6 +500,7 @@ title: Service Configuration
       minioPasswordInput.placeholder = minioPasswordSet
         ? "Leave blank to keep the current password"
         : "Required — no password set yet";
+      vaultwardenSignupsInput.checked = baseline["vaultwarden.signupsAllowed"];
       refreshSaveVisibility();
     })
     .catch(function () { refreshSaveVisibility(); });

@@ -109,6 +109,8 @@
       "/etc/jellyfin"
       "/etc/dashboard-login"
       "/etc/unix-ldap-login"
+      "/etc/vaultwarden"
+      "/var/lib/vaultwarden"
     ];
     files = [
       "/etc/machine-id"
