@@ -20,11 +20,36 @@ in
       # still works but adds latency. No manual firewall stanza needed;
       # nixpkgs' own module handles this entirely from this one flag.
       openFirewall = true;
-      # Grants the dashboard-tailscale system user permission to run
-      # `tailscale status`/etc directly against the local control
-      # socket without root — tailscaled's own built-in mechanism for
-      # exactly this, used instead of fighting socket permissions.
-      extraSetFlags = [ "--operator=dashboard-tailscale" ];
+      # Applied via nixpkgs' own tailscaled-set.service (a oneshot that
+      # runs `tailscale set <these flags>` on every boot/rebuild where
+      # they change) — explicit =true/=false on every boolean rather
+      # than omitting when false, so toggling a Service Configuration
+      # checkbox off actually clears it on the next rebuild instead of
+      # just "not asking" to turn it off. --operator grants the
+      # dashboard-tailscale system user permission to run `tailscale
+      # status`/etc directly against the local control socket without
+      # root — tailscaled's own built-in mechanism for exactly this,
+      # used instead of fighting socket permissions.
+      extraSetFlags = [
+        "--accept-dns=${lib.boolToString f.tailscale.acceptDns}"
+        "--accept-routes=${lib.boolToString f.tailscale.acceptRoutes}"
+        "--advertise-exit-node=${lib.boolToString f.tailscale.advertiseExitNode}"
+        "--advertise-routes=${f.tailscale.advertiseRoutes}"
+        "--operator=dashboard-tailscale"
+      ];
+      # "client" (loose reverse-path filtering) covers acceptRoutes;
+      # "server" (IP forwarding) covers advertising either an exit node
+      # or subnet routes — combined into "both" when this box does
+      # both. See nixpkgs' own option description for exactly what
+      # each setting enables.
+      useRoutingFeatures =
+        let
+          advertising = f.tailscale.advertiseExitNode || f.tailscale.advertiseRoutes != "";
+        in
+        if advertising && f.tailscale.acceptRoutes then "both"
+        else if advertising then "server"
+        else if f.tailscale.acceptRoutes then "client"
+        else "none";
     };
 
     # tailscaled-autoconnect.service is Type=notify and blocks

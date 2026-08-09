@@ -4,6 +4,10 @@ let
   lanIf = config.mySystem.lanInterface;
   hostName = config.networking.hostName;
   backends = config.mySystem.serviceBackends; # set by modules/traefik.nix
+  f = config.mySystem.features;
+  # nixpkgs' own default, but read from config rather than hardcoded so
+  # this stays correct if modules/tailscale.nix ever overrides it.
+  tsIf = config.services.tailscale.interfaceName;
 
   # See modules/dashboard-login.nix for the full rationale — a dashboard-
   # local LDAP-bind login rather than routing through Authelia, since
@@ -24,6 +28,19 @@ let
   # (shared by the footer and the Help page's {{< contact >}} shortcode).
   contactDataFile = pkgs.writeText "contact.json" (builtins.toJSON config.mySystem.contactInfo);
 
+  # Same auto-loaded-by-Hugo shape as contact.json, read by
+  # dashboard/layouts/index.html's Network section — which mesh VPN
+  # cards to render is a build-time decision (whether the interface
+  # exists at all), unlike each card's live up/down state, which stays
+  # a runtime metrics.json concern (see net_json below). Regenerated on
+  # every rebuild, so toggling Nebula/Tailscale off on the Services page
+  # removes/adds the corresponding card the next time this rebuilds.
+  networkInterfacesDataFile = pkgs.writeText "networkinterfaces.json" (builtins.toJSON (
+    (lib.optional f.nebula.enable { iface = "nebula"; label = "Nebula"; })
+    ++ (lib.optional f.tailscale.enable { iface = "tailscale"; label = "Tailscale"; })
+    ++ [ { iface = "lan"; label = "Local Ethernet"; } ]
+  ));
+
   # Built once at nixos-rebuild time from ../dashboard — the Hugo source
   # for this. No npm/webpack/Tailwind build here on purpose: the theme's
   # CSS/JS bundles are vendored pre-built into dashboard/static (see
@@ -38,6 +55,7 @@ let
     installPhase = ''
       mkdir -p data
       cp ${contactDataFile} data/contact.json
+      cp ${networkInterfacesDataFile} data/networkinterfaces.json
       hugo --minify -d $out
     '';
   };
@@ -50,7 +68,7 @@ let
   # root, and one less thing in environment.persistence to get wrong.
   metricsScript = pkgs.writeShellApplication {
     name = "dashboard-metrics";
-    runtimeInputs = [ pkgs.jq pkgs.coreutils pkgs.iproute2 pkgs.gawk pkgs.iputils pkgs.netcat ];
+    runtimeInputs = [ pkgs.jq pkgs.coreutils pkgs.iproute2 pkgs.gawk pkgs.iputils pkgs.netcat pkgs.tailscale ];
     text = ''
       out=/var/lib/dashboard/metrics.json
       tmp=$(mktemp)
@@ -84,21 +102,39 @@ let
         --argjson pct "$mem_pct" \
         '{used:$used, total:$total, pct:$pct}')
 
-      # $3, if given, is a host to ping to determine "up" instead of trusting
-      # operstate. Needed for nebula1 specifically: TUN/overlay interfaces
-      # like Nebula's have no physical carrier to detect, so the kernel
-      # reports operstate "unknown" even when the tunnel is working fine —
-      # confirmed the hard way, the dashboard showed Nebula as permanently
-      # "down" despite it working. Physical ethernet (lan) doesn't have this
-      # problem, so it keeps using the cheaper operstate check.
+      # $3, if given, is either a host to ping or the literal string
+      # "backendstate" to determine "up" instead of trusting operstate.
+      # Needed for nebula1/tailscale0 specifically: TUN/overlay
+      # interfaces have no physical carrier to detect, so the kernel
+      # reports operstate "unknown" even when the tunnel is working fine
+      # — confirmed the hard way, the dashboard showed Nebula as
+      # permanently "down" despite it working. Physical ethernet (lan)
+      # doesn't have this problem, so it keeps using the cheaper
+      # operstate check. Nebula pings its lighthouse (a fixed, known-at-
+      # build-time IP); Tailscale has no equivalent fixed peer to ping,
+      # so it instead asks tailscaled's own `status --json` for
+      # BackendState — "Running" is the same definition of "connected"
+      # modules/dashboard-tailscale.nix's currentCgi already uses.
       # Tradeoff: this makes Nebula's status depend on one specific peer
       # (the lighthouse) being reachable, not just the tunnel itself.
       net_json() {
-        local iface="$1" label="$2" ping_target="''${3:-}" up="false" ip=""
+        local iface="$1" label="$2" mode="''${3:-}" up="false" ip=""
         if [ -e "/sys/class/net/$iface" ]; then
           ip=$(ip -4 -o addr show dev "$iface" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1)
-          if [ -n "$ping_target" ]; then
-            ping -c1 -W1 "$ping_target" >/dev/null 2>&1 && up="true"
+          if [ "$mode" = "backendstate" ]; then
+            # writeShellApplication's errexit+pipefail would otherwise
+            # abort this whole script (30s-timer-driven, so a crash
+            # here would silently stop updating every other card too)
+            # the moment tailscaled isn't reachable — same guard shape
+            # as modules/dashboard-tailscale.nix's currentCgi.
+            raw=$(tailscale status --json 2>/dev/null) || raw=""
+            state=""
+            if [ -n "$raw" ]; then
+              state=$(printf '%s' "$raw" | jq -r '.BackendState // empty' 2>/dev/null || true)
+            fi
+            [ "$state" = "Running" ] && up="true"
+          elif [ -n "$mode" ]; then
+            ping -c1 -W1 "$mode" >/dev/null 2>&1 && up="true"
           else
             state=$(cat "/sys/class/net/$iface/operstate" 2>/dev/null || echo down)
             [ "$state" = "up" ] && up="true"
@@ -108,8 +144,11 @@ let
           '{iface:$iface, up:$up, ip:$ip}'
       }
       network=$(jq -s '.' \
-        <(net_json nebula1 nebula 10.100.0.1) \
-        <(net_json "${lanIf}" lan))
+        ${lib.concatStringsSep " \\\n        " (
+          (lib.optional f.nebula.enable "<(net_json nebula1 nebula 10.100.0.1)")
+          ++ (lib.optional f.tailscale.enable "<(net_json ${tsIf} tailscale backendstate)")
+          ++ [ "<(net_json \"${lanIf}\" lan)" ]
+        )})
 
       # Plain TCP connect check against each backend's local port (from
       # mySystem.serviceBackends, set once in modules/traefik.nix — not

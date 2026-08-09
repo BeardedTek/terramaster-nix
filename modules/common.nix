@@ -169,6 +169,47 @@
         no out-of-band secret delivery needed.
       '';
     };
+    tailscale.acceptDns = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Accept DNS settings (MagicDNS) pushed by the tailnet — see
+        modules/tailscale.nix's extraSetFlags. Dashboard-editable on
+        the Service Configuration page (modules/dashboard-svcconfig.nix),
+        rebuild-driven like Vaultwarden's signupsAllowed.
+      '';
+    };
+    tailscale.acceptRoutes = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Accept subnet routes and exit nodes advertised by other
+        tailnet devices — see modules/tailscale.nix's extraSetFlags
+        and useRoutingFeatures. Dashboard-editable, rebuild-driven.
+      '';
+    };
+    tailscale.advertiseExitNode = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Advertise this box itself as an exit node other tailnet
+        devices can route all their traffic through — see
+        modules/tailscale.nix's extraSetFlags and useRoutingFeatures
+        (needs IP forwarding enabled, handled there). Dashboard-
+        editable, rebuild-driven.
+      '';
+    };
+    tailscale.advertiseRoutes = lib.mkOption {
+      type = lib.types.str;
+      default = "";
+      description = ''
+        Comma-separated CIDR list of subnet routes this box advertises
+        to the tailnet (e.g. "192.168.3.0/24") — see
+        modules/tailscale.nix's extraSetFlags and useRoutingFeatures.
+        Empty clears any previously advertised routes. Dashboard-
+        editable, rebuild-driven.
+      '';
+    };
     minio.enable = lib.mkOption {
       type = lib.types.bool;
       default = false;

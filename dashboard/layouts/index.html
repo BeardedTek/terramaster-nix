@@ -34,7 +34,7 @@
 
     <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Network</h2>
     <div id="network-cards" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-        {{ range (slice (dict "iface" "nebula" "label" "Nebula") (dict "iface" "lan" "label" "Local Ethernet")) }}
+        {{ range .Site.Data.networkinterfaces }}
         <div class="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm" data-iface="{{ .iface }}">
             <div class="flex justify-between items-baseline mb-1">
                 <span class="font-medium text-gray-900 dark:text-white">{{ .label }}</span>

@@ -363,6 +363,29 @@ title: Service Configuration
         </p>
         <button id="svccfg-tailscale-login-btn" type="button" class="text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium rounded-lg text-sm px-4 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600">Get Login Link</button>
         <div id="svccfg-tailscale-login-message" class="mt-2 text-sm hidden"></div>
+        <div class="border-t border-gray-200 dark:border-gray-700 mt-4 pt-4">
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            These apply on the next system rebuild via the shared Save
+            Changes button below, not immediately like authentication
+            above.
+          </p>
+          <div class="flex items-center justify-between py-2">
+            <span class="text-sm text-gray-700 dark:text-gray-300">Accept DNS settings from the tailnet (MagicDNS)</span>
+            <label class="switch"><input type="checkbox" id="svccfg-tailscale-accept-dns" data-svcfield="tailscale.acceptDns"><span class="slider"></span></label>
+          </div>
+          <div class="flex items-center justify-between py-2">
+            <span class="text-sm text-gray-700 dark:text-gray-300">Accept routes/exit nodes advertised by other tailnet devices</span>
+            <label class="switch"><input type="checkbox" id="svccfg-tailscale-accept-routes" data-svcfield="tailscale.acceptRoutes"><span class="slider"></span></label>
+          </div>
+          <div class="flex items-center justify-between py-2">
+            <span class="text-sm text-gray-700 dark:text-gray-300">Advertise this device as an exit node</span>
+            <label class="switch"><input type="checkbox" id="svccfg-tailscale-advertise-exit-node" data-svcfield="tailscale.advertiseExitNode"><span class="slider"></span></label>
+          </div>
+          <div class="py-2">
+            <span class="block mb-2 text-sm text-gray-700 dark:text-gray-300">Advertise subnet routes (comma-separated CIDRs)</span>
+            <input type="text" id="svccfg-tailscale-advertise-routes" data-svcfield="tailscale.advertiseRoutes" placeholder="192.168.3.0/24" class="font-mono text-xs bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -378,7 +401,7 @@ title: Service Configuration
     <div id="svcconfig-modal-confirm-view">
       <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Apply these changes?</h3>
       <ul id="svcconfig-modal-summary" class="text-sm text-gray-700 dark:text-gray-300 mb-6 list-disc pl-5"></ul>
-      <p class="text-sm text-gray-700 dark:text-gray-300 mb-6">MinIO changes take effect in a couple of seconds. Authelia and Vaultwarden changes rebuild the system in place, which can take several minutes.</p>
+      <p class="text-sm text-gray-700 dark:text-gray-300 mb-6">MinIO changes take effect in a couple of seconds. Authelia, Vaultwarden, and Tailscale routing/DNS changes rebuild the system in place, which can take several minutes.</p>
       <div class="flex justify-end gap-2">
         <button id="svcconfig-modal-cancel-btn" type="button" class="text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600">Cancel</button>
         <button id="svcconfig-modal-confirm-btn" type="button" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Apply</button>
@@ -431,6 +454,26 @@ title: Service Configuration
       type: "checkbox",
       label: "Vaultwarden signups",
       describe: function (v) { return (v ? "Enable" : "Disable") + " new signups on Vaultwarden."; }
+    },
+    "tailscale.acceptDns": {
+      type: "checkbox",
+      label: "Tailscale accept DNS",
+      describe: function (v) { return (v ? "Enable" : "Disable") + " accepting DNS settings (MagicDNS) from the tailnet."; }
+    },
+    "tailscale.acceptRoutes": {
+      type: "checkbox",
+      label: "Tailscale accept routes",
+      describe: function (v) { return (v ? "Enable" : "Disable") + " accepting routes/exit nodes advertised by other tailnet devices."; }
+    },
+    "tailscale.advertiseExitNode": {
+      type: "checkbox",
+      label: "Tailscale exit node",
+      describe: function (v) { return (v ? "Advertise" : "Stop advertising") + " this device as a Tailscale exit node."; }
+    },
+    "tailscale.advertiseRoutes": {
+      type: "text",
+      label: "Tailscale advertised routes",
+      describe: function (v) { return v ? "Advertise Tailscale subnet routes: " + v + "." : "Stop advertising Tailscale subnet routes."; }
     }
   };
 
@@ -440,6 +483,10 @@ title: Service Configuration
   var minioUserInput = document.getElementById("svccfg-minio-user");
   var minioPasswordInput = document.getElementById("svccfg-minio-password");
   var vaultwardenSignupsInput = document.getElementById("svccfg-vaultwarden-signups");
+  var tailscaleAcceptDnsInput = document.getElementById("svccfg-tailscale-accept-dns");
+  var tailscaleAcceptRoutesInput = document.getElementById("svccfg-tailscale-accept-routes");
+  var tailscaleAdvertiseExitNodeInput = document.getElementById("svccfg-tailscale-advertise-exit-node");
+  var tailscaleAdvertiseRoutesInput = document.getElementById("svccfg-tailscale-advertise-routes");
 
   var modal = document.getElementById("svcconfig-modal");
   var modalCloseX = document.getElementById("svcconfig-modal-close-x");
@@ -470,7 +517,15 @@ title: Service Configuration
   }
   function hideMessage() { messageEl.classList.add("hidden"); }
 
-  var baseline = { "authelia.theme": "auto", "minio.rootUser": "", "vaultwarden.signupsAllowed": false };
+  var baseline = {
+    "authelia.theme": "auto",
+    "minio.rootUser": "",
+    "vaultwarden.signupsAllowed": false,
+    "tailscale.acceptDns": false,
+    "tailscale.acceptRoutes": false,
+    "tailscale.advertiseExitNode": false,
+    "tailscale.advertiseRoutes": ""
+  };
   var minioPasswordSet = false;
 
   // One place to add a new field's input element — currentValue() reads
@@ -481,14 +536,18 @@ title: Service Configuration
     "authelia.theme": themeInput,
     "minio.rootUser": minioUserInput,
     "minio.rootPassword": minioPasswordInput,
-    "vaultwarden.signupsAllowed": vaultwardenSignupsInput
+    "vaultwarden.signupsAllowed": vaultwardenSignupsInput,
+    "tailscale.acceptDns": tailscaleAcceptDnsInput,
+    "tailscale.acceptRoutes": tailscaleAcceptRoutesInput,
+    "tailscale.advertiseExitNode": tailscaleAdvertiseExitNodeInput,
+    "tailscale.advertiseRoutes": tailscaleAdvertiseRoutesInput
   };
 
   function currentValue(key) {
     var el = fieldInputs[key];
     if (!el) { return ""; }
     if (SVCFIELDS[key].type === "checkbox") { return el.checked; }
-    return key === "minio.rootUser" ? el.value.trim() : el.value;
+    return (key === "minio.rootUser" || key === "tailscale.advertiseRoutes") ? el.value.trim() : el.value;
   }
 
   // Only ever includes fields that actually changed — saveCgi accepts
@@ -513,7 +572,10 @@ title: Service Configuration
     saveBtn.classList.toggle("hidden", buildChanges().length === 0);
   }
 
-  [themeInput, minioUserInput, minioPasswordInput, vaultwardenSignupsInput].forEach(function (el) {
+  [
+    themeInput, minioUserInput, minioPasswordInput, vaultwardenSignupsInput,
+    tailscaleAcceptDnsInput, tailscaleAcceptRoutesInput, tailscaleAdvertiseExitNodeInput, tailscaleAdvertiseRoutesInput
+  ].forEach(function (el) {
     el.addEventListener("input", refreshSaveVisibility);
     el.addEventListener("change", refreshSaveVisibility);
   });
@@ -524,7 +586,11 @@ title: Service Configuration
       baseline = {
         "authelia.theme": data["authelia.theme"] || "auto",
         "minio.rootUser": data["minio.rootUser"] || "",
-        "vaultwarden.signupsAllowed": !!data["vaultwarden.signupsAllowed"]
+        "vaultwarden.signupsAllowed": !!data["vaultwarden.signupsAllowed"],
+        "tailscale.acceptDns": !!data["tailscale.acceptDns"],
+        "tailscale.acceptRoutes": !!data["tailscale.acceptRoutes"],
+        "tailscale.advertiseExitNode": !!data["tailscale.advertiseExitNode"],
+        "tailscale.advertiseRoutes": data["tailscale.advertiseRoutes"] || ""
       };
       minioPasswordSet = !!data["minio.rootPasswordSet"];
       themeInput.value = baseline["authelia.theme"];
@@ -533,6 +599,10 @@ title: Service Configuration
         ? "Leave blank to keep the current password"
         : "Required — no password set yet";
       vaultwardenSignupsInput.checked = baseline["vaultwarden.signupsAllowed"];
+      tailscaleAcceptDnsInput.checked = baseline["tailscale.acceptDns"];
+      tailscaleAcceptRoutesInput.checked = baseline["tailscale.acceptRoutes"];
+      tailscaleAdvertiseExitNodeInput.checked = baseline["tailscale.advertiseExitNode"];
+      tailscaleAdvertiseRoutesInput.value = baseline["tailscale.advertiseRoutes"];
       refreshSaveVisibility();
     })
     .catch(function () { refreshSaveVisibility(); });

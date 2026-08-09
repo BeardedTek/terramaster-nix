@@ -16,6 +16,10 @@ let
   # expose — see modules/common.nix's vaultwarden.signupsAllowed option.
   vaultwardenOverridesFile = "/persist/nixos-vaultwarden-overrides.nix";
 
+  # Same shape, for Tailscale's four `tailscale set` toggles — see
+  # modules/common.nix's tailscale.accept*/advertise* options.
+  tailscaleOverridesFile = "/persist/nixos-tailscale-overrides.nix";
+
   # The literal path modules/minio.nix's rootCredentialsFile already
   # points at — a plain runtime secrets file (systemd EnvironmentFile=),
   # not baked into the Nix store, so rewriting it only needs a service
@@ -37,6 +41,10 @@ let
   currentState = {
     "authelia.theme" = f.sso.authelia.theme;
     "vaultwarden.signupsAllowed" = f.vaultwarden.signupsAllowed;
+    "tailscale.acceptDns" = f.tailscale.acceptDns;
+    "tailscale.acceptRoutes" = f.tailscale.acceptRoutes;
+    "tailscale.advertiseExitNode" = f.tailscale.advertiseExitNode;
+    "tailscale.advertiseRoutes" = f.tailscale.advertiseRoutes;
   };
   stateJson = pkgs.writeText "dashboard-svcconfig-state.json" (builtins.toJSON currentState);
 
@@ -103,6 +111,7 @@ let
         [ -z "$k" ] && continue
         case "$k" in
           authelia.theme|minio.rootUser|minio.rootPassword|vaultwarden.signupsAllowed) ;;
+          tailscale.acceptDns|tailscale.acceptRoutes|tailscale.advertiseExitNode|tailscale.advertiseRoutes) ;;
           *) fail "unknown field: $k" ;;
         esac
       done <<< "$keys"
@@ -125,6 +134,34 @@ let
           *) fail "invalid vaultwarden.signupsAllowed" ;;
         esac
         request_json=$(printf '%s' "$request_json" | jq --argjson v "$signups_val" '.["vaultwarden.signupsAllowed"] = $v')
+      fi
+
+      for field in acceptDns acceptRoutes advertiseExitNode; do
+        k="tailscale.$field"
+        if printf '%s' "$body" | jq -e --arg k "$k" 'has($k)' >/dev/null 2>&1; then
+          v=$(printf '%s' "$body" | jq -r --arg k "$k" '.[$k]')
+          case "$v" in
+            true|false) ;;
+            *) fail "invalid $k" ;;
+          esac
+          request_json=$(printf '%s' "$request_json" | jq --arg k "$k" --argjson v "$v" '.[$k] = $v')
+        fi
+      done
+
+      if printf '%s' "$body" | jq -e 'has("tailscale.advertiseRoutes")' >/dev/null 2>&1; then
+        routes_val=$(printf '%s' "$body" | jq -r '.["tailscale.advertiseRoutes"]')
+        # Charset-restricted (comma-separated CIDRs only) rather than
+        # just newline-rejected like minio's fields above — this value
+        # gets interpolated straight into a generated Nix source file
+        # in applyScript below, so anything outside this charset (a
+        # quote, semicolon, brace, backslash, dollar sign...) would be
+        # a Nix syntax/injection risk, not just a cosmetic issue.
+        case "$routes_val" in
+          "") ;;
+          *[!0-9a-fA-F:.,/]*) fail "invalid tailscale.advertiseRoutes — use a comma-separated CIDR list" ;;
+          ,*|*,|*,,*) fail "invalid tailscale.advertiseRoutes — use a comma-separated CIDR list" ;;
+        esac
+        request_json=$(printf '%s' "$request_json" | jq --arg v "$routes_val" '.["tailscale.advertiseRoutes"] = $v')
       fi
 
       minio_user_present=false
@@ -284,17 +321,52 @@ let
         mv ${vaultwardenOverridesFile}.tmp ${vaultwardenOverridesFile}
       fi
 
+      # Reads a tailscale.* field from this save's payload if present,
+      # else falls back to the last-known value from
+      # /etc/dashboard-svcconfig-state.json — needed because all four
+      # fields share one overrides file, regenerated from scratch on
+      # every save. Without this, saving just one changed checkbox
+      # would silently reset the other three to their common.nix
+      # defaults instead of leaving them as they were.
+      tailscale_get_field() {
+        local k="$1"
+        if jq -e --arg k "$k" 'has($k)' ${pendingFile} >/dev/null 2>&1; then
+          jq -r --arg k "$k" '.[$k]' ${pendingFile}
+        else
+          jq -r --arg k "$k" '.[$k]' /etc/dashboard-svcconfig-state.json
+        fi
+      }
+
+      tailscale_present=$(jq -r '(has("tailscale.acceptDns") or has("tailscale.acceptRoutes") or has("tailscale.advertiseExitNode") or has("tailscale.advertiseRoutes")) | tostring' ${pendingFile})
+      if [ "$tailscale_present" = "true" ]; then
+        ts_accept_dns=$(tailscale_get_field "tailscale.acceptDns")
+        ts_accept_routes=$(tailscale_get_field "tailscale.acceptRoutes")
+        ts_advertise_exit_node=$(tailscale_get_field "tailscale.advertiseExitNode")
+        ts_advertise_routes=$(tailscale_get_field "tailscale.advertiseRoutes")
+        {
+          echo "{ lib, ... }:"
+          echo "{"
+          echo "  config.mySystem.features.tailscale.acceptDns = lib.mkForce $ts_accept_dns;"
+          echo "  config.mySystem.features.tailscale.acceptRoutes = lib.mkForce $ts_accept_routes;"
+          echo "  config.mySystem.features.tailscale.advertiseExitNode = lib.mkForce $ts_advertise_exit_node;"
+          echo "  config.mySystem.features.tailscale.advertiseRoutes = lib.mkForce \"$ts_advertise_routes\";"
+          echo "}"
+        } > ${tailscaleOverridesFile}.tmp
+        mv ${tailscaleOverridesFile}.tmp ${tailscaleOverridesFile}
+      fi
+
       rm -f ${pendingFile}
 
-      # theme_present/vaultwarden_present are the two rebuild-driven
-      # concerns — either one (or both, in the same save) triggers
-      # exactly one shared-runner handoff. MinIO's own outcome is
-      # already final by this point (synchronous, above); if it failed,
-      # surface that directly instead of also kicking off an unrelated
-      # rebuild — the overrides file(s) are still written either way, so
-      # a pending rebuild-driven change takes effect on whatever rebuild
-      # happens next instead of being lost.
-      if [ "$theme_present" = "true" ] || [ "$vaultwarden_present" = "true" ]; then
+      # theme_present/vaultwarden_present/tailscale_present are the
+      # three rebuild-driven concerns — any one (or several, in the
+      # same save) triggers exactly one shared-runner handoff. MinIO's
+      # own outcome is already final by this point (synchronous,
+      # above); if it failed, surface that directly instead of also
+      # kicking off an unrelated rebuild — the overrides file(s) are
+      # still written either way, so a pending rebuild-driven change
+      # takes effect on whatever rebuild happens next instead of being
+      # lost.
+      if [ "$theme_present" = "true" ] || [ "$vaultwarden_present" = "true" ] || [ "$tailscale_present" = "true" ]; then
         if [ -n "$minio_result" ] && [ "$minio_result" != "ok" ]; then
           write_local_result "$minio_result"
         else
@@ -360,11 +432,12 @@ in
     default = true;
     description = ''
       Dashboard-driven Service Configuration save pipeline — see
-      modules/dashboard-svcconfig.nix and the Authelia/MinIO/Vaultwarden
-      blocks on the Service Configuration page. One batch save endpoint
-      covering two different underlying mechanisms: Authelia's theme
-      and Vaultwarden's signupsAllowed each go through their own
-      /persist-backed overrides file and
+      modules/dashboard-svcconfig.nix and the Authelia/MinIO/
+      Vaultwarden/Tailscale blocks on the Service Configuration page.
+      One batch save endpoint covering two different underlying
+      mechanisms: Authelia's theme, Vaultwarden's signupsAllowed, and
+      Tailscale's four `tailscale set` toggles each go through their
+      own /persist-backed overrides file and
       modules/system-rebuild.nix's shared rebuild runner (kind:
       "svcconfig"); MinIO's root credentials are rewritten directly
       into modules/minio.nix's rootCredentialsFile and the service

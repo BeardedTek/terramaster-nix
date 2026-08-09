@@ -39,6 +39,10 @@
       # Same shape, for modules/dashboard-svcconfig.nix's Vaultwarden
       # signupsAllowed setting.
       vaultwardenOverridesPath = /persist/nixos-vaultwarden-overrides.nix;
+      # Same shape, for modules/dashboard-svcconfig.nix's Tailscale
+      # acceptDns/acceptRoutes/advertiseExitNode/advertiseRoutes
+      # settings.
+      tailscaleOverridesPath = /persist/nixos-tailscale-overrides.nix;
     in
     {
       # Attribute name follows variables.nix's own hostName rather than
@@ -91,7 +95,8 @@
           ++ (if builtins.pathExists networkOverridesPath then [ networkOverridesPath ] else [ ])
           ++ (if builtins.pathExists smtpOverridesPath then [ smtpOverridesPath ] else [ ])
           ++ (if builtins.pathExists autheliaOverridesPath then [ autheliaOverridesPath ] else [ ])
-          ++ (if builtins.pathExists vaultwardenOverridesPath then [ vaultwardenOverridesPath ] else [ ]);
+          ++ (if builtins.pathExists vaultwardenOverridesPath then [ vaultwardenOverridesPath ] else [ ])
+          ++ (if builtins.pathExists tailscaleOverridesPath then [ tailscaleOverridesPath ] else [ ]);
       };
 
       nixosConfigurations.installer = nixpkgs.lib.nixosSystem {
