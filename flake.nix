@@ -78,6 +78,7 @@
           ./modules/dashboard-nebula.nix
           ./modules/dashboard-svcconfig.nix
           ./modules/vaultwarden.nix
+          ./modules/scrutiny.nix
           ./modules/tailscale.nix
           ./modules/dashboard-tailscale.nix
           ./modules/system-rebuild.nix

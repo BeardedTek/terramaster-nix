@@ -391,6 +391,34 @@ title: Service Configuration
   </div>
 </div>
 
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="svccfg-category-monitoring-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Monitoring</span>
+    </button>
+  </div>
+  <div id="svccfg-category-monitoring-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+      <div class="flex items-center justify-between p-3">
+        <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-scrutiny-panel">
+          <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          <span>Scrutiny</span>
+        </button>
+      </div>
+      <div id="svccfg-scrutiny-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          Scrutiny has no settings exposed here &mdash; drive history,
+          thresholds, and notifications are all managed in its own
+          admin UI. It has no login of its own, so access is gated by
+          Authelia SSO instead.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Save-changes modal (Authelia theme / MinIO credentials) -->
 <div id="svcconfig-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center update-modal-overlay p-4">
   <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl update-modal-panel w-full overflow-y-auto p-6 relative">

@@ -113,6 +113,14 @@
       "/var/lib/vaultwarden"
       "/etc/tailscale"
       "/var/lib/tailscale"
+      # Scrutiny's own DB doesn't need an entry here — it runs with
+      # DynamicUser = true (see modules/scrutiny.nix), so it's already
+      # covered by the /var/lib/private entry above, same reasoning as
+      # lldap's. InfluxDB2 (Scrutiny's historical-trends backend) runs
+      # as its own stable user instead, so it needs the usual explicit
+      # entry — without it, every SMART history graph would reset on
+      # each reboot.
+      "/var/lib/influxdb2"
     ];
     files = [
       "/etc/machine-id"

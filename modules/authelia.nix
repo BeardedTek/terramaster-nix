@@ -80,6 +80,11 @@ let
     seerr = { enable = true; policy = "one_factor"; }; # Phase 3
     qbittorrent = { enable = true; policy = "one_factor"; }; # Phase 3 — validate alongside the existing qb-headers middleware
     frigate = { enable = true; policy = "one_factor"; }; # Phase 3
+    # Unlike the others above, this isn't a Phase-3 rollout candidate
+    # gating an app that already has its own login — Scrutiny has none
+    # at all, so this gate is its only authentication, not a second
+    # layer on top of one.
+    scrutiny = { enable = true; policy = "one_factor"; };
     # No minio-console entry: it gets native OIDC (candidateOidcClients
     # below) instead of this plain ForwardAuth gate — MinIO has a real
     # OIDC client, unlike the gate-only apps above.

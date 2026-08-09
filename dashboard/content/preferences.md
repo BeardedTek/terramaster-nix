@@ -260,6 +260,26 @@ title: System Preferences
   </div>
 </div>
 
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-monitoring-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Monitoring</span>
+    </button>
+  </div>
+  <div id="services-group-monitoring-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm font-medium text-gray-900 dark:text-white">Scrutiny</span>
+      <label class="switch"><input type="checkbox" data-flag="scrutiny.enable"><span class="slider"></span></label>
+    </div>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+      Hard drive S.M.A.R.T monitoring and historical trends. Has no
+      login of its own, so it sits behind the same SSO gate as Sonarr
+      &mdash; sign in once, reach both.
+    </p>
+  </div>
+</div>
+
 <button id="services-save-btn" type="button" class="hidden text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Save</button>
   </div>
 </div>
@@ -907,7 +927,8 @@ title: System Preferences
     "sso.authelia.enable": "Authelia",
     "nebula.enable": "Nebula",
     "tailscale.enable": "Tailscale",
-    "vaultwarden.enable": "Vaultwarden"
+    "vaultwarden.enable": "Vaultwarden",
+    "scrutiny.enable": "Scrutiny"
   };
 
   var saveBtn = document.getElementById("services-save-btn");

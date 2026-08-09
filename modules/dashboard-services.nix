@@ -50,6 +50,7 @@ let
     [ "nebula" "enable" ]
     [ "tailscale" "enable" ]
     [ "vaultwarden" "enable" ]
+    [ "scrutiny" "enable" ]
   ];
 
   flagKey = path: lib.concatStringsSep "." path;

@@ -215,6 +215,17 @@
       default = false;
       description = "S3-compatible object storage (MinIO) — see modules/minio.nix.";
     };
+    scrutiny.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Scrutiny — hard drive S.M.A.R.T monitoring and historical
+        trends, see modules/scrutiny.nix. No login of its own, so it
+        sits behind Authelia's ForwardAuth gate like Sonarr
+        (modules/authelia.nix's candidateProtectedServices), not left
+        open like Vaultwarden/MinIO which have their own auth.
+      '';
+    };
     filebrowser.enable = lib.mkOption {
       type = lib.types.bool;
       default = false;
