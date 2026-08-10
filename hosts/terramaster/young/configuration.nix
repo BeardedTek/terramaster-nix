@@ -1,4 +1,7 @@
-{ config, ... }:
+{ config, lib, ... }:
+let
+  f = config.mySystem.features;
+in
 {
   system.stateVersion = "26.05";
 
@@ -48,11 +51,15 @@
     device = "rust/config";
     fsType = "zfs";
   };
-  fileSystems."/rust/minio" = {
+  # Conditional, unlike the always-on mounts above: minio/immich are
+  # both optional services, and their datasets shouldn't be mounted (or
+  # created — see the zfs-ensure-*-dataset units below) unless the
+  # matching feature is actually turned on.
+  fileSystems."/rust/minio" = lib.mkIf f.minio.enable {
     device = "rust/minio";
     fsType = "zfs";
   };
-  fileSystems."/rust/immich" = {
+  fileSystems."/rust/immich" = lib.mkIf f.immich.enable {
     device = "rust/immich";
     fsType = "zfs";
   };
@@ -71,13 +78,12 @@
   # mode (Immich hit this in production; MinIO's own dataset was already
   # documented as the same known-but-unhit gap, see
   # docs/content/en/docs/architecture/_index.md's MinIO section).
-  # Deliberately unconditional, not gated on
-  # mySystem.features.minio.enable/immich.enable — the mounts themselves
-  # are unconditional too (same as every other /rust/* entry), so the
-  # dataset has to exist regardless of whether the service is currently
-  # toggled on, or a box with the feature off would hit this exact crash
-  # the moment this config syncs (which is exactly what happened —
-  # Immich wasn't even enabled yet).
+  #
+  # Gated on the same mySystem.features.*.enable flag as the mount
+  # itself, on purpose: if the service isn't turned on, this should
+  # neither mount nor create anything for it — a disabled feature has
+  # no business touching the pool at all, not even to ensure a dataset
+  # it doesn't currently need.
   #
   # Ordered after/requires "rust.mount" (the already-existing top-level
   # /rust mount) rather than a hand-guessed zfs-import-rust.service name
@@ -88,11 +94,14 @@
   # escaping: /rust/X -> rust-X.mount) is what actually inserts this
   # *before* the mount attempt; requiredBy is what pulls it into the
   # boot graph at all, equivalent to the mount unit itself declaring
-  # Requires=zfs-ensure-X-dataset.service.
+  # Requires=zfs-ensure-X-dataset.service. Both vanish together (mkIf)
+  # when the feature's off, so there's nothing dangling to resolve.
   #
   # Only ever creates, never destroys — disabling a service must never
-  # delete its data. No `zfs destroy` anywhere in this repo, deliberately.
-  systemd.services."zfs-ensure-minio-dataset" = {
+  # delete its data. No `zfs destroy` anywhere in this repo, deliberately;
+  # a dataset created while the feature was on stays right where it is
+  # if the feature is later turned off, just unmounted.
+  systemd.services."zfs-ensure-minio-dataset" = lib.mkIf f.minio.enable {
     description = "Ensure the rust/minio ZFS dataset exists before mounting it";
     after = [ "rust.mount" ];
     requires = [ "rust.mount" ];
@@ -108,7 +117,7 @@
       fi
     '';
   };
-  systemd.services."zfs-ensure-immich-dataset" = {
+  systemd.services."zfs-ensure-immich-dataset" = lib.mkIf f.immich.enable {
     description = "Ensure the rust/immich ZFS dataset exists before mounting it";
     after = [ "rust.mount" ];
     requires = [ "rust.mount" ];
