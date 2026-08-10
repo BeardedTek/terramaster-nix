@@ -43,6 +43,10 @@
       # acceptDns/acceptRoutes/advertiseExitNode/advertiseRoutes
       # settings.
       tailscaleOverridesPath = /persist/nixos-tailscale-overrides.nix;
+      # Same shape, for modules/dashboard-svcconfig.nix's Immich
+      # machine-learning and public-proxy toggles.
+      immichMlOverridesPath = /persist/nixos-immich-ml-overrides.nix;
+      immichProxyOverridesPath = /persist/nixos-immich-proxy-overrides.nix;
     in
     {
       # Attribute name follows variables.nix's own hostName rather than
@@ -80,6 +84,7 @@
           ./modules/vaultwarden.nix
           ./modules/scrutiny.nix
           ./modules/plex.nix
+          ./modules/immich.nix
           ./modules/tailscale.nix
           ./modules/dashboard-tailscale.nix
           ./modules/system-rebuild.nix
@@ -98,7 +103,9 @@
           ++ (if builtins.pathExists smtpOverridesPath then [ smtpOverridesPath ] else [ ])
           ++ (if builtins.pathExists autheliaOverridesPath then [ autheliaOverridesPath ] else [ ])
           ++ (if builtins.pathExists vaultwardenOverridesPath then [ vaultwardenOverridesPath ] else [ ])
-          ++ (if builtins.pathExists tailscaleOverridesPath then [ tailscaleOverridesPath ] else [ ]);
+          ++ (if builtins.pathExists tailscaleOverridesPath then [ tailscaleOverridesPath ] else [ ])
+          ++ (if builtins.pathExists immichMlOverridesPath then [ immichMlOverridesPath ] else [ ])
+          ++ (if builtins.pathExists immichProxyOverridesPath then [ immichProxyOverridesPath ] else [ ]);
       };
 
       nixosConfigurations.installer = nixpkgs.lib.nixosSystem {

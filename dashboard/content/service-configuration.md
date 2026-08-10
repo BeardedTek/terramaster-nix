@@ -435,6 +435,50 @@ title: Service Configuration
   </div>
 </div>
 
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="svccfg-category-photos-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Photos</span>
+    </button>
+  </div>
+  <div id="svccfg-category-photos-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+      <div class="flex items-center justify-between p-3">
+        <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-immich-panel">
+          <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          <span>Immich</span>
+        </button>
+      </div>
+      <div id="svccfg-immich-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Libraries, albums, and sharing are managed in Immich's own
+          admin UI.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+          These two toggles rebuild the system in place, like the
+          other checkboxes on this page.
+        </p>
+        <div class="flex items-center justify-between py-2">
+          <span class="text-sm text-gray-700 dark:text-gray-300">Machine learning (face recognition, smart search)</span>
+          <label class="switch"><input type="checkbox" id="svccfg-immich-ml" data-svcfield="immich.machineLearning.enable"><span class="slider"></span></label>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-2">
+          CPU-only on this hardware &mdash; expect a real, sustained
+          load during the initial backfill of an existing library.
+        </p>
+        <div class="flex items-center justify-between py-2">
+          <span class="text-sm text-gray-700 dark:text-gray-300">Public sharing proxy</span>
+          <label class="switch"><input type="checkbox" id="svccfg-immich-proxy" data-svcfield="immich.publicProxy.enable"><span class="slider"></span></label>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          Lets a shared album be reachable without exposing the full
+          Immich app.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Save-changes modal (Authelia theme / MinIO credentials) -->
 <div id="svcconfig-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center update-modal-overlay p-4">
   <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl update-modal-panel w-full overflow-y-auto p-6 relative">
@@ -518,6 +562,16 @@ title: Service Configuration
       type: "text",
       label: "Tailscale advertised routes",
       describe: function (v) { return v ? "Advertise Tailscale subnet routes: " + v + "." : "Stop advertising Tailscale subnet routes."; }
+    },
+    "immich.machineLearning.enable": {
+      type: "checkbox",
+      label: "Immich machine learning",
+      describe: function (v) { return (v ? "Enable" : "Disable") + " Immich machine learning (face recognition, smart search)."; }
+    },
+    "immich.publicProxy.enable": {
+      type: "checkbox",
+      label: "Immich public proxy",
+      describe: function (v) { return (v ? "Enable" : "Disable") + " the Immich public sharing proxy."; }
     }
   };
 
@@ -531,6 +585,8 @@ title: Service Configuration
   var tailscaleAcceptRoutesInput = document.getElementById("svccfg-tailscale-accept-routes");
   var tailscaleAdvertiseExitNodeInput = document.getElementById("svccfg-tailscale-advertise-exit-node");
   var tailscaleAdvertiseRoutesInput = document.getElementById("svccfg-tailscale-advertise-routes");
+  var immichMlInput = document.getElementById("svccfg-immich-ml");
+  var immichProxyInput = document.getElementById("svccfg-immich-proxy");
 
   var modal = document.getElementById("svcconfig-modal");
   var modalCloseX = document.getElementById("svcconfig-modal-close-x");
@@ -568,7 +624,9 @@ title: Service Configuration
     "tailscale.acceptDns": false,
     "tailscale.acceptRoutes": false,
     "tailscale.advertiseExitNode": false,
-    "tailscale.advertiseRoutes": ""
+    "tailscale.advertiseRoutes": "",
+    "immich.machineLearning.enable": false,
+    "immich.publicProxy.enable": false
   };
   var minioPasswordSet = false;
 
@@ -584,7 +642,9 @@ title: Service Configuration
     "tailscale.acceptDns": tailscaleAcceptDnsInput,
     "tailscale.acceptRoutes": tailscaleAcceptRoutesInput,
     "tailscale.advertiseExitNode": tailscaleAdvertiseExitNodeInput,
-    "tailscale.advertiseRoutes": tailscaleAdvertiseRoutesInput
+    "tailscale.advertiseRoutes": tailscaleAdvertiseRoutesInput,
+    "immich.machineLearning.enable": immichMlInput,
+    "immich.publicProxy.enable": immichProxyInput
   };
 
   function currentValue(key) {
@@ -618,7 +678,8 @@ title: Service Configuration
 
   [
     themeInput, minioUserInput, minioPasswordInput, vaultwardenSignupsInput,
-    tailscaleAcceptDnsInput, tailscaleAcceptRoutesInput, tailscaleAdvertiseExitNodeInput, tailscaleAdvertiseRoutesInput
+    tailscaleAcceptDnsInput, tailscaleAcceptRoutesInput, tailscaleAdvertiseExitNodeInput, tailscaleAdvertiseRoutesInput,
+    immichMlInput, immichProxyInput
   ].forEach(function (el) {
     el.addEventListener("input", refreshSaveVisibility);
     el.addEventListener("change", refreshSaveVisibility);
@@ -634,7 +695,9 @@ title: Service Configuration
         "tailscale.acceptDns": !!data["tailscale.acceptDns"],
         "tailscale.acceptRoutes": !!data["tailscale.acceptRoutes"],
         "tailscale.advertiseExitNode": !!data["tailscale.advertiseExitNode"],
-        "tailscale.advertiseRoutes": data["tailscale.advertiseRoutes"] || ""
+        "tailscale.advertiseRoutes": data["tailscale.advertiseRoutes"] || "",
+        "immich.machineLearning.enable": !!data["immich.machineLearning.enable"],
+        "immich.publicProxy.enable": !!data["immich.publicProxy.enable"]
       };
       minioPasswordSet = !!data["minio.rootPasswordSet"];
       themeInput.value = baseline["authelia.theme"];
@@ -647,6 +710,8 @@ title: Service Configuration
       tailscaleAcceptRoutesInput.checked = baseline["tailscale.acceptRoutes"];
       tailscaleAdvertiseExitNodeInput.checked = baseline["tailscale.advertiseExitNode"];
       tailscaleAdvertiseRoutesInput.value = baseline["tailscale.advertiseRoutes"];
+      immichMlInput.checked = baseline["immich.machineLearning.enable"];
+      immichProxyInput.checked = baseline["immich.publicProxy.enable"];
       refreshSaveVisibility();
     })
     .catch(function () { refreshSaveVisibility(); });

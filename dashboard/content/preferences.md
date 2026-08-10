@@ -260,6 +260,28 @@ title: System Preferences
   </div>
 </div>
 
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="services-group-photos-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Photos</span>
+    </button>
+  </div>
+  <div id="services-group-photos-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="flex items-center justify-between py-2">
+      <span class="text-sm font-medium text-gray-900 dark:text-white">Immich</span>
+      <label class="switch"><input type="checkbox" data-flag="immich.enable"><span class="slider"></span></label>
+    </div>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+      Photo/video library and mobile backup. Machine learning (face
+      recognition, smart search) and public sharing are separate
+      toggles on the
+      <a href="/service-configuration/" class="text-primary-700 dark:text-primary-500 hover:underline">Service Configuration</a>
+      page.
+    </p>
+  </div>
+</div>
+
 <button id="services-save-btn" type="button" class="hidden text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Save</button>
   </div>
 </div>
@@ -844,6 +866,7 @@ title: System Preferences
   var FLAG_LABELS = {
     "jellyfin.enable": "Jellyfin",
     "plex.enable": "Plex",
+    "immich.enable": "Immich",
     "minio.enable": "MinIO",
     "filebrowser.enable": "FileBrowser",
     "homeAssistant.enable": "Home Assistant",

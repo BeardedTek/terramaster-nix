@@ -34,6 +34,7 @@ let
   flagPaths = [
     [ "jellyfin" "enable" ]
     [ "plex" "enable" ]
+    [ "immich" "enable" ]
     [ "minio" "enable" ]
     [ "filebrowser" "enable" ]
     [ "homeAssistant" "enable" ]

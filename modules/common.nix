@@ -149,6 +149,40 @@
         not in mySystem.sso.protectedServices.
       '';
     };
+    immich.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Immich — self-hosted photo/video library and mobile backup,
+        see modules/immich.nix. First service on this box to pull in
+        PostgreSQL (with pgvector) and Redis. Real account-based auth
+        of its own, same posture as Jellyfin/Plex — not in
+        mySystem.sso.protectedServices.
+      '';
+    };
+    immich.machineLearning.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Face recognition, CLIP smart search, and duplicate detection —
+        see modules/immich.nix. Off by default: nixpkgs only packages
+        a CPU-only build of immich-machine-learning (no OpenVINO/CUDA
+        acceleration), so this is genuinely heavy on NAS-class
+        hardware, especially the one-time backfill over an existing
+        library. Dashboard-editable on Service Configuration,
+        rebuild-driven like Vaultwarden's signupsAllowed.
+      '';
+    };
+    immich.publicProxy.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        immich-public-proxy — a narrow reverse-proxy that only serves
+        public share links, so a shared album can be exposed without
+        opening up the full Immich app/API. See modules/immich.nix.
+        Dashboard-editable, rebuild-driven.
+      '';
+    };
     frigate.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;

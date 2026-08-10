@@ -21,6 +21,8 @@ let
     files = 8095;
     vaultwarden = 8222;
     scrutiny = 8223;
+    immich = 2283;
+    "immich-share" = 3000;
     # "auth", not "authelia": modules/authelia.nix's own
     # session.cookies[0].authelia_url points at auth.${hostName}.${domain}
     # (confirmed the hard way — a mismatched name here means Authelia
@@ -44,6 +46,8 @@ let
     files = f.filebrowser.enable;
     vaultwarden = f.vaultwarden.enable;
     scrutiny = f.scrutiny.enable;
+    immich = f.immich.enable;
+    "immich-share" = f.immich.enable && f.immich.publicProxy.enable;
     auth = f.sso.authelia.enable;
   };
 

@@ -20,6 +20,13 @@ let
   # modules/common.nix's tailscale.accept*/advertise* options.
   tailscaleOverridesFile = "/persist/nixos-tailscale-overrides.nix";
 
+  # Same shape as vaultwardenOverridesFile — each is a single,
+  # independent boolean (unlike Tailscale's four fields, these don't
+  # need to share one file or fall back to a prior value on partial
+  # submission).
+  immichMlOverridesFile = "/persist/nixos-immich-ml-overrides.nix";
+  immichProxyOverridesFile = "/persist/nixos-immich-proxy-overrides.nix";
+
   # The literal path modules/minio.nix's rootCredentialsFile already
   # points at — a plain runtime secrets file (systemd EnvironmentFile=),
   # not baked into the Nix store, so rewriting it only needs a service
@@ -45,6 +52,8 @@ let
     "tailscale.acceptRoutes" = f.tailscale.acceptRoutes;
     "tailscale.advertiseExitNode" = f.tailscale.advertiseExitNode;
     "tailscale.advertiseRoutes" = f.tailscale.advertiseRoutes;
+    "immich.machineLearning.enable" = f.immich.machineLearning.enable;
+    "immich.publicProxy.enable" = f.immich.publicProxy.enable;
   };
   stateJson = pkgs.writeText "dashboard-svcconfig-state.json" (builtins.toJSON currentState);
 
@@ -112,6 +121,7 @@ let
         case "$k" in
           authelia.theme|minio.rootUser|minio.rootPassword|vaultwarden.signupsAllowed) ;;
           tailscale.acceptDns|tailscale.acceptRoutes|tailscale.advertiseExitNode|tailscale.advertiseRoutes) ;;
+          immich.machineLearning.enable|immich.publicProxy.enable) ;;
           *) fail "unknown field: $k" ;;
         esac
       done <<< "$keys"
@@ -163,6 +173,17 @@ let
         esac
         request_json=$(printf '%s' "$request_json" | jq --arg v "$routes_val" '.["tailscale.advertiseRoutes"] = $v')
       fi
+
+      for field in "immich.machineLearning.enable" "immich.publicProxy.enable"; do
+        if printf '%s' "$body" | jq -e --arg k "$field" 'has($k)' >/dev/null 2>&1; then
+          v=$(printf '%s' "$body" | jq -r --arg k "$field" '.[$k]')
+          case "$v" in
+            true|false) ;;
+            *) fail "invalid $field" ;;
+          esac
+          request_json=$(printf '%s' "$request_json" | jq --arg k "$field" --argjson v "$v" '.[$k] = $v')
+        fi
+      done
 
       minio_user_present=false
       pass_val=""
@@ -355,18 +376,42 @@ let
         mv ${tailscaleOverridesFile}.tmp ${tailscaleOverridesFile}
       fi
 
+      immich_ml_present=$(jq -r 'has("immich.machineLearning.enable") | tostring' ${pendingFile})
+      if [ "$immich_ml_present" = "true" ]; then
+        ml_val=$(jq -r '.["immich.machineLearning.enable"]' ${pendingFile})
+        {
+          echo "{ lib, ... }:"
+          echo "{"
+          echo "  config.mySystem.features.immich.machineLearning.enable = lib.mkForce $ml_val;"
+          echo "}"
+        } > ${immichMlOverridesFile}.tmp
+        mv ${immichMlOverridesFile}.tmp ${immichMlOverridesFile}
+      fi
+
+      immich_proxy_present=$(jq -r 'has("immich.publicProxy.enable") | tostring' ${pendingFile})
+      if [ "$immich_proxy_present" = "true" ]; then
+        proxy_val=$(jq -r '.["immich.publicProxy.enable"]' ${pendingFile})
+        {
+          echo "{ lib, ... }:"
+          echo "{"
+          echo "  config.mySystem.features.immich.publicProxy.enable = lib.mkForce $proxy_val;"
+          echo "}"
+        } > ${immichProxyOverridesFile}.tmp
+        mv ${immichProxyOverridesFile}.tmp ${immichProxyOverridesFile}
+      fi
+
       rm -f ${pendingFile}
 
-      # theme_present/vaultwarden_present/tailscale_present are the
-      # three rebuild-driven concerns — any one (or several, in the
-      # same save) triggers exactly one shared-runner handoff. MinIO's
-      # own outcome is already final by this point (synchronous,
-      # above); if it failed, surface that directly instead of also
-      # kicking off an unrelated rebuild — the overrides file(s) are
-      # still written either way, so a pending rebuild-driven change
-      # takes effect on whatever rebuild happens next instead of being
-      # lost.
-      if [ "$theme_present" = "true" ] || [ "$vaultwarden_present" = "true" ] || [ "$tailscale_present" = "true" ]; then
+      # theme_present/vaultwarden_present/tailscale_present/immich_ml_present/
+      # immich_proxy_present are the rebuild-driven concerns — any one
+      # (or several, in the same save) triggers exactly one shared-runner
+      # handoff. MinIO's own outcome is already final by this point
+      # (synchronous, above); if it failed, surface that directly
+      # instead of also kicking off an unrelated rebuild — the
+      # overrides file(s) are still written either way, so a pending
+      # rebuild-driven change takes effect on whatever rebuild happens
+      # next instead of being lost.
+      if [ "$theme_present" = "true" ] || [ "$vaultwarden_present" = "true" ] || [ "$tailscale_present" = "true" ] || [ "$immich_ml_present" = "true" ] || [ "$immich_proxy_present" = "true" ]; then
         if [ -n "$minio_result" ] && [ "$minio_result" != "ok" ]; then
           write_local_result "$minio_result"
         else
@@ -433,15 +478,16 @@ in
     description = ''
       Dashboard-driven Service Configuration save pipeline — see
       modules/dashboard-svcconfig.nix and the Authelia/MinIO/
-      Vaultwarden/Tailscale blocks on the Service Configuration page.
-      One batch save endpoint covering two different underlying
-      mechanisms: Authelia's theme, Vaultwarden's signupsAllowed, and
-      Tailscale's four `tailscale set` toggles each go through their
-      own /persist-backed overrides file and
-      modules/system-rebuild.nix's shared rebuild runner (kind:
-      "svcconfig"); MinIO's root credentials are rewritten directly
-      into modules/minio.nix's rootCredentialsFile and the service
-      restarted, no rebuild involved.
+      Vaultwarden/Tailscale/Immich blocks on the Service Configuration
+      page. One batch save endpoint covering two different underlying
+      mechanisms: Authelia's theme, Vaultwarden's signupsAllowed,
+      Tailscale's four `tailscale set` toggles, and Immich's machine-
+      learning/public-proxy toggles each go through their own
+      /persist-backed overrides file and modules/system-rebuild.nix's
+      shared rebuild runner (kind: "svcconfig"); MinIO's root
+      credentials are rewritten directly into modules/minio.nix's
+      rootCredentialsFile and the service restarted, no rebuild
+      involved.
     '';
   };
 

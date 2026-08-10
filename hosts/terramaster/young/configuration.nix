@@ -51,6 +51,10 @@
     device = "rust/minio";
     fsType = "zfs";
   };
+  fileSystems."/rust/immich" = {
+    device = "rust/immich";
+    fsType = "zfs";
+  };
   fileSystems."/rust/backups" = {
     device = "rust/backups";
     fsType = "zfs";
@@ -138,6 +142,27 @@
       # once" guard would instead become "once every reboot", since a
       # tmpfs root wipes it on every restart.
       "/var/lib/scrutiny-collector-state"
+      # PostgreSQL (first pulled in by Immich, modules/immich.nix) is
+      # its own stable "postgres" user, not DynamicUser, so it needs
+      # the usual explicit entry — but *structured*, not a plain
+      # string, learned from the exact Plex ownership bug above:
+      # impermanence's plain-string default (root:root 0755) would
+      # leave the postgres user unable to write into its own data
+      # directory on initdb, and separately, postgres itself refuses
+      # to start at all against anything more permissive than 0700
+      # (same class of failure as /var/lib/private above).
+      { directory = "/var/lib/postgresql"; user = "postgres"; group = "postgres"; mode = "0700"; }
+      # Immich's own StateDirectory/CacheDirectory (modules/immich.nix)
+      # — unlike Plex's hand-written prestart script, systemd's native
+      # StateDirectory=/CacheDirectory= re-asserts ownership on every
+      # start regardless of prior state, so a plain string is safe
+      # here. The bulk photo/video library itself lives on the rust
+      # pool (/rust/immich, mediaLocation), not under here at all.
+      "/var/lib/immich"
+      # ML model weights (~hundreds of MB from Hugging Face) — without
+      # this, machine-learning.enable would re-download them on every
+      # reboot instead of reusing what's already been fetched.
+      "/var/cache/immich"
     ];
     files = [
       "/etc/machine-id"
