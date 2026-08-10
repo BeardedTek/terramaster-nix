@@ -16,14 +16,6 @@
       vars = import ./variables.nix;
       hostDir = ./hosts + "/${vars.mySystem.manufacturer}/${vars.mySystem.model}";
 
-      # Dashboard-driven service enable/disable toggles
-      # (modules/dashboard-services.nix) write here on save — a real
-      # path on disk, independent of which checkout is doing the
-      # building, so it survives both a manual rebuild and every future
-      # self-update fetch (which always re-extracts a fresh tarball that
-      # never saw a local variables.nix edit). A no-op import on any box
-      # that's never touched that feature.
-      serviceOverridesPath = /persist/nixos-service-overrides.nix;
       # Same shape, for modules/dashboard-network.nix's DHCP/Static IP
       # toggle.
       networkOverridesPath = /persist/nixos-network-overrides.nix;
@@ -47,6 +39,12 @@
       # machine-learning and public-proxy toggles.
       immichMlOverridesPath = /persist/nixos-immich-ml-overrides.nix;
       immichProxyOverridesPath = /persist/nixos-immich-proxy-overrides.nix;
+      # Same shape, for modules/dashboard-svcconfig.nix's 21 absorbed
+      # service enable/disable flags (formerly
+      # modules/dashboard-services.nix's own serviceOverridesPath,
+      # before the "Services" accordion on System Preferences was
+      # merged into each service's own Service Configuration panel).
+      serviceEnableOverridesPath = /persist/nixos-service-enable-overrides.nix;
     in
     {
       # Attribute name follows variables.nix's own hostName rather than
@@ -76,7 +74,6 @@
           ./modules/traefik.nix
           ./modules/traefik-dns01.nix
           ./modules/dashboard.nix
-          ./modules/dashboard-services.nix
           ./modules/dashboard-network.nix
           ./modules/dashboard-smtp.nix
           ./modules/dashboard-nebula.nix
@@ -98,14 +95,14 @@
           ./modules/smtp-relay.nix
           ./modules/dashboard-login.nix
           ./modules/unix-ldap-login.nix
-        ] ++ (if builtins.pathExists serviceOverridesPath then [ serviceOverridesPath ] else [ ])
-          ++ (if builtins.pathExists networkOverridesPath then [ networkOverridesPath ] else [ ])
+        ] ++ (if builtins.pathExists networkOverridesPath then [ networkOverridesPath ] else [ ])
           ++ (if builtins.pathExists smtpOverridesPath then [ smtpOverridesPath ] else [ ])
           ++ (if builtins.pathExists autheliaOverridesPath then [ autheliaOverridesPath ] else [ ])
           ++ (if builtins.pathExists vaultwardenOverridesPath then [ vaultwardenOverridesPath ] else [ ])
           ++ (if builtins.pathExists tailscaleOverridesPath then [ tailscaleOverridesPath ] else [ ])
           ++ (if builtins.pathExists immichMlOverridesPath then [ immichMlOverridesPath ] else [ ])
-          ++ (if builtins.pathExists immichProxyOverridesPath then [ immichProxyOverridesPath ] else [ ]);
+          ++ (if builtins.pathExists immichProxyOverridesPath then [ immichProxyOverridesPath ] else [ ])
+          ++ (if builtins.pathExists serviceEnableOverridesPath then [ serviceEnableOverridesPath ] else [ ]);
       };
 
       nixosConfigurations.installer = nixpkgs.lib.nixosSystem {

@@ -3,13 +3,14 @@ title: Service Configuration
 ---
 
 <p class="text-gray-700 dark:text-gray-300 mb-8 leading-relaxed">
-  Per-service settings, grouped the same way as the Services accordion in
-  <a href="/preferences/" class="text-primary-700 dark:text-primary-500 hover:underline">System Preferences</a>.
-  Most services here don't have anything genuinely configurable through
-  this dashboard &mdash; they manage their own settings through their
-  own admin UI, so those blocks just link out instead of pretending to
-  offer controls that don't exist. Authelia and MinIO have a couple of
-  real, live settings; Nebula's config upload lives at the bottom.
+  Enable or disable each service and manage whatever settings it has,
+  all in one place. Toggling a switch previews the change only &mdash;
+  nothing is applied until you click Save and confirm. Most services
+  don't have anything genuinely configurable beyond that toggle
+  &mdash; they manage their own settings through their own admin UI,
+  so those blocks just link out instead of pretending to offer
+  controls that don't exist. Authelia and MinIO have a couple of real,
+  live settings; Nebula's config upload lives at the bottom.
 </p>
 
 <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
@@ -28,6 +29,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-jellyfin-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Jellyfin</span>
+          <label class="switch"><input type="checkbox" checked id="svccfg-jellyfin-enable" data-svcfield="jellyfin.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-sm text-gray-700 dark:text-gray-300">
           Jellyfin has no settings exposed here &mdash; manage libraries,
           transcoding, and hardware acceleration directly in its own
@@ -44,6 +49,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-plex-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Plex</span>
+          <label class="switch"><input type="checkbox" id="svccfg-plex-enable" data-svcfield="plex.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-sm text-gray-700 dark:text-gray-300">
           Plex has no settings exposed here &mdash; libraries, transcoding,
           and remote access are all managed directly in its own admin
@@ -71,6 +80,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-minio-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable MinIO</span>
+          <label class="switch"><input type="checkbox" id="svccfg-minio-enable" data-svcfield="minio.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
           Root credentials are rewritten directly and MinIO is
           restarted &mdash; no system rebuild needed. Console port and
@@ -97,6 +110,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-filebrowser-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable FileBrowser</span>
+          <label class="switch"><input type="checkbox" id="svccfg-filebrowser-enable" data-svcfield="filebrowser.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-sm text-gray-700 dark:text-gray-300">
           FileBrowser's sources and admin account are set up once at
           first boot. Manage users, permissions, and sharing directly
@@ -124,12 +141,22 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-homeassistant-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Home Assistant</span>
+          <label class="switch"><input type="checkbox" checked id="svccfg-homeassistant-enable" data-svcfield="homeAssistant.enable" data-group-toggle="homeassistant"><span class="slider"></span></label>
+        </div>
+        <div class="pl-6 space-y-2 mb-2" data-group="homeassistant">
+          <div class="flex items-center justify-between py-2">
+            <span class="text-sm text-gray-700 dark:text-gray-300">Z-Wave</span>
+            <label class="switch"><input type="checkbox" id="svccfg-homeassistant-zwave-enable" data-svcfield="homeAssistant.zwave.enable"><span class="slider"></span></label>
+          </div>
+          <div class="flex items-center justify-between py-2">
+            <span class="text-sm text-gray-700 dark:text-gray-300">HACS</span>
+            <label class="switch"><input type="checkbox" checked id="svccfg-homeassistant-hacs-enable" data-svcfield="homeAssistant.hacs.enable"><span class="slider"></span></label>
+          </div>
+        </div>
         <p class="text-sm text-gray-700 dark:text-gray-300">
-          Z-Wave and HACS are already toggleable &mdash; just not here.
-          Manage them on
-          <a href="/preferences/" class="text-primary-700 dark:text-primary-500 hover:underline">System Preferences</a>,
-          under Services &rarr; Home Automation. Everything else about
-          Home Assistant is managed in its own UI.
+          Everything else about Home Assistant is managed in its own UI.
           <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
         </p>
       </div>
@@ -142,6 +169,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-frigate-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Frigate</span>
+          <label class="switch"><input type="checkbox" checked id="svccfg-frigate-enable" data-svcfield="frigate.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-sm text-gray-700 dark:text-gray-300">
           Camera configuration lives entirely in Frigate's own config,
           not here. Manage cameras, detection, and recording directly
@@ -169,6 +200,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-seerr-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Seerr</span>
+          <label class="switch"><input type="checkbox" checked id="svccfg-seerr-enable" data-svcfield="mediaAcquisition.seerr.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-sm text-gray-700 dark:text-gray-300">
           Seerr has no settings exposed here &mdash; manage requests,
           users, and integrations directly in its own UI.
@@ -184,6 +219,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-radarr-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Radarr</span>
+          <label class="switch"><input type="checkbox" checked id="svccfg-radarr-enable" data-svcfield="mediaAcquisition.radarr.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-sm text-gray-700 dark:text-gray-300">
           Radarr generates and manages its own API key and settings
           &mdash; manage them directly in its own UI.
@@ -199,6 +238,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-sonarr-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Sonarr</span>
+          <label class="switch"><input type="checkbox" checked id="svccfg-sonarr-enable" data-svcfield="mediaAcquisition.sonarr.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-sm text-gray-700 dark:text-gray-300">
           Sonarr generates and manages its own API key and settings
           &mdash; manage them directly in its own UI.
@@ -214,6 +257,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-jackett-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Jackett</span>
+          <label class="switch"><input type="checkbox" checked id="svccfg-jackett-enable" data-svcfield="mediaAcquisition.jackett.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-sm text-gray-700 dark:text-gray-300">
           Jackett's indexers and API key are managed entirely in its
           own UI.
@@ -229,6 +276,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-qbittorrent-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable qBittorrent</span>
+          <label class="switch"><input type="checkbox" checked id="svccfg-qbittorrent-enable" data-svcfield="mediaAcquisition.qbittorrent.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-sm text-gray-700 dark:text-gray-300">
           qBittorrent's settings, including its WebUI password, are
           managed entirely in its own interface.
@@ -255,19 +306,31 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-sso-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-          Authelia's own UI theme. Session, LDAP, and access-control
-          settings aren't editable here &mdash; they're derived from
-          this box's own domain and security setup.
-        </p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Theme</span>
-            <select id="svccfg-authelia-theme" data-svcfield="authelia.theme" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-              <option value="auto">Auto</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable SSO</span>
+          <label class="switch"><input type="checkbox" id="svccfg-sso-enable" data-svcfield="sso.enable" data-group-toggle="sso"><span class="slider"></span></label>
+        </div>
+        <div class="pl-6 space-y-2 mb-2" data-group="sso">
+          <div class="flex items-center justify-between py-2">
+            <span class="text-sm text-gray-700 dark:text-gray-300">Authelia</span>
+            <label class="switch"><input type="checkbox" id="svccfg-authelia-enable" data-svcfield="sso.authelia.enable" data-group-toggle="authelia"><span class="slider"></span></label>
+          </div>
+          <div class="pl-6" data-group="authelia">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Authelia's own UI theme. Session, LDAP, and access-control
+              settings aren't editable here &mdash; they're derived from
+              this box's own domain and security setup.
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Theme</span>
+                <select id="svccfg-authelia-theme" data-svcfield="authelia.theme" class="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                  <option value="auto">Auto</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -291,6 +354,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-vaultwarden-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Vaultwarden</span>
+          <label class="switch"><input type="checkbox" id="svccfg-vaultwarden-enable" data-svcfield="vaultwarden.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
           User accounts, vault items, and everything else are managed
           through Vaultwarden's own ADMIN_TOKEN-gated <code>/admin</code>
@@ -325,6 +392,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-nebula-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Nebula</span>
+          <label class="switch"><input type="checkbox" checked id="svccfg-nebula-enable" data-svcfield="nebula.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
           Upload or paste a complete Nebula <code>config.yaml</code> &mdash;
           the same format the Nebula mobile apps use, with the CA/cert/key
@@ -333,10 +404,7 @@ title: Service Configuration
           system rebuild. The current config is loaded below since this
           page is admin-only &mdash; note that it includes this node's
           private key, same as reading the file directly on the box
-          would. Enabling/disabling the Nebula service itself is still
-          done on
-          <a href="/preferences/" class="text-primary-700 dark:text-primary-500 hover:underline">System Preferences</a>,
-          under Services &rarr; Mesh VPN Networks.
+          would.
         </p>
         <div id="svccfg-nebula-status" class="text-xs text-gray-500 dark:text-gray-400 mb-2"></div>
         <div class="mb-3">
@@ -362,10 +430,7 @@ title: Service Configuration
           key generated at
           <span class="font-mono">login.tailscale.com/admin/settings/keys</span>.
           Applying restarts the Tailscale connection immediately; it
-          does not require a system rebuild. Enabling/disabling
-          Tailscale itself is still done on
-          <a href="/preferences/" class="text-primary-700 dark:text-primary-500 hover:underline">System Preferences</a>,
-          under Services &rarr; Mesh VPN Networks.
+          does not require a system rebuild.
         </p>
         <div id="svccfg-tailscale-status" class="text-xs text-gray-500 dark:text-gray-400 mb-2"></div>
         <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Auth Key</span>
@@ -385,6 +450,10 @@ title: Service Configuration
             Changes button below, not immediately like authentication
             above.
           </p>
+          <div class="flex items-center justify-between py-2">
+            <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Tailscale</span>
+            <label class="switch"><input type="checkbox" id="svccfg-tailscale-enable" data-svcfield="tailscale.enable"><span class="slider"></span></label>
+          </div>
           <div class="flex items-center justify-between py-2">
             <span class="text-sm text-gray-700 dark:text-gray-300">Accept DNS settings from the tailnet (MagicDNS)</span>
             <label class="switch"><input type="checkbox" id="svccfg-tailscale-accept-dns" data-svcfield="tailscale.acceptDns"><span class="slider"></span></label>
@@ -423,6 +492,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-scrutiny-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Scrutiny</span>
+          <label class="switch"><input type="checkbox" id="svccfg-scrutiny-enable" data-svcfield="scrutiny.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-sm text-gray-700 dark:text-gray-300">
           Scrutiny has no settings exposed here &mdash; drive history,
           thresholds, and notifications are all managed in its own
@@ -451,6 +524,10 @@ title: Service Configuration
         </button>
       </div>
       <div id="svccfg-immich-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Immich</span>
+          <label class="switch"><input type="checkbox" id="svccfg-immich-enable" data-svcfield="immich.enable"><span class="slider"></span></label>
+        </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
           Libraries, albums, and sharing are managed in Immich's own
           admin UI.
@@ -572,7 +649,31 @@ title: Service Configuration
       type: "checkbox",
       label: "Immich public proxy",
       describe: function (v) { return (v ? "Enable" : "Disable") + " the Immich public sharing proxy."; }
-    }
+    },
+    // Absorbed from the now-deleted Services accordion on System
+    // Preferences — every service's own enable/disable flag now lives
+    // on its own panel here instead, saved through this same shared
+    // Save Changes flow.
+    "jellyfin.enable": { type: "checkbox", label: "Jellyfin", describe: function (v) { return (v ? "Enable" : "Disable") + " Jellyfin."; } },
+    "plex.enable": { type: "checkbox", label: "Plex", describe: function (v) { return (v ? "Enable" : "Disable") + " Plex."; } },
+    "minio.enable": { type: "checkbox", label: "MinIO", describe: function (v) { return (v ? "Enable" : "Disable") + " MinIO."; } },
+    "filebrowser.enable": { type: "checkbox", label: "FileBrowser", describe: function (v) { return (v ? "Enable" : "Disable") + " FileBrowser."; } },
+    "homeAssistant.enable": { type: "checkbox", label: "Home Assistant", describe: function (v) { return (v ? "Enable" : "Disable") + " Home Assistant."; } },
+    "homeAssistant.zwave.enable": { type: "checkbox", label: "Home Assistant Z-Wave", describe: function (v) { return (v ? "Enable" : "Disable") + " Home Assistant Z-Wave."; } },
+    "homeAssistant.hacs.enable": { type: "checkbox", label: "Home Assistant HACS", describe: function (v) { return (v ? "Enable" : "Disable") + " Home Assistant HACS."; } },
+    "frigate.enable": { type: "checkbox", label: "Frigate", describe: function (v) { return (v ? "Enable" : "Disable") + " Frigate."; } },
+    "mediaAcquisition.seerr.enable": { type: "checkbox", label: "Seerr", describe: function (v) { return (v ? "Enable" : "Disable") + " Seerr."; } },
+    "mediaAcquisition.radarr.enable": { type: "checkbox", label: "Radarr", describe: function (v) { return (v ? "Enable" : "Disable") + " Radarr."; } },
+    "mediaAcquisition.sonarr.enable": { type: "checkbox", label: "Sonarr", describe: function (v) { return (v ? "Enable" : "Disable") + " Sonarr."; } },
+    "mediaAcquisition.jackett.enable": { type: "checkbox", label: "Jackett", describe: function (v) { return (v ? "Enable" : "Disable") + " Jackett."; } },
+    "mediaAcquisition.qbittorrent.enable": { type: "checkbox", label: "qBittorrent", describe: function (v) { return (v ? "Enable" : "Disable") + " qBittorrent."; } },
+    "sso.enable": { type: "checkbox", label: "SSO", describe: function (v) { return (v ? "Enable" : "Disable") + " SSO."; } },
+    "sso.authelia.enable": { type: "checkbox", label: "Authelia", describe: function (v) { return (v ? "Enable" : "Disable") + " Authelia."; } },
+    "vaultwarden.enable": { type: "checkbox", label: "Vaultwarden", describe: function (v) { return (v ? "Enable" : "Disable") + " Vaultwarden."; } },
+    "nebula.enable": { type: "checkbox", label: "Nebula", describe: function (v) { return (v ? "Enable" : "Disable") + " Nebula."; } },
+    "tailscale.enable": { type: "checkbox", label: "Tailscale", describe: function (v) { return (v ? "Enable" : "Disable") + " Tailscale."; } },
+    "scrutiny.enable": { type: "checkbox", label: "Scrutiny", describe: function (v) { return (v ? "Enable" : "Disable") + " Scrutiny."; } },
+    "immich.enable": { type: "checkbox", label: "Immich", describe: function (v) { return (v ? "Enable" : "Disable") + " Immich."; } }
   };
 
   var messageEl = document.getElementById("svccfg-message");
@@ -587,6 +688,26 @@ title: Service Configuration
   var tailscaleAdvertiseRoutesInput = document.getElementById("svccfg-tailscale-advertise-routes");
   var immichMlInput = document.getElementById("svccfg-immich-ml");
   var immichProxyInput = document.getElementById("svccfg-immich-proxy");
+  var jellyfinEnableInput = document.getElementById("svccfg-jellyfin-enable");
+  var plexEnableInput = document.getElementById("svccfg-plex-enable");
+  var minioEnableInput = document.getElementById("svccfg-minio-enable");
+  var filebrowserEnableInput = document.getElementById("svccfg-filebrowser-enable");
+  var homeAssistantEnableInput = document.getElementById("svccfg-homeassistant-enable");
+  var homeAssistantZwaveEnableInput = document.getElementById("svccfg-homeassistant-zwave-enable");
+  var homeAssistantHacsEnableInput = document.getElementById("svccfg-homeassistant-hacs-enable");
+  var frigateEnableInput = document.getElementById("svccfg-frigate-enable");
+  var seerrEnableInput = document.getElementById("svccfg-seerr-enable");
+  var radarrEnableInput = document.getElementById("svccfg-radarr-enable");
+  var sonarrEnableInput = document.getElementById("svccfg-sonarr-enable");
+  var jackettEnableInput = document.getElementById("svccfg-jackett-enable");
+  var qbittorrentEnableInput = document.getElementById("svccfg-qbittorrent-enable");
+  var ssoEnableInput = document.getElementById("svccfg-sso-enable");
+  var autheliaEnableInput = document.getElementById("svccfg-authelia-enable");
+  var vaultwardenEnableInput = document.getElementById("svccfg-vaultwarden-enable");
+  var nebulaEnableInput = document.getElementById("svccfg-nebula-enable");
+  var tailscaleEnableInput = document.getElementById("svccfg-tailscale-enable");
+  var scrutinyEnableInput = document.getElementById("svccfg-scrutiny-enable");
+  var immichEnableInput = document.getElementById("svccfg-immich-enable");
 
   var modal = document.getElementById("svcconfig-modal");
   var modalCloseX = document.getElementById("svcconfig-modal-close-x");
@@ -626,7 +747,27 @@ title: Service Configuration
     "tailscale.advertiseExitNode": false,
     "tailscale.advertiseRoutes": "",
     "immich.machineLearning.enable": false,
-    "immich.publicProxy.enable": false
+    "immich.publicProxy.enable": false,
+    "jellyfin.enable": true,
+    "plex.enable": false,
+    "minio.enable": false,
+    "filebrowser.enable": false,
+    "homeAssistant.enable": true,
+    "homeAssistant.zwave.enable": false,
+    "homeAssistant.hacs.enable": true,
+    "frigate.enable": true,
+    "mediaAcquisition.seerr.enable": true,
+    "mediaAcquisition.radarr.enable": true,
+    "mediaAcquisition.sonarr.enable": true,
+    "mediaAcquisition.jackett.enable": true,
+    "mediaAcquisition.qbittorrent.enable": true,
+    "sso.enable": false,
+    "sso.authelia.enable": false,
+    "vaultwarden.enable": false,
+    "nebula.enable": true,
+    "tailscale.enable": false,
+    "scrutiny.enable": false,
+    "immich.enable": false
   };
   var minioPasswordSet = false;
 
@@ -644,7 +785,27 @@ title: Service Configuration
     "tailscale.advertiseExitNode": tailscaleAdvertiseExitNodeInput,
     "tailscale.advertiseRoutes": tailscaleAdvertiseRoutesInput,
     "immich.machineLearning.enable": immichMlInput,
-    "immich.publicProxy.enable": immichProxyInput
+    "immich.publicProxy.enable": immichProxyInput,
+    "jellyfin.enable": jellyfinEnableInput,
+    "plex.enable": plexEnableInput,
+    "minio.enable": minioEnableInput,
+    "filebrowser.enable": filebrowserEnableInput,
+    "homeAssistant.enable": homeAssistantEnableInput,
+    "homeAssistant.zwave.enable": homeAssistantZwaveEnableInput,
+    "homeAssistant.hacs.enable": homeAssistantHacsEnableInput,
+    "frigate.enable": frigateEnableInput,
+    "mediaAcquisition.seerr.enable": seerrEnableInput,
+    "mediaAcquisition.radarr.enable": radarrEnableInput,
+    "mediaAcquisition.sonarr.enable": sonarrEnableInput,
+    "mediaAcquisition.jackett.enable": jackettEnableInput,
+    "mediaAcquisition.qbittorrent.enable": qbittorrentEnableInput,
+    "sso.enable": ssoEnableInput,
+    "sso.authelia.enable": autheliaEnableInput,
+    "vaultwarden.enable": vaultwardenEnableInput,
+    "nebula.enable": nebulaEnableInput,
+    "tailscale.enable": tailscaleEnableInput,
+    "scrutiny.enable": scrutinyEnableInput,
+    "immich.enable": immichEnableInput
   };
 
   function currentValue(key) {
@@ -679,7 +840,12 @@ title: Service Configuration
   [
     themeInput, minioUserInput, minioPasswordInput, vaultwardenSignupsInput,
     tailscaleAcceptDnsInput, tailscaleAcceptRoutesInput, tailscaleAdvertiseExitNodeInput, tailscaleAdvertiseRoutesInput,
-    immichMlInput, immichProxyInput
+    immichMlInput, immichProxyInput,
+    jellyfinEnableInput, plexEnableInput, minioEnableInput, filebrowserEnableInput,
+    homeAssistantEnableInput, homeAssistantZwaveEnableInput, homeAssistantHacsEnableInput, frigateEnableInput,
+    seerrEnableInput, radarrEnableInput, sonarrEnableInput, jackettEnableInput, qbittorrentEnableInput,
+    ssoEnableInput, autheliaEnableInput, vaultwardenEnableInput, nebulaEnableInput, tailscaleEnableInput,
+    scrutinyEnableInput, immichEnableInput
   ].forEach(function (el) {
     el.addEventListener("input", refreshSaveVisibility);
     el.addEventListener("change", refreshSaveVisibility);
@@ -697,7 +863,27 @@ title: Service Configuration
         "tailscale.advertiseExitNode": !!data["tailscale.advertiseExitNode"],
         "tailscale.advertiseRoutes": data["tailscale.advertiseRoutes"] || "",
         "immich.machineLearning.enable": !!data["immich.machineLearning.enable"],
-        "immich.publicProxy.enable": !!data["immich.publicProxy.enable"]
+        "immich.publicProxy.enable": !!data["immich.publicProxy.enable"],
+        "jellyfin.enable": !!data["jellyfin.enable"],
+        "plex.enable": !!data["plex.enable"],
+        "minio.enable": !!data["minio.enable"],
+        "filebrowser.enable": !!data["filebrowser.enable"],
+        "homeAssistant.enable": !!data["homeAssistant.enable"],
+        "homeAssistant.zwave.enable": !!data["homeAssistant.zwave.enable"],
+        "homeAssistant.hacs.enable": !!data["homeAssistant.hacs.enable"],
+        "frigate.enable": !!data["frigate.enable"],
+        "mediaAcquisition.seerr.enable": !!data["mediaAcquisition.seerr.enable"],
+        "mediaAcquisition.radarr.enable": !!data["mediaAcquisition.radarr.enable"],
+        "mediaAcquisition.sonarr.enable": !!data["mediaAcquisition.sonarr.enable"],
+        "mediaAcquisition.jackett.enable": !!data["mediaAcquisition.jackett.enable"],
+        "mediaAcquisition.qbittorrent.enable": !!data["mediaAcquisition.qbittorrent.enable"],
+        "sso.enable": !!data["sso.enable"],
+        "sso.authelia.enable": !!data["sso.authelia.enable"],
+        "vaultwarden.enable": !!data["vaultwarden.enable"],
+        "nebula.enable": !!data["nebula.enable"],
+        "tailscale.enable": !!data["tailscale.enable"],
+        "scrutiny.enable": !!data["scrutiny.enable"],
+        "immich.enable": !!data["immich.enable"]
       };
       minioPasswordSet = !!data["minio.rootPasswordSet"];
       themeInput.value = baseline["authelia.theme"];
@@ -712,6 +898,27 @@ title: Service Configuration
       tailscaleAdvertiseRoutesInput.value = baseline["tailscale.advertiseRoutes"];
       immichMlInput.checked = baseline["immich.machineLearning.enable"];
       immichProxyInput.checked = baseline["immich.publicProxy.enable"];
+      jellyfinEnableInput.checked = baseline["jellyfin.enable"];
+      plexEnableInput.checked = baseline["plex.enable"];
+      minioEnableInput.checked = baseline["minio.enable"];
+      filebrowserEnableInput.checked = baseline["filebrowser.enable"];
+      homeAssistantEnableInput.checked = baseline["homeAssistant.enable"];
+      homeAssistantZwaveEnableInput.checked = baseline["homeAssistant.zwave.enable"];
+      homeAssistantHacsEnableInput.checked = baseline["homeAssistant.hacs.enable"];
+      frigateEnableInput.checked = baseline["frigate.enable"];
+      seerrEnableInput.checked = baseline["mediaAcquisition.seerr.enable"];
+      radarrEnableInput.checked = baseline["mediaAcquisition.radarr.enable"];
+      sonarrEnableInput.checked = baseline["mediaAcquisition.sonarr.enable"];
+      jackettEnableInput.checked = baseline["mediaAcquisition.jackett.enable"];
+      qbittorrentEnableInput.checked = baseline["mediaAcquisition.qbittorrent.enable"];
+      ssoEnableInput.checked = baseline["sso.enable"];
+      autheliaEnableInput.checked = baseline["sso.authelia.enable"];
+      vaultwardenEnableInput.checked = baseline["vaultwarden.enable"];
+      nebulaEnableInput.checked = baseline["nebula.enable"];
+      tailscaleEnableInput.checked = baseline["tailscale.enable"];
+      scrutinyEnableInput.checked = baseline["scrutiny.enable"];
+      immichEnableInput.checked = baseline["immich.enable"];
+      document.querySelectorAll("[data-group-toggle]").forEach(function (t) { t.dispatchEvent(new Event("change")); });
       refreshSaveVisibility();
     })
     .catch(function () { refreshSaveVisibility(); });

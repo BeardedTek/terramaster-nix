@@ -155,7 +155,7 @@ let
   };
 in
 {
-  config = lib.mkIf (f.selfUpdate.enable || f.dashboardServices.enable) {
+  config = lib.mkIf (f.selfUpdate.enable || f.dashboardSvcconfig.enable) {
     users.groups.system-rebuild = { };
 
     systemd.tmpfiles.rules = [
@@ -173,7 +173,7 @@ in
     # applyScript above for why this is the one unit in this repo that
     # actually needs both.
     systemd.services.system-rebuild-apply = {
-      description = "Fetch a release and run nixos-rebuild switch, on behalf of self-update or dashboard-services";
+      description = "Fetch a release and run nixos-rebuild switch, on behalf of self-update or dashboard-svcconfig";
       restartIfChanged = false;
       unitConfig.X-StopOnRemoval = false;
       serviceConfig = {
@@ -191,7 +191,7 @@ in
       };
     };
     systemd.paths.system-rebuild-apply = {
-      description = "Watch for a rebuild request from self-update or dashboard-services";
+      description = "Watch for a rebuild request from self-update or dashboard-svcconfig";
       wantedBy = [ "multi-user.target" ];
       pathConfig.PathExists = triggerFile;
     };

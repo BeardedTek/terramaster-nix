@@ -27,6 +27,44 @@ let
   immichMlOverridesFile = "/persist/nixos-immich-ml-overrides.nix";
   immichProxyOverridesFile = "/persist/nixos-immich-proxy-overrides.nix";
 
+  # Absorbed from the now-deleted modules/dashboard-services.nix (the old
+  # "Services" accordion on System Preferences) — every service
+  # enable/disable flag now lives here instead, one toggle per service's
+  # own panel on this page. Order matches this page's category grouping.
+  # Not selfUpdate, traefikDns01, or the two dashboard*.enable flags —
+  # those were never part of that accordion either.
+  flagPaths = [
+    [ "jellyfin" "enable" ]
+    [ "plex" "enable" ]
+    [ "immich" "enable" ]
+    [ "minio" "enable" ]
+    [ "filebrowser" "enable" ]
+    [ "homeAssistant" "enable" ]
+    [ "homeAssistant" "zwave" "enable" ]
+    [ "homeAssistant" "hacs" "enable" ]
+    [ "frigate" "enable" ]
+    [ "mediaAcquisition" "enable" ]
+    [ "mediaAcquisition" "seerr" "enable" ]
+    [ "mediaAcquisition" "radarr" "enable" ]
+    [ "mediaAcquisition" "sonarr" "enable" ]
+    [ "mediaAcquisition" "jackett" "enable" ]
+    [ "mediaAcquisition" "qbittorrent" "enable" ]
+    [ "sso" "enable" ]
+    [ "sso" "authelia" "enable" ]
+    [ "nebula" "enable" ]
+    [ "tailscale" "enable" ]
+    [ "vaultwarden" "enable" ]
+    [ "scrutiny" "enable" ]
+  ];
+  flagKey = path: lib.concatStringsSep "." path;
+  flagVarName = path: lib.replaceStrings [ "." ] [ "_" ] (flagKey path);
+  flagKeyCaseArms = lib.concatStringsSep "|" (map flagKey flagPaths);
+
+  # One consolidated file for all 21 — mirrors dashboard-services.nix's
+  # own former "one file, full rewrite of every flag" convention, rather
+  # than 21 tiny per-flag files.
+  serviceEnableOverridesFile = "/persist/nixos-service-enable-overrides.nix";
+
   # The literal path modules/minio.nix's rootCredentialsFile already
   # points at — a plain runtime secrets file (systemd EnvironmentFile=),
   # not baked into the Nix store, so rewriting it only needs a service
@@ -54,7 +92,9 @@ let
     "tailscale.advertiseRoutes" = f.tailscale.advertiseRoutes;
     "immich.machineLearning.enable" = f.immich.machineLearning.enable;
     "immich.publicProxy.enable" = f.immich.publicProxy.enable;
-  };
+  } // lib.listToAttrs (map
+    (path: lib.nameValuePair (flagKey path) (lib.getAttrFromPath path f))
+    flagPaths);
   stateJson = pkgs.writeText "dashboard-svcconfig-state.json" (builtins.toJSON currentState);
 
   # Shared by saveCgi (blank/absent password = keep whatever's already
@@ -122,6 +162,7 @@ let
           authelia.theme|minio.rootUser|minio.rootPassword|vaultwarden.signupsAllowed) ;;
           tailscale.acceptDns|tailscale.acceptRoutes|tailscale.advertiseExitNode|tailscale.advertiseRoutes) ;;
           immich.machineLearning.enable|immich.publicProxy.enable) ;;
+          ${flagKeyCaseArms}) ;;
           *) fail "unknown field: $k" ;;
         esac
       done <<< "$keys"
@@ -184,6 +225,26 @@ let
           request_json=$(printf '%s' "$request_json" | jq --arg k "$field" --argjson v "$v" '.[$k] = $v')
         fi
       done
+
+      # Every service enable/disable flag, ported from the old Services
+      # accordion's saveCgi — optional per-key here (unlike that old
+      # module, which required all 21 on every save), matching how
+      # every other field on this page only gets submitted when it
+      # actually changed (buildChanges() on the frontend). Server-side
+      # group-consistency normalization (sso off forces authelia off,
+      # etc.) happens in applyScript below, against the *resolved*
+      # value of each flag (submitted-or-last-known), not just what
+      # this particular save happened to include.
+      ${lib.concatMapStringsSep "\n" (path: ''
+        if printf '%s' "$body" | jq -e 'has("${flagKey path}")' >/dev/null 2>&1; then
+          v=$(printf '%s' "$body" | jq -r '.["${flagKey path}"]')
+          case "$v" in
+            true|false) ;;
+            *) fail "invalid ${flagKey path}" ;;
+          esac
+          request_json=$(printf '%s' "$request_json" | jq --argjson v "$v" '.["${flagKey path}"] = $v')
+        fi
+      '') flagPaths}
 
       minio_user_present=false
       pass_val=""
@@ -400,18 +461,70 @@ let
         mv ${immichProxyOverridesFile}.tmp ${immichProxyOverridesFile}
       fi
 
+      # Same "read submitted value, else fall back to last-known state"
+      # merge tailscale_get_field() already does — all 21 flags share
+      # one overrides file, regenerated from scratch on every save, so
+      # saving just one changed checkbox must not silently reset the
+      # other 20 to their common.nix defaults.
+      service_enable_get_field() {
+        local k="$1"
+        if jq -e --arg k "$k" 'has($k)' ${pendingFile} >/dev/null 2>&1; then
+          jq -r --arg k "$k" '.[$k]' ${pendingFile}
+        else
+          jq -r --arg k "$k" '.[$k]' /etc/dashboard-svcconfig-state.json
+        fi
+      }
+
+      service_enable_present=$(jq -r '(${lib.concatMapStringsSep " or " (path: "has(\"${flagKey path}\")") flagPaths}) | tostring' ${pendingFile})
+      if [ "$service_enable_present" = "true" ]; then
+        ${lib.concatMapStringsSep "\n" (path: ''
+          ${flagVarName path}=$(service_enable_get_field "${flagKey path}")
+        '') flagPaths}
+
+        # Group-consistency normalization against the *resolved* values
+        # above, not just what this save happened to submit — same
+        # backstop the old Services accordion's saveCgi had server-side,
+        # ported here since modules/authelia.nix hard-asserts
+        # sso.authelia.enable requires sso.enable, and hitting that
+        # assertion mid-rebuild is a much worse failure than never
+        # constructing an invalid combination here.
+        if [ "$sso_enable" = "false" ]; then
+          sso_authelia_enable=false
+        fi
+        if [ "$homeAssistant_enable" = "false" ]; then
+          homeAssistant_zwave_enable=false
+          homeAssistant_hacs_enable=false
+        fi
+        # mediaAcquisition.enable has no UI control on this page (never
+        # has) — always written true, matching current production
+        # behavior exactly; only its 5 sub-flags are ever really toggled.
+        mediaAcquisition_enable=true
+
+        {
+          echo "{ lib, ... }:"
+          echo "{"
+          echo "  config = {"
+          ${lib.concatMapStringsSep "\n" (path: ''
+            echo "    mySystem.features.${flagKey path} = lib.mkForce ''$${flagVarName path};"
+          '') flagPaths}
+          echo "  };"
+          echo "}"
+        } > ${serviceEnableOverridesFile}.tmp
+        mv ${serviceEnableOverridesFile}.tmp ${serviceEnableOverridesFile}
+      fi
+
       rm -f ${pendingFile}
 
       # theme_present/vaultwarden_present/tailscale_present/immich_ml_present/
-      # immich_proxy_present are the rebuild-driven concerns — any one
-      # (or several, in the same save) triggers exactly one shared-runner
-      # handoff. MinIO's own outcome is already final by this point
-      # (synchronous, above); if it failed, surface that directly
-      # instead of also kicking off an unrelated rebuild — the
+      # immich_proxy_present/service_enable_present are the rebuild-driven
+      # concerns — any one (or several, in the same save) triggers exactly
+      # one shared-runner handoff. MinIO's own outcome is already final by
+      # this point (synchronous, above); if it failed, surface that
+      # directly instead of also kicking off an unrelated rebuild — the
       # overrides file(s) are still written either way, so a pending
       # rebuild-driven change takes effect on whatever rebuild happens
       # next instead of being lost.
-      if [ "$theme_present" = "true" ] || [ "$vaultwarden_present" = "true" ] || [ "$tailscale_present" = "true" ] || [ "$immich_ml_present" = "true" ] || [ "$immich_proxy_present" = "true" ]; then
+      if [ "$theme_present" = "true" ] || [ "$vaultwarden_present" = "true" ] || [ "$tailscale_present" = "true" ] || [ "$immich_ml_present" = "true" ] || [ "$immich_proxy_present" = "true" ] || [ "$service_enable_present" = "true" ]; then
         if [ -n "$minio_result" ] && [ "$minio_result" != "ok" ]; then
           write_local_result "$minio_result"
         else
@@ -477,17 +590,20 @@ in
     default = true;
     description = ''
       Dashboard-driven Service Configuration save pipeline — see
-      modules/dashboard-svcconfig.nix and the Authelia/MinIO/
-      Vaultwarden/Tailscale/Immich blocks on the Service Configuration
-      page. One batch save endpoint covering two different underlying
-      mechanisms: Authelia's theme, Vaultwarden's signupsAllowed,
-      Tailscale's four `tailscale set` toggles, and Immich's machine-
-      learning/public-proxy toggles each go through their own
-      /persist-backed overrides file and modules/system-rebuild.nix's
-      shared rebuild runner (kind: "svcconfig"); MinIO's root
-      credentials are rewritten directly into modules/minio.nix's
-      rootCredentialsFile and the service restarted, no rebuild
-      involved.
+      modules/dashboard-svcconfig.nix and every service's panel on the
+      Service Configuration page (each now carries its own enable/
+      disable toggle alongside whatever real settings it has — the
+      former "Services" accordion on System Preferences no longer
+      exists). One batch save endpoint covering two different
+      underlying mechanisms: Authelia's theme, Vaultwarden's
+      signupsAllowed, Tailscale's four `tailscale set` toggles,
+      Immich's machine-learning/public-proxy toggles, and all 21
+      service enable/disable flags each go through their own (or, for
+      the 21 flags, one shared) /persist-backed overrides file and
+      modules/system-rebuild.nix's shared rebuild runner (kind:
+      "svcconfig"); MinIO's root credentials are rewritten directly
+      into modules/minio.nix's rootCredentialsFile and the service
+      restarted, no rebuild involved.
     '';
   };
 
