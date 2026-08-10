@@ -3,9 +3,5 @@ links:
     link: /
   - name: Services
     link: /services/
-  - name: Samba
-    link: /samba/
-  - name: NFS
-    link: /nfs/
   - name: Help
-    link: /troubleshooting/
+    link: /help/
