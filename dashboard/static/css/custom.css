@@ -291,6 +291,7 @@
      (already used in dashboard/content/update.md's cards) so those stay
      as plain Tailwind classes on the element itself. */
   .auth-nav-button {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
@@ -340,6 +341,42 @@
   }
   .dark .auth-nav-item:hover {
     background-color: #374151;
+  }
+
+  /* System-update notification (auth-nav.js checkForUpdate()) — plain
+     CSS rather than utilities again: bg-red-500, text-red-600/400,
+     w-2.5/h-2.5, and negative-value utilities like -top-0.5/-right-0.5
+     all fall into the same "not in this vendored bundle" gap as the
+     other hand-written rules in this file. Deliberately a small dot +
+     bold-red menu item instead of a page-wide banner — an earlier
+     full-width version read as a jarring, out-of-place alert; this
+     stays noticeable without fighting the rest of the chrome. */
+  .auth-nav-update-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    background-color: #ef4444;
+    border-radius: 9999px;
+    border: 2px solid #fff;
+  }
+  .dark .auth-nav-update-dot {
+    border-color: #1f2937;
+  }
+
+  .auth-nav-update-link {
+    font-weight: 700;
+    color: #dc2626;
+  }
+  .dark .auth-nav-update-link {
+    color: #f87171;
+  }
+  .auth-nav-update-link:hover {
+    color: #b91c1c;
+  }
+  .dark .auth-nav-update-link:hover {
+    color: #fca5a5;
   }
 
   /* System Preferences' group/mode toggles (preferences-toggles.js) —

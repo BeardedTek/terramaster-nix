@@ -20,6 +20,28 @@
       '<a href="/login/" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Login</a>';
   }
 
+  // Checked once the dropdown exists (admins only — same gating as the
+  // System Preferences/Service Configuration/System Update links
+  // themselves, since only an admin can act on this via /update/trigger).
+  // Reuses /update/status as-is — it already does a live GitHub check on
+  // every call, so no separate endpoint is needed. Deliberately subtle
+  // rather than a page-wide banner: a small red dot on the account
+  // button, and the System Update item itself turns bold red once the
+  // dropdown is opened — noticeable without demanding attention on every
+  // single page load.
+  function checkForUpdate() {
+    fetch("/update/status", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data || data.state || !data.updateAvailable) { return; }
+        var dot = document.getElementById("auth-nav-update-dot");
+        var link = document.getElementById("auth-nav-update-link");
+        if (dot) { dot.classList.remove("hidden"); }
+        if (link) { link.classList.add("auth-nav-update-link"); }
+      })
+      .catch(function () {});
+  }
+
   function renderLoggedIn(info) {
     var items = "";
     if (info.isAdmin) {
@@ -28,7 +50,7 @@
       items +=
         '<a href="/service-configuration/" class="auth-nav-item">Service Configuration</a>';
       items +=
-        '<a href="/update/" class="auth-nav-item">System Update</a>';
+        '<a href="/update/" id="auth-nav-update-link" class="auth-nav-item">System Update</a>';
     }
     items += '<a href="/account/" class="auth-nav-item">Manage Profile</a>';
     items += '<a href="/logout" class="auth-nav-item">Logout</a>';
@@ -37,6 +59,7 @@
       '<button id="auth-nav-toggle" type="button" class="auth-nav-button">' +
       (info.username || "Account") +
       ' <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>' +
+      '<span id="auth-nav-update-dot" class="hidden auth-nav-update-dot"></span>' +
       "</button>" +
       '<div id="auth-nav-dropdown" class="hidden auth-nav-dropdown bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">' +
       items +
@@ -53,6 +76,8 @@
         dropdown.classList.add("hidden");
       }
     });
+
+    if (info.isAdmin) { checkForUpdate(); }
   }
 
   fetch("/whoami", { cache: "no-store" })
