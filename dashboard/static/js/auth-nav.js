@@ -21,14 +21,16 @@
   }
 
   function renderLoggedIn(info) {
-    var items =
-      '<a href="/account/" class="auth-nav-item">Manage Profile</a>';
+    var items = "";
     if (info.isAdmin) {
       items +=
         '<a href="/preferences/" class="auth-nav-item">System Preferences</a>';
       items +=
         '<a href="/service-configuration/" class="auth-nav-item">Service Configuration</a>';
+      items +=
+        '<a href="/update/" class="auth-nav-item">System Update</a>';
     }
+    items += '<a href="/account/" class="auth-nav-item">Manage Profile</a>';
     items += '<a href="/logout" class="auth-nav-item">Logout</a>';
 
     container.innerHTML =
