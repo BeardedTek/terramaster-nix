@@ -1,3 +1,4 @@
+{ config, ... }:
 {
   system.stateVersion = "26.05";
 
@@ -62,6 +63,66 @@
   fileSystems."/rust/docker" = {
     device = "rust/docker";
     fsType = "zfs";
+  };
+
+  # Ensures rust/minio and rust/immich exist *before* the mount units
+  # above try to mount them — confirmed the hard way: a missing dataset
+  # is a hard boot-time mount failure that drops systemd into emergency
+  # mode (Immich hit this in production; MinIO's own dataset was already
+  # documented as the same known-but-unhit gap, see
+  # docs/content/en/docs/architecture/_index.md's MinIO section).
+  # Deliberately unconditional, not gated on
+  # mySystem.features.minio.enable/immich.enable — the mounts themselves
+  # are unconditional too (same as every other /rust/* entry), so the
+  # dataset has to exist regardless of whether the service is currently
+  # toggled on, or a box with the feature off would hit this exact crash
+  # the moment this config syncs (which is exactly what happened —
+  # Immich wasn't even enabled yet).
+  #
+  # Ordered after/requires "rust.mount" (the already-existing top-level
+  # /rust mount) rather than a hand-guessed zfs-import-rust.service name
+  # — if /rust itself is successfully mounted, the pool is definitely
+  # already imported, so this gets correct pool-import ordering for free
+  # from a unit we already know exists. before/requiredBy the target's
+  # own mount unit (systemd's standard, deterministic path-to-unit-name
+  # escaping: /rust/X -> rust-X.mount) is what actually inserts this
+  # *before* the mount attempt; requiredBy is what pulls it into the
+  # boot graph at all, equivalent to the mount unit itself declaring
+  # Requires=zfs-ensure-X-dataset.service.
+  #
+  # Only ever creates, never destroys — disabling a service must never
+  # delete its data. No `zfs destroy` anywhere in this repo, deliberately.
+  systemd.services."zfs-ensure-minio-dataset" = {
+    description = "Ensure the rust/minio ZFS dataset exists before mounting it";
+    after = [ "rust.mount" ];
+    requires = [ "rust.mount" ];
+    before = [ "rust-minio.mount" ];
+    requiredBy = [ "rust-minio.mount" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      if ! ${config.boot.zfs.package}/bin/zfs list "rust/minio" >/dev/null 2>&1; then
+        ${config.boot.zfs.package}/bin/zfs create "rust/minio"
+      fi
+    '';
+  };
+  systemd.services."zfs-ensure-immich-dataset" = {
+    description = "Ensure the rust/immich ZFS dataset exists before mounting it";
+    after = [ "rust.mount" ];
+    requires = [ "rust.mount" ];
+    before = [ "rust-immich.mount" ];
+    requiredBy = [ "rust-immich.mount" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      if ! ${config.boot.zfs.package}/bin/zfs list "rust/immich" >/dev/null 2>&1; then
+        ${config.boot.zfs.package}/bin/zfs create "rust/immich"
+      fi
+    '';
   };
 
   environment.persistence."/persist" = {
