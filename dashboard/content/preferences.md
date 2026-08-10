@@ -2,21 +2,12 @@
 title: System Preferences
 ---
 
-<p class="text-gray-700 dark:text-gray-300 mb-8 leading-relaxed">
-  Admin-only system settings. More will land here over time.
-</p>
-
 <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm mb-4">
   <button type="button" class="accordion-toggle w-full flex items-center justify-between p-4 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="accordion-network-panel">
     <span>Network</span>
     <svg class="accordion-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
   </button>
   <div id="accordion-network-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-4">
-<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-  Hostname and Domain below are preview only for now. Network Interface
-  and the fields below it are live &mdash; saving rebuilds the system in
-  place.
-</p>
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 preferences-dimmed">
   <div>
     <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Hostname</span>
@@ -66,16 +57,27 @@ title: System Preferences
 
 <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm mb-4">
   <button type="button" class="accordion-toggle w-full flex items-center justify-between p-4 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="accordion-letsencrypt-panel">
-    <span>Let's Encrypt</span>
+    <span>Let's Encrypt SSL Certs</span>
     <svg class="accordion-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
   </button>
   <div id="accordion-letsencrypt-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-4">
-<p class="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
-  Configures DNS-01 certificate issuance for Traefik. Pick your DNS
-  provider, enter its credentials, and set the domain (and wildcard
-  subdomain) you want a certificate for. Saving restarts Traefik to apply
-  the change &mdash; takes a few seconds.
-</p>
+    <p class="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
+      This system uses DNS-01 Certificate Issuance for SSL Certs which
+      does not require your NAS to be exposed to the general internet,
+      but requires you to have a registered domain name.
+    </p>
+    <p class="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
+      Choose your DNS provider and fill in your credentials.
+      All fields are required.
+    </p>
+    <p class="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
+      NOTE: you must have either a DNS server with records for this
+      domain pointed at this NAS or on each computer manually edit
+      the hosts file in order for domain resolution to properly work.
+      If you have questions about this please contact your admin
+      listed in the footer of this page.
+    </p>
+
 
 <div class="mb-4">
   <span class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">DNS Provider</span>
@@ -408,15 +410,17 @@ title: System Preferences
 
 <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm mb-4">
   <button type="button" class="accordion-toggle w-full flex items-center justify-between p-4 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="accordion-smtp-panel">
-    <span>OpenSMTP</span>
+    <span>Email Settings</span>
     <svg class="accordion-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
   </button>
   <div id="accordion-smtp-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-4">
 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-  Lets other services on this box (password resets, 2FA links, alerts)
-  send email through a real upstream provider. Saving rebuilds the
-  system in place, same as Services or Network changes &mdash; it can
-  take a few minutes.
+  In order to send emails, we need to configure an SMTP server.<br>
+  This system uses OpenSMTP which opens an email relay ONLY on localhost.
+</p>
+<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+  Choose your email service, fill in the required information and click save
+  or choose Custom / Other SMTP to set it up manually.
 </p>
 <div class="flex items-center justify-between py-2 mb-4">
   <span class="text-sm font-medium text-gray-900 dark:text-white">Enable SMTP relay</span>

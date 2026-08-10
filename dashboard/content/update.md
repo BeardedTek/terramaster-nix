@@ -3,9 +3,10 @@ title: System Update
 ---
 
 <p class="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
-  The current and latest available version are always shown below.
-  Applying an update fetches the new release and rebuilds the system
-  in place.
+  A notification dot will appear above your username on the navbar if a newer version is available.
+</p>
+<p class="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
+  See the project's <a href="https://github.com/BeardedTek/terramaster-nix/releases">GitHub Releases</a> for more information.
 </p>
 
 <div id="update-info" class="mb-4 text-sm text-gray-700 dark:text-gray-300">

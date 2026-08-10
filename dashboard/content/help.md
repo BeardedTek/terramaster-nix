@@ -1,12 +1,6 @@
 ---
-title: Help
+title: Help Topics
 ---
-
-<p class="text-gray-700 dark:text-gray-300 mb-8 leading-relaxed">
-  Everything in one place: connecting to your file shares, what each
-  service is for and how to reach it, and what to do if something's
-  not working.
-</p>
 
 <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
   <div class="flex items-center justify-between p-3">

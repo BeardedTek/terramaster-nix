@@ -3,14 +3,10 @@ title: Service Configuration
 ---
 
 <p class="text-gray-700 dark:text-gray-300 mb-8 leading-relaxed">
-  Enable or disable each service and manage whatever settings it has,
-  all in one place. Toggling a switch previews the change only &mdash;
-  nothing is applied until you click Save and confirm. Most services
-  don't have anything genuinely configurable beyond that toggle
-  &mdash; they manage their own settings through their own admin UI,
-  so those blocks just link out instead of pretending to offer
-  controls that don't exist. Authelia and MinIO have a couple of real,
-  live settings; Nebula's config upload lives at the bottom.
+  Enable, disable, and configure services on this NAS.
+</p>
+<p class="text-gray-700 dark:text-gray-300 mb-8 leading-relaxed">
+  You must click SAVE at the bottom of the page for changes to apply.
 </p>
 
 <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
