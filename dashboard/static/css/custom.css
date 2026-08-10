@@ -364,3 +364,17 @@
   .switch input:disabled + .slider {
     cursor: not-allowed;
   }
+
+  /* Same "vendored bundle only has what the original site's templates
+     happened to use" gap as the update-modal rules above, this time for
+     list-disc pl-6 — used throughout the Help page and elsewhere for
+     ordinary bulleted lists. pl-3/4/5/9/10/11/12 are all compiled in,
+     but pl-6/7/8 aren't; with no padding-left at all, list-style-
+     position:outside renders the bullet marker before the list's own
+     left edge instead of indented under the text above it, spilling
+     out past the surrounding container. 1.5rem matches Tailwind's own
+     scale for pl-6, so this behaves exactly like the utility would
+     have if it were compiled in. */
+  .pl-6 {
+    padding-left: 1.5rem;
+  }
