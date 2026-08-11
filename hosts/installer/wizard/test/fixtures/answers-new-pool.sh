@@ -39,7 +39,7 @@ MOCK_ANSWERS["testuser2's password"]="TestUser2Pass123!"
 # something the wizard alone can produce a working config for, matching
 # its own real default (OFF, "no dongle attached yet") and the
 # Architecture doc's documented manual Z-Wave enablement steps.
-MOCK_ANSWERS["Services"]='"sso" "sso_authelia" "jellyfin" "frigate" "minio" "filebrowser" "homeassistant" "homeassistant_hacs" "mediaacq" "mediaacq_seerr" "mediaacq_radarr" "mediaacq_sonarr" "mediaacq_jackett" "mediaacq_qbittorrent"'
+MOCK_ANSWERS["Services"]='"sso" "sso_authelia" "jellyfin" "frigate" "minio" "filebrowser" "homeassistant" "homeassistant_hacs" "mediaacq" "mediaacq_seerr" "mediaacq_radarr" "mediaacq_sonarr" "mediaacq_jackett" "mediaacq_qbittorrent" "immich" "nebula"'
 
 MOCK_ANSWERS["SSH access for testadmin"]="password"
 MOCK_YESNO["Use password login?"]="true"

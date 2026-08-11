@@ -20,7 +20,7 @@ let
   versionFile = "/persist/nixos-version";
 
   # The actual fetch/extract/nixos-rebuild-switch/progress-tracking work
-  # is shared with modules/dashboard-services.nix via
+  # is shared with modules/dashboard-svcconfig.nix via
   # modules/system-rebuild.nix — see that file's own comment for why
   # (this module used to carry an independent copy of all of that,
   # which is what originally hit the apply-service-kills-itself and
@@ -79,7 +79,7 @@ let
   '';
 
   # Periodic check only — never touches the system. Skips entirely while
-  # a rebuild (from either this feature or dashboard-services') is in
+  # a rebuild (from either this feature or dashboard-svcconfig's) is in
   # flight, so it can't clobber statusFile with a stale "no update
   # available" read mid-rebuild — the shared runner refreshes
   # statusFile-equivalent state itself via the progress file, so
@@ -112,7 +112,7 @@ let
       # actual resolved tag once it knows it — this caller requests
       # mode:"latest" and doesn't find out which tag that is until the
       # shared runner does. kind:"update" lets statusCgi below tell "my
-      # own run" apart from a dashboard-services run that happens to
+      # own run" apart from a dashboard-svcconfig run that happens to
       # still be within its own settled-state window.
       printf '%s' '{"mode":"latest","label":"Updated to %TAG%","kind":"update"}' > ${sharedRequestFile}.tmp
       mv ${sharedRequestFile}.tmp ${sharedRequestFile}
@@ -143,7 +143,7 @@ let
       # Also treat a progress file written in the last 2 minutes as
       # current, so a fast-finished run's result is still visible for a
       # bit rather than only during the run itself. Gated on
-      # kind:"update" specifically — otherwise a dashboard-services run
+      # kind:"update" specifically — otherwise a dashboard-svcconfig run
       # still inside its own settled-state window would show up here
       # too, reading as "it's updating again" when nothing update-related
       # actually re-triggered.
@@ -169,7 +169,7 @@ in
       group = "nas-update";
       # Lets triggerCgi write directly into modules/system-rebuild.nix's
       # shared run directory (0770 root:system-rebuild) without needing
-      # its own privileged relay step — unlike dashboard-services.nix's
+      # its own privileged relay step — unlike dashboard-svcconfig.nix's
       # own pre-step, this feature has no root-only work to do before
       # handing off (no overrides file to write), so there's nothing
       # else a privileged step would be for.

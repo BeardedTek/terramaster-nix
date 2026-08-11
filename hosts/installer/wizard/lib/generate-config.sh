@@ -35,9 +35,15 @@ ${users_nix}  ];
 
   mySystem.features = {
     jellyfin.enable = $(f jellyfin);
+    plex.enable = $(f plex);
     frigate.enable = $(f frigate);
     minio.enable = $(f minio);
     filebrowser.enable = $(f filebrowser);
+    immich.enable = $(f immich);
+    nebula.enable = $(f nebula);
+    tailscale.enable = $(f tailscale);
+    vaultwarden.enable = $(f vaultwarden);
+    scrutiny.enable = $(f scrutiny);
 
     sso.enable = $(f sso);
     sso.authelia.enable = $(f sso_authelia);
@@ -74,6 +80,7 @@ _gen_persistence_block() {
       "/etc/traefik"
       "/var/lib/samba"
       "/var/lib/jellyfin"
+      { directory = "/var/lib/plex"; user = "plex"; group = "plex"; mode = "0755"; }
       "/var/lib/sonarr"
       "/var/lib/radarr"
       "/var/lib/jackett"
@@ -93,7 +100,16 @@ _gen_persistence_block() {
       "/etc/jellyfin"
       "/etc/dashboard-login"
       "/etc/unix-ldap-login"
+      "/etc/vaultwarden"
+      "/var/lib/vaultwarden"
+      "/etc/tailscale"
+      "/var/lib/tailscale"
+      "/var/lib/influxdb2"
+      "/var/lib/scrutiny-collector-state"
       { directory = "/var/lib/private"; user = "root"; group = "root"; mode = "0700"; }
+      { directory = "/var/lib/postgresql"; user = "postgres"; group = "postgres"; mode = "0700"; }
+      "/var/lib/immich"
+      "/var/cache/immich"
     ];
     files = [
       "/etc/machine-id"
@@ -102,6 +118,62 @@ _gen_persistence_block() {
       "/etc/ssh/ssh_host_ed25519_key"
       "/etc/ssh/ssh_host_ed25519_key.pub"
     ];
+  };
+EOF
+}
+
+# Runtime dataset-creation safety net for the optional, feature-gated
+# /<pool>/minio and /<pool>/immich datasets — same lib.mkIf-gated
+# fileSystems + zfs-ensure-<name>-dataset oneshot pattern as
+# hosts/terramaster/young/configuration.nix (ported here after that
+# exact gap — an unconditionally-mounted dataset that didn't exist yet
+# — caused a real production boot failure there). Only ever creates,
+# never destroys. Needed by both storage paths: neither disko (new
+# pool) nor an adopted pool (existing) know about these two optional
+# per-feature datasets ahead of time, so this stays a purely runtime,
+# post-mount concern rather than something baked into pool creation.
+# `${pool}.mount` exists as a real unit for both paths — the existing-
+# pool generator declares fileSystems."/${pool}" directly below, and
+# lib/zfs-pool.nix sets the new-pool disko zpool's own mountpoint to
+# "/${poolName}", so disko produces the same top-level mount.
+_gen_zfs_ensure_block() {
+  local pool="$1" name="$2"
+  cat <<EOF
+  fileSystems."/${pool}/${name}" = lib.mkIf f.${name}.enable {
+    device = "${pool}/${name}";
+    fsType = "zfs";
+  };
+  systemd.services."zfs-ensure-${name}-dataset" = lib.mkIf f.${name}.enable {
+    description = "Ensure the ${pool}/${name} ZFS dataset exists before mounting it";
+    # DefaultDependencies = false is required, not cosmetic: without it
+    # this oneshot picks up systemd's normal After=basic.target, which
+    # pulls in sockets.target -> every enabled .socket unit (e.g.
+    # fcgiwrap-dashboard-nebula.socket) -> sysinit.target ->
+    # systemd-update-done.service -> local-fs.target — closing a real
+    # ordering cycle back to "${pool}-${name}.mount", since that mount
+    # unit's own Before=local-fs.target makes local-fs.target implicitly
+    # After= it. Confirmed the hard way in a real Tier 2 VM boot:
+    # systemd silently breaks the cycle by deleting
+    # "${pool}-${name}.mount"'s own start job, so the ensure-service
+    # still runs and creates the dataset, but the mount itself never
+    # happens and the dependent service (e.g. minio.service) just sits
+    # inactive with no error surfaced anywhere obvious. Early-boot-only
+    # oneshots that must run before a specific local mount need this,
+    # same as systemd-fsck@ and other early mount helpers.
+    unitConfig.DefaultDependencies = false;
+    after = [ "${pool}.mount" ];
+    requires = [ "${pool}.mount" ];
+    before = [ "${pool}-${name}.mount" "local-fs.target" ];
+    requiredBy = [ "${pool}-${name}.mount" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      if ! \${config.boot.zfs.package}/bin/zfs list "${pool}/${name}" >/dev/null 2>&1; then
+        \${config.boot.zfs.package}/bin/zfs create "${pool}/${name}"
+      fi
+    '';
   };
 EOF
 }
@@ -117,6 +189,10 @@ gen_configuration_nix_existing() {
   data=$(wiz_get role_data)
 
   cat <<EOF
+{ config, lib, ... }:
+let
+  f = config.mySystem.features;
+in
 {
   system.stateVersion = "26.05";
 
@@ -159,6 +235,9 @@ gen_configuration_nix_existing() {
     fsType = "zfs";
   };
 
+$(_gen_zfs_ensure_block "$pool" "minio")
+$(_gen_zfs_ensure_block "$pool" "immich")
+
 $(_gen_persistence_block)
 }
 EOF
@@ -176,7 +255,14 @@ EOF
 # added, since disko's auto-generated fileSystems entries default it to
 # false.
 gen_configuration_nix_new() {
+  local pool
+  pool=$(wiz_get pool_name)
+
   cat <<EOF
+{ config, lib, ... }:
+let
+  f = config.mySystem.features;
+in
 {
   system.stateVersion = "26.05";
 
@@ -192,6 +278,9 @@ gen_configuration_nix_new() {
 
   fileSystems."/nix".neededForBoot = true;
   fileSystems."/persist".neededForBoot = true;
+
+$(_gen_zfs_ensure_block "$pool" "minio")
+$(_gen_zfs_ensure_block "$pool" "immich")
 
 $(_gen_persistence_block)
 }

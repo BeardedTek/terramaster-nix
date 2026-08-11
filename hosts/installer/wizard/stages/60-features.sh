@@ -20,12 +20,19 @@ stage_60_features() {
     "mediaacq_radarr"     "  -> Radarr"                                "ON" \
     "mediaacq_sonarr"     "  -> Sonarr"                                "ON" \
     "mediaacq_jackett"    "  -> Jackett"                               "ON" \
-    "mediaacq_qbittorrent" "  -> qBittorrent"                          "ON"
+    "mediaacq_qbittorrent" "  -> qBittorrent"                          "ON" \
+    "plex"                "Plex (media server)"                       "OFF" \
+    "immich"              "Immich (photo/video backup)"                "OFF" \
+    "nebula"              "Nebula (mesh VPN)"                          "ON" \
+    "tailscale"           "Tailscale (mesh VPN)"                       "OFF" \
+    "vaultwarden"         "Vaultwarden (password manager)"             "OFF" \
+    "scrutiny"            "Scrutiny (drive health monitoring)"         "OFF"
   )
 
   local flag
   for flag in sso sso_authelia jellyfin frigate minio filebrowser homeassistant homeassistant_hacs homeassistant_zwave \
-              mediaacq mediaacq_seerr mediaacq_radarr mediaacq_sonarr mediaacq_jackett mediaacq_qbittorrent; do
+              mediaacq mediaacq_seerr mediaacq_radarr mediaacq_sonarr mediaacq_jackett mediaacq_qbittorrent \
+              plex immich nebula tailscale vaultwarden scrutiny; do
     if [[ " $selected " == *"\"$flag\""* ]]; then
       wiz_set "feature_$flag" "true"
     else

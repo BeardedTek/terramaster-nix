@@ -101,11 +101,27 @@ in
   # delete its data. No `zfs destroy` anywhere in this repo, deliberately;
   # a dataset created while the feature was on stays right where it is
   # if the feature is later turned off, just unmounted.
+  # DefaultDependencies = false is required, not cosmetic: without it
+  # these oneshots pick up systemd's normal After=basic.target, which
+  # pulls in sockets.target -> every enabled .socket unit (e.g.
+  # fcgiwrap-dashboard-nebula.socket) -> sysinit.target ->
+  # systemd-update-done.service -> local-fs.target — closing a real
+  # ordering cycle back to "rust-minio.mount"/"rust-immich.mount",
+  # since those mount units' own Before=local-fs.target makes
+  # local-fs.target implicitly After= them. Confirmed the hard way in a
+  # real Tier 2 installer VM boot (same pattern, ported from
+  # hosts/installer/wizard/lib/generate-config.sh after finding it
+  # there first): systemd silently breaks the cycle by deleting the
+  # mount unit's own start job, so the ensure-service still runs and
+  # creates the dataset, but the mount itself never happens and the
+  # dependent service (minio.service) just sits inactive with no error
+  # surfaced anywhere obvious.
   systemd.services."zfs-ensure-minio-dataset" = lib.mkIf f.minio.enable {
     description = "Ensure the rust/minio ZFS dataset exists before mounting it";
+    unitConfig.DefaultDependencies = false;
     after = [ "rust.mount" ];
     requires = [ "rust.mount" ];
-    before = [ "rust-minio.mount" ];
+    before = [ "rust-minio.mount" "local-fs.target" ];
     requiredBy = [ "rust-minio.mount" ];
     serviceConfig = {
       Type = "oneshot";
@@ -119,9 +135,10 @@ in
   };
   systemd.services."zfs-ensure-immich-dataset" = lib.mkIf f.immich.enable {
     description = "Ensure the rust/immich ZFS dataset exists before mounting it";
+    unitConfig.DefaultDependencies = false;
     after = [ "rust.mount" ];
     requires = [ "rust.mount" ];
-    before = [ "rust-immich.mount" ];
+    before = [ "rust-immich.mount" "local-fs.target" ];
     requiredBy = [ "rust-immich.mount" ];
     serviceConfig = {
       Type = "oneshot";
