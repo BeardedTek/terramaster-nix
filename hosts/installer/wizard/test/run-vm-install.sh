@@ -312,19 +312,18 @@ vkey_enter                              # Add a user -> blank name ends the loop
 wiz_note "users added (root, testadmin, testuser2)"
 
 # Services checklist: defaults already match this test's "everything but
-# minio/filebrowser/zwave" target except minio (index 4) and filebrowser
-# (index 5), which default OFF — down to each and toggle with Space.
-vkey_down; vkey_down; vkey_down; vkey_down; vkey_space
-vkey_down; vkey_space
-# Immich (index 16, appended after the original 15 items — plex 15,
-# immich 16, nebula 17, tailscale 18, vaultwarden 19, scrutiny 20) is
-# also toggled on here, same reason as minio above: exercises the
-# rust/immich dataset-creation-safety-net path (see
-# hosts/installer/wizard/lib/generate-config.sh's _gen_zfs_ensure_block)
-# rather than leaving it untested at its OFF default. Cursor is at
-# index 5 (filebrowser) after the toggle above — 11 downs reaches 16.
-for _ in $(seq 1 11); do vkey_down; done
+# minio/filebrowser/immich/zwave" target — minio (index 14), filebrowser
+# (index 15), and immich (index 16) all default OFF and are consecutive
+# in the checklist's current order (hosts/installer/wizard/stages/60-features.sh),
+# so one run of downs reaches all three. Immich is toggled on for the
+# same reason minio is: exercises the rust/<name> dataset-creation
+# safety net (see hosts/installer/wizard/lib/generate-config.sh's
+# _gen_zfs_ensure_block) rather than leaving it untested at its OFF
+# default.
+for _ in $(seq 1 14); do vkey_down; done
 vkey_space
+vkey_down; vkey_space
+vkey_down; vkey_space
 vkey_enter
 wiz_note "services selected"
 

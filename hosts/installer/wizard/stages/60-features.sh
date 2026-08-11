@@ -9,19 +9,19 @@ stage_60_features() {
     "sso"                 "LLDAP + unified login (dashboard, console/sudo)" "ON" \
     "sso_authelia"        "  -> Authelia SSO for other services (Sonarr, Radarr, etc.)" "ON" \
     "jellyfin"            "Jellyfin (media server)"                    "ON" \
-    "frigate"             "Frigate (NVR)"                              "ON" \
-    "minio"               "MinIO (S3-compatible object storage)"       "OFF" \
-    "filebrowser"         "FileBrowser (web file browser for media/data)" "OFF" \
-    "homeassistant"       "Home Assistant + Mosquitto + Samba share"   "ON" \
-    "homeassistant_hacs"  "  -> HACS"                                  "ON" \
-    "homeassistant_zwave" "  -> Z-Wave JS (only if a dongle is attached)" "OFF" \
+    "plex"                "Plex (media server)"                       "OFF" \
     "mediaacq"            "Media acquisition group"                    "ON" \
     "mediaacq_seerr"      "  -> Seerr"                                 "ON" \
     "mediaacq_radarr"     "  -> Radarr"                                "ON" \
     "mediaacq_sonarr"     "  -> Sonarr"                                "ON" \
     "mediaacq_jackett"    "  -> Jackett"                               "ON" \
     "mediaacq_qbittorrent" "  -> qBittorrent"                          "ON" \
-    "plex"                "Plex (media server)"                       "OFF" \
+    "homeassistant"       "Home Assistant + Mosquitto + Samba share"   "ON" \
+    "homeassistant_hacs"  "  -> HACS"                                  "ON" \
+    "homeassistant_zwave" "  -> Z-Wave JS (only if a dongle is attached)" "OFF" \
+    "frigate"             "Frigate (NVR)"                              "ON" \
+    "minio"               "MinIO (S3-compatible object storage)"       "OFF" \
+    "filebrowser"         "FileBrowser (web file browser for media/data)" "OFF" \
     "immich"              "Immich (photo/video backup)"                "OFF" \
     "nebula"              "Nebula (mesh VPN)"                          "ON" \
     "tailscale"           "Tailscale (mesh VPN)"                       "OFF" \

@@ -105,7 +105,7 @@ stage_70_secrets() {
   if [ "$(wiz_get feature_sso)" = "true" ]; then
     local ldap_pw ldap_pw2
     while true; do
-      ldap_pw=$(wiz_password "LLDAP admin password" "Set the LLDAP directory's bootstrap admin password — you'll use this to log into LLDAP's own admin UI after install and set an initial password for each user.")
+      ldap_pw=$(wiz_password "LLDAP admin password" "Set the LLDAP directory's bootstrap admin password — you'll use this to log into LLDAP's own admin UI directly, if you ever need to manage accounts/groups there beyond what this wizard already sets up.")
       ldap_pw2=$(wiz_password "LLDAP admin password" "Confirm:")
       [ "$ldap_pw" = "$ldap_pw2" ] && [ -n "$ldap_pw" ] && break
       wiz_msgbox "Mismatch" "Passwords didn't match or were empty — try again."

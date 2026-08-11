@@ -102,14 +102,16 @@ stage_90_install() {
     cp -r "$secrets_usb/etc/." /mnt/persist/etc/
   fi
 
-  # SSO secrets. Only one (LLDAP's bootstrap admin password) is ever typed
-  # by a human — see 70-secrets.sh. Everything else here is a
-  # machine-to-machine credential that each module's own
-  # *-provision-ldap-bind-user oneshot pushes into LLDAP automatically on
-  # first boot; the wizard just needs to generate a random value and leave
-  # it where that oneshot (and each service itself) expects to find it.
-  # hex lengths match what every secrets/extra-files/**/*.example file in
-  # this repo already documents for these exact secrets.
+  # SSO secrets. Two things here are ever typed by a human: LLDAP's
+  # bootstrap admin password, and each user's own password from
+  # 50-users.sh (retained in $WIZ as plainpw_<name> specifically for
+  # this). Everything else here is a machine-to-machine credential that
+  # each module's own *-provision-ldap-bind-user oneshot pushes into
+  # LLDAP automatically on first boot; the wizard just needs to
+  # generate a random value and leave it where that oneshot (and each
+  # service itself) expects to find it. hex lengths match what every
+  # secrets/extra-files/**/*.example file in this repo already
+  # documents for these exact secrets.
   if [ "$(wiz_get feature_sso)" = "true" ]; then
     mkdir -p /mnt/persist/etc/lldap /mnt/persist/etc/dashboard-login /mnt/persist/etc/unix-ldap-login
     wiz_get ldap_admin_password > /mnt/persist/etc/lldap/ldap_user_pass
@@ -118,6 +120,22 @@ stage_90_install() {
     chmod 600 /mnt/persist/etc/lldap/ldap_user_pass \
       /mnt/persist/etc/dashboard-login/ldap_password \
       /mnt/persist/etc/unix-ldap-login/ldap_password
+
+    # One file per user, consumed and deleted by
+    # modules/lldap.nix's lldap-seed-initial-passwords oneshot on first
+    # boot — sets each wizard-created user's LLDAP password to match
+    # their local Unix one, so SSO-gated login (dashboard, sudo) works
+    # immediately instead of needing a manual LLDAP-admin-UI step.
+    # Deliberately a separate, one-time file per user rather than
+    # touching modules/lldap.nix's continuously-reconciled userConfigs
+    # — see that module for why those stay password-less.
+    mkdir -p /mnt/persist/etc/lldap/initial-passwords
+    while IFS= read -r uname; do
+      [ -z "$uname" ] && continue
+      printf '%s' "$(wiz_get "plainpw_${uname}")" > "/mnt/persist/etc/lldap/initial-passwords/${uname}"
+      chmod 600 "/mnt/persist/etc/lldap/initial-passwords/${uname}"
+      wiz_unset "plainpw_${uname}"
+    done <<< "$(wiz_get user_list)"
 
     if [ "$(wiz_get feature_jellyfin)" = "true" ]; then
       mkdir -p /mnt/persist/etc/jellyfin
@@ -197,7 +215,7 @@ stage_90_install() {
   if [ "$(wiz_get feature_sso)" = "true" ]; then
     sso_note="
 
-SSO is enabled: once rebooted, log into LLDAP's admin UI at http://<this box's LAN IP>:17170 as \"admin\" with the bootstrap password you set earlier, and set an initial password for each user there. Human LLDAP accounts are created with no usable password until that's done — no one can log into the dashboard or (if enabled) console/sudo with their LLDAP account before this step."
+SSO is enabled: once rebooted, each user you added can already log into the dashboard and (if enabled) console/sudo with the same password set for them during setup. LLDAP's own admin UI is at http://<this box's LAN IP>:17170, signed in as \"admin\" with the bootstrap password you set earlier — only needed if you want to manage accounts/groups directly there beyond what this wizard already set up."
   fi
 
   wiz_msgbox "Done" "Install complete.

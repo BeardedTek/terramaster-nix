@@ -39,6 +39,14 @@ stage_50_users() {
       wiz_msgbox "Mismatch" "Passwords didn't match or were empty — try again."
     done
     wiz_set "hash_${name}" "$(mkpasswd -m sha-512 "$pw")"
+    # Retained a little longer than the hash alone would require — SSO
+    # isn't known yet at this point in the stage order (60-features
+    # runs after this one), so this is kept around in case stage 90
+    # needs to seed the same password into LLDAP. Same in-process-only
+    # $WIZ trust boundary ldap_admin_password (stage 70) already uses;
+    # consumed and wiz_unset by stage 90 if SSO is on, or just vanishes
+    # with the process if it isn't.
+    wiz_set "plainpw_${name}" "$pw"
     unset pw pw2
 
     wiz_set "wheel_${name}" "$wheel"

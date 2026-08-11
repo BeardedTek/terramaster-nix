@@ -5,6 +5,7 @@ declare -gA WIZ=()
 
 wiz_set() { WIZ["$1"]="$2"; }
 wiz_get() { printf '%s' "${WIZ[$1]:-}"; }
+wiz_unset() { unset "WIZ[$1]"; }
 
 WHIPTAIL_BACKTITLE="TerraMaster-family NAS installer"
 

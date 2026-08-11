@@ -63,6 +63,52 @@ let
       bash ${bootstrapScript}
     '';
   };
+
+  # Counterpart to userConfigs' deliberate password-lessness above: sets
+  # each wizard-created user's LLDAP password to match the one they
+  # typed during install, exactly once, so SSO-gated login (dashboard,
+  # sudo via unix-ldap-login) works immediately instead of needing a
+  # manual visit to LLDAP's own admin UI first. A separate unit rather
+  # than a password/password_file field on userConfigs on purpose —
+  # that config is reconciled on every activation, and a password field
+  # there would reset a user's later self-service LLDAP password change
+  # right back to their wizard-era one on the next rebuild.
+  #
+  # hosts/installer/wizard/stages/90-install.sh writes one file per user
+  # to /persist/etc/lldap/initial-passwords/<name> (plaintext, 0600,
+  # root-owned — readable by this oneshot, which runs as root) only
+  # when SSO was enabled during install; nothing writes there ever
+  # again afterward. Naturally idempotent, no stamp file needed: each
+  # file is deleted immediately after a successful lldap_set_password
+  # call, so re-running this on every activation (same posture as
+  # lldap-provision-users above) just finds nothing left to do once the
+  # first successful boot has processed them — and a user who changes
+  # their LLDAP password later through LLDAP's own UI is never touched
+  # again, since their file is already gone.
+  seedInitialPasswordsScript = pkgs.writeShellApplication {
+    name = "lldap-seed-initial-passwords";
+    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.jo pkgs.coreutils pkgs.lldap ];
+    text = ''
+      dir="/etc/lldap/initial-passwords"
+      [ -d "$dir" ] || exit 0
+      shopt -s nullglob
+      files=("$dir"/*)
+      [ "''${#files[@]}" -eq 0 ] && exit 0
+
+      admin_password="$(cat ${adminPassFile})"
+      token="$(curl --silent --request POST --url "http://127.0.0.1:${toString httpPort}/auth/simple/login" \
+        --header 'Content-Type: application/json' \
+        --data "$(jo -- username=admin password="$admin_password")" \
+        | jq --raw-output .token)"
+
+      for f in "''${files[@]}"; do
+        user="$(basename "$f")"
+        lldap_set_password --base-url "http://127.0.0.1:${toString httpPort}" --token "$token" \
+          --username "$user" --password "$(cat "$f")"
+        rm -f "$f"
+      done
+    '';
+  };
 in
 {
   config = lib.mkIf cfg.enable {
@@ -133,6 +179,20 @@ in
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe provisionScript;
+      };
+    };
+
+    # After lldap-provision-users specifically (not just lldap.service):
+    # a user's LLDAP account has to exist before a password can be set
+    # on it.
+    systemd.services.lldap-seed-initial-passwords = {
+      description = "Seed initial LLDAP passwords for wizard-created users, one time only";
+      after = [ "lldap.service" "lldap-provision-users.service" ];
+      requires = [ "lldap.service" ];
+      wantedBy = [ "multi-user.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = lib.getExe seedInitialPasswordsScript;
       };
     };
 

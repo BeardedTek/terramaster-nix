@@ -442,6 +442,14 @@ LDAP bind can only ever see its own entry, so any service that needs to
 search or read *other* users' entries needs one of these dedicated
 accounts, not just its own user's bind.
 
+`userConfigs` deliberately never sets a password, so a user's later
+self-service LLDAP password change is never reset on a rebuild — a
+separate, one-time-only `lldap-seed-initial-passwords` oneshot instead
+seeds each wizard-created user's LLDAP password from a file the
+installer writes at `/persist/etc/lldap/initial-passwords/<name>`,
+deleting it immediately after a successful set so it's never touched
+again afterward.
+
 ### Authelia
 
 `modules/authelia.nix` — SSO/forward-auth/OIDC provider sitting in front
