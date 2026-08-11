@@ -257,12 +257,27 @@ in
           trustForwardHeader = true;
           authResponseHeaders = [ "Remote-User" "Remote-Groups" "Remote-Name" "Remote-Email" ];
         };
-      }) // (lib.optionalAttrs (protected ? frigate) {
+      }) // (lib.optionalAttrs (protected ? frigate && backendEnabled.frigate) {
         # Frigate's own docs: without this, anything that can reach its
         # nginx vhost at all (not just Traefik) could forge
         # Remote-User/Remote-Groups and get in — Frigate checks this
         # header against its own settings.proxy.auth_secret
         # (modules/frigate.nix), which must be the exact same value.
+        #
+        # backendEnabled.frigate matters here, not just protected ?
+        # frigate: candidateProtectedServices.frigate.enable
+        # (modules/authelia.nix) is a deliberate, independent "has this
+        # service's SSO rollout been validated" flag, not tied to
+        # Frigate's own mySystem.features.frigate.enable — so protected
+        # ? frigate is true whenever Authelia is on, regardless of
+        # whether Frigate itself is installed. Since this whole file has
+        # no top-level mkIf (Traefik always runs), that alone used to
+        # force this readFile even with Frigate disabled, crashing eval
+        # with "path ... does not exist" since the installer wizard
+        # only ever writes that file when Frigate is actually selected.
+        # modules/frigate.nix's own copy of this secret was already
+        # correctly gated on both conditions — this just brings the
+        # duplicate here in line with it.
         frigate-proxy-secret.headers.customRequestHeaders."X-Proxy-Secret" =
           lib.removeSuffix "\n" (builtins.readFile "/persist/etc/frigate/proxy_auth_secret");
       });
