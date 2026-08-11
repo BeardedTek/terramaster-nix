@@ -72,7 +72,11 @@ in
     (lib.mkIf f.jellyfin.enable {
       hardware.graphics = {
         enable = true;
-        extraPackages = [ pkgs.intel-media-driver ];
+        extraPackages = with pkgs; [
+          intel-media-driver     # iHD VA-API driver
+          intel-compute-runtime  # OpenCL runtime — required for tone mapping
+          vpl-gpu-rt             # Intel VPL runtime — modern Quick Sync
+        ];
       };
       services.jellyfin = {
         enable = true;
