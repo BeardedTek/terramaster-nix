@@ -38,6 +38,13 @@ in
           vpl-gpu-rt             # Intel VPL runtime — modern Quick Sync
         ];
       };
+      # Forwards the real /etc/OpenCL/vendors to the merged extraPackages
+      # env — see modules/media-stack.nix's own copy of this line for the
+      # full rationale (ocl-icd, which ffmpeg links against, never looks
+      # at /run/opengl-driver itself). Same identical value declared
+      # again here, harmlessly, matching how hardware.graphics.enable
+      # itself is already declared redundantly across these three files.
+      environment.etc."OpenCL/vendors".source = "/run/opengl-driver/etc/OpenCL/vendors";
 
       services.immich = {
         enable = true;

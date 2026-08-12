@@ -78,6 +78,19 @@ in
           vpl-gpu-rt             # Intel VPL runtime — modern Quick Sync
         ];
       };
+      # hardware.graphics.extraPackages above merges every listed
+      # package's whole output tree into /run/opengl-driver (a plain
+      # pkgs.buildEnv, confirmed by reading nixos/modules/hardware/
+      # graphics.nix directly — it's not OpenCL-aware) — so
+      # intel-compute-runtime's ICD file really does land at
+      # /run/opengl-driver/etc/OpenCL/vendors/intel-neo.icd. But the
+      # OpenCL ICD loader (ocl-icd, which ffmpeg links against) only
+      # ever searches the real /etc/OpenCL/vendors — nothing points
+      # there at the merged one by default. Confirmed the hard way via
+      # `clinfo` reporting zero platforms despite the runtime being
+      # correctly installed: HDR tone-mapping (tonemap_opencl) needs
+      # this, on both the QSV and plain VA-API transcode paths.
+      environment.etc."OpenCL/vendors".source = "/run/opengl-driver/etc/OpenCL/vendors";
       services.jellyfin = {
         enable = true;
         openFirewall = directlyReachable "jellyfin";
