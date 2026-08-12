@@ -468,6 +468,19 @@
 
     system.autoUpgrade.enable = false;
 
+    # Off by default in NixOS. Every host this flake targets is real
+    # physical hardware (never a VM), so there's no reason to withhold
+    # redistributable-but-non-free-licensed firmware blobs (Intel DMC,
+    # GuC/HuC, etc.) — confirmed the hard way on young: without this,
+    # i915 logs "Direct firmware load for i915/icl_dmc_ver1_09.bin
+    # failed" and disables runtime power management, and GuC/HuC never
+    # load at all (silently — no log line, just absent), which some
+    # GPU compute workloads (e.g. OpenCL via intel-compute-runtime,
+    # used for Jellyfin/Plex/Immich HDR tone-mapping) may depend on
+    # i915's own auto-detection (enable_guc=-1 by default) being able
+    # to find.
+    hardware.enableRedistributableFirmware = true;
+
     environment.systemPackages = with pkgs; [
       vim
       git

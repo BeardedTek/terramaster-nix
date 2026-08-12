@@ -33,9 +33,13 @@ in
       hardware.graphics = {
         enable = true;
         extraPackages = with pkgs; [
-          intel-media-driver     # iHD VA-API driver
-          intel-compute-runtime  # OpenCL runtime — required for tone mapping
-          vpl-gpu-rt             # Intel VPL runtime — modern Quick Sync
+          intel-media-driver            # iHD VA-API driver
+          # See modules/media-stack.nix's own copy of this list for why
+          # this is intel-compute-runtime-legacy1, not mainline
+          # intel-compute-runtime (mainline reports zero OpenCL platforms
+          # on Jasper Lake/Gen11 hardware — confirmed on young).
+          intel-compute-runtime-legacy1
+          vpl-gpu-rt                    # Intel VPL runtime — modern Quick Sync
         ];
       };
       # Forwards the real /etc/OpenCL/vendors to the merged extraPackages

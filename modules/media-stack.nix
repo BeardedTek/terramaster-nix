@@ -73,9 +73,33 @@ in
       hardware.graphics = {
         enable = true;
         extraPackages = with pkgs; [
-          intel-media-driver     # iHD VA-API driver
-          intel-compute-runtime  # OpenCL runtime — required for tone mapping
-          vpl-gpu-rt             # Intel VPL runtime — modern Quick Sync
+          intel-media-driver            # iHD VA-API driver
+          # intel-compute-runtime (mainline) reports zero OpenCL
+          # platforms on Jasper Lake/Gen11 (device 0x4E55, e.g. the
+          # Celeron N5095 in young) — confirmed via clinfo and a
+          # syscall-level strace showing DRM_IOCTL_I915_GEM_CREATE_EXT
+          # failing ENODEV. Upstream compute-runtime genuinely dropped
+          # Gen8/9/11 support from its mainline branch (confirmed by
+          # browsing github.com/intel/compute-runtime's own source
+          # tree — shared/source/gen11 doesn't exist on master, only on
+          # releases/24.35 and older). intel-compute-runtime-legacy1
+          # builds from that older branch instead — confirmed working
+          # end to end on this exact hardware: `clinfo` reports the
+          # real device ("Intel(R) UHD Graphics", Gen11.8, 16 EUs), and
+          # a live VA-API-decode -> OpenCL-tonemap -> VA-API-encode
+          # ffmpeg run against real HDR content succeeds — WITH H.264
+          # encode. HEVC hardware encode is a separate, still-open
+          # problem on this SKU via both available paths (QSV device
+          # creation fails with "-9"/MFX_ERR_NOT_FOUND; native
+          # hevc_vaapi fails with "Failed to map output buffers") —
+          # confirmed unrelated to OpenCL/this package, since the
+          # OpenCL/tonemap step itself never even gets reached in
+          # either failure. Use ONE of these two, never both — they
+          # both ship a file at the same etc/OpenCL/vendors/
+          # intel-neo.icd path, which the hardware.graphics merge (a
+          # plain pkgs.buildEnv) would collide on.
+          intel-compute-runtime-legacy1
+          vpl-gpu-rt                    # Intel VPL runtime — modern Quick Sync
         ];
       };
       # hardware.graphics.extraPackages above merges every listed
