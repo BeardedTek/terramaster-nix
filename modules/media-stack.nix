@@ -87,15 +87,17 @@ in
           # end to end on this exact hardware: `clinfo` reports the
           # real device ("Intel(R) UHD Graphics", Gen11.8, 16 EUs), and
           # a live VA-API-decode -> OpenCL-tonemap -> VA-API-encode
-          # ffmpeg run against real HDR content succeeds — WITH H.264
-          # encode. HEVC hardware encode is a separate, still-open
-          # problem on this SKU via both available paths (QSV device
-          # creation fails with "-9"/MFX_ERR_NOT_FOUND; native
-          # hevc_vaapi fails with "Failed to map output buffers") —
-          # confirmed unrelated to OpenCL/this package, since the
-          # OpenCL/tonemap step itself never even gets reached in
-          # either failure. Use ONE of these two, never both — they
-          # both ship a file at the same etc/OpenCL/vendors/
+          # ffmpeg run against real HDR content succeeds, both H.264
+          # and HEVC. (Getting there also needed a separate, unrelated
+          # fix — see young's own enable_guc modprobe config in
+          # hosts/terramaster/young/configuration.nix — for a VA-API
+          # rate-control limitation that looked like an OpenCL problem
+          # at first but wasn't.) QSV remains untested/likely broken
+          # (device creation previously failed with
+          # "-9"/MFX_ERR_NOT_FOUND) — irrelevant now that VA-API is the
+          # recommended hardware-acceleration mode for this hardware.
+          # Use ONE of these two, never both — they both ship a file
+          # at the same etc/OpenCL/vendors/
           # intel-neo.icd path, which the hardware.graphics merge (a
           # plain pkgs.buildEnv) would collide on.
           intel-compute-runtime-legacy1

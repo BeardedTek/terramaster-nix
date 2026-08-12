@@ -10,6 +10,27 @@ in
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
+  # young's Celeron N5095 (Jasper Lake, Gen11) only supports VA-API's
+  # "low-power" encoder mode, and Jellyfin requires VBR/CBR rate
+  # control (not the CQP-only mode the driver falls back to without
+  # this) — confirmed the hard way: h264_vaapi rejects Jellyfin's
+  # "-rc_mode VBR" with "Driver does not support VBR RC mode
+  # (supported modes: CQP)" without it. This is Jellyfin's own
+  # documented fix for exactly this CPU family (jellyfin.org's Intel
+  # hardware-acceleration docs list N5095/N5105/N6005/J6412 by name):
+  # GuC must be loaded in submission mode (bit 0) with HuC firmware
+  # loading enabled (bit 1) — i915 defaults enable_guc to -1
+  # (auto-detect), which doesn't turn this on for Jasper Lake/Elkhart
+  # Lake. The firmware itself (ehl_guc_*.bin, ehl_huc_9.0.0.bin —
+  # Jasper Lake shares Elkhart Lake's GuC/HuC blobs) only ships once
+  # hardware.enableRedistributableFirmware is on (modules/common.nix).
+  # Module parameter, not a kernel command-line one, since i915 loads
+  # as a module here — takes effect on next boot, not just rebuild
+  # switch.
+  boot.extraModprobeConfig = ''
+    options i915 enable_guc=2
+  '';
+
   fileSystems."/" = {
     fsType = "tmpfs";
     options = [ "size=2G" "mode=755" ];
