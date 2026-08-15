@@ -1,0 +1,82 @@
+{
+  # Copy this file to hosts/<manufacturer>/<instance>/variables.nix (the
+  # same directory as that host's configuration.nix/disko.nix — see
+  # hosts/terramaster/f4-245/ for a from-scratch template of those two)
+  # and fill in your real values. That per-host variables.nix is
+  # intentionally gitignored — it's local-only, never committed — so
+  # flake.nix discovers it via a real filesystem path rather than through
+  # git, which means `nix build`/`nix eval` must be invoked from this
+  # repo's root (see flake.nix's own repoRoot comment).
+
+  # The single source of truth for this box's name — propagates into
+  # every proxied hostname, the Samba server name, and more. Also drives
+  # which nixosConfigurations.<name> this host builds as.
+  networking.hostName = "CHANGEME";
+
+  # Selects hosts/<manufacturer>/<model>/ for this instance's hardware
+  # profile (disko.nix, configuration.nix) — see docs/ARCHITECTURE.md's
+  # variables.nix section.
+  mySystem.manufacturer = "CHANGEME"; # e.g. "terramaster", "qnap"
+  mySystem.model = "CHANGEME"; # matches the directory name under hosts/<manufacturer>/
+  mySystem.domain = "CHANGEME.example.com";
+
+  # Name of the physical LAN interface — check with `ip link` on the live
+  # installer if you don't already know it. Defaults to "enp1s0" if unset.
+  # mySystem.lanInterface = "enp1s0";
+
+  # Only if you want Authelia's real SMTP notifications instead of its
+  # file-based fallback — the password is NOT set here, it's delivered
+  # out-of-repo (see
+  # secrets/extra-files/persist/etc/authelia/smtp_password.example and
+  # docs/DEPLOYMENT.md's secrets table). Leave this whole block removed
+  # (mySystem.smtp stays null) to keep the file-based fallback.
+  # mySystem.smtp = {
+  #   host = "mail.example.com";
+  #   port = 465;
+  #   scheme = "submissions"; # "smtp", "submission", or "submissions"
+  #   sender = "NO-REPLY@example.com";
+  #   username = "no-reply@example.com";
+  # };
+
+  mySystem.users = [
+    { name = "CHANGEME"; wheel = true; }
+  ];
+
+  mySystem.contactInfo = [
+    # { label = "Tech Support"; email = "support@example.com"; phone = "5551234567"; }
+  ];
+
+  mySystem.features = {
+    # Most of these default sensibly (jellyfin/frigate/nebula/
+    # mediaAcquisition.*/homeAssistant all default on; minio/filebrowser/
+    # immich/plex/tailscale/vaultwarden/scrutiny default off) — see
+    # modules/common.nix's options.mySystem.features for the full list
+    # with descriptions. Only override what you actually want different
+    # from the defaults; everything below is illustrative, not required.
+
+    jellyfin.enable = true;
+    frigate.enable = true;
+    minio.enable = false;
+    filebrowser.enable = false;
+    immich.enable = false;
+
+    # LLDAP first, by itself — validate it before turning on Authelia.
+    sso.enable = false;
+    sso.authelia.enable = false;
+
+    homeAssistant = {
+      enable = true;
+      zwave.enable = false;
+      hacs.enable = true;
+    };
+
+    mediaAcquisition = {
+      enable = true;
+      seerr.enable = true;
+      radarr.enable = true;
+      sonarr.enable = true;
+      jackett.enable = true;
+      qbittorrent.enable = true;
+    };
+  };
+}

@@ -20,14 +20,20 @@ let
   # candidateOidcClients directly so this file doesn't need to know
   # modules/authelia.nix's internal table shape.
   ssoEnabled = config.mySystem.features.sso.authelia.enable;
-  # Plaintext client secret, matching the argon2 digest of the same
-  # value registered in modules/authelia.nix's candidateOidcClients —
-  # read straight from /persist (Nix eval-time builtins.readFile, same
-  # pattern modules/frigate.nix uses for its proxy_auth_secret), not a
-  # runtime *File option: pkgs.formats.yaml bakes configFile's values in
-  # at build time regardless, so there's no separate runtime read to
-  # delegate this to.
-  oidcClientSecret = lib.removeSuffix "\n" (builtins.readFile "/persist/etc/filebrowser/oidc_client_secret");
+  # Same OIDC_SECRETS_DIR override as modules/authelia.nix's
+  # oidcSecretsDir (only so Tier 1's run-config-check.sh can point this
+  # at a scratch dir instead of real /persist — never set on a real box)
+  # — must match, since that module hashes this exact file to register
+  # the matching client.
+  oidcSecretsDir =
+    let envOverride = builtins.getEnv "OIDC_SECRETS_DIR"; in
+    if envOverride != "" then envOverride else "/persist/etc/authelia/oidc-clients";
+  # Plaintext client secret, read straight from /persist (Nix eval-time
+  # builtins.readFile, same pattern modules/frigate.nix uses for its
+  # proxy_auth_secret), not a runtime *File option: pkgs.formats.yaml
+  # bakes configFile's values in at build time regardless, so there's no
+  # separate runtime read to delegate this to.
+  oidcClientSecret = lib.removeSuffix "\n" (builtins.readFile "${oidcSecretsDir}/filebrowser_secret");
 
   # server.database/cacheDir are absolute paths under this unit's own
   # StateDirectory (systemd creates /var/lib/filebrowser itself, owned by
@@ -128,6 +134,13 @@ in
     # never stomped back to this initial value on a later rebuild.
     systemd.services.filebrowser-setup = {
       description = "Bootstrap FileBrowser's initial admin account";
+      # Validates OIDC config against auth.<host>.beardedtek.com at
+      # startup, so it needs DNS/network up first — without this it
+      # raced network-online at boot and failed permanently (oneshot,
+      # no restart), taking filebrowser.service down with it since that
+      # requires this unit. Same pattern as modules/nebula.nix.
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
       before = [ "filebrowser.service" ];
       requiredBy = [ "filebrowser.service" ];
       unitConfig.ConditionPathExists = "!${stateDir}/filebrowser.db";

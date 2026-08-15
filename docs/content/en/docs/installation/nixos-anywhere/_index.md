@@ -16,8 +16,14 @@ non-standard layout the wizard doesn't ask about.
 ## 0. Set up your host and fill in the placeholders
 
 Copy `hosts/terramaster/f4-245/` (the generic template) to
-`hosts/<manufacturer>/<instance-name>/`, and set
-`mySystem.manufacturer`/`mySystem.model` in `variables.nix` to match.
+`hosts/<manufacturer>/<instance-name>/` — `flake.nix` discovers every
+`hosts/<manufacturer>/<instance>/` directory that has a `variables.nix`
+and builds a matching `nixosConfigurations.<hostname>` automatically.
+That directory doesn't come with its own `variables.nix` (it's
+gitignored, never committed — see `variables.nix.example` at the repo
+root): copy the example to `hosts/<manufacturer>/<instance-name>/
+variables.nix` and set `networking.hostName` and
+`mySystem.manufacturer`/`mySystem.model` to match.
 Then fill in every `CHANGEME` marker (`grep -rn CHANGEME .` finds them
 all) — your boot drive's `/dev/disk/by-id/...` path and your LAN
 interface name are the two you can't know until you've booted the live

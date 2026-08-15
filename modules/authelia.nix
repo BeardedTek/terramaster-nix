@@ -98,24 +98,42 @@ let
     policy = p.policy;
   } // lib.optionalAttrs (p ? group) { subject = [ "group:${p.group}" ]; };
 
+  # Every confidential OIDC client's plaintext secret lives at
+  # oidcSecretsDir/<name>_secret, generated once per host (installer for a
+  # fresh box, a one-time manual step for an already-installed one — see
+  # docs/DEPLOYMENT.md) — and its argon2id hash, which Authelia actually
+  # needs in config.yml, lives alongside it at
+  # oidcSecretsDir/<name>_secret_hash. Both plain files, not Nix values:
+  # a single hash hardcoded in this repo can only ever match the one
+  # host it was originally derived from — confirmed the hard way,
+  # filebrowser's OIDC login was broken on every host except young
+  # (whichever one's install-time-generated
+  # /persist/etc/filebrowser/oidc_client_secret happened to match the
+  # hash once hardcoded here) since hosts/installer/wizard/stages/
+  # 90-install.sh regenerates a fresh random secret on every single
+  # install, independent of whatever this file says. Deriving the hash
+  # from each host's own secret, instead of duplicating a fixed value
+  # here, closes that gap the same way modules/users.nix's
+  # hashedPasswordFile does for Unix account passwords.
+  # Overridable via OIDC_SECRETS_DIR only so
+  # hosts/installer/wizard/test/run-config-check.sh (Tier 1 — no real
+  # /persist on a bare CI/dev machine, and it deliberately never runs the
+  # real stage_90_install that would populate this) can point this at a
+  # scratch dir instead; never meant to be set on a real box.
+  oidcSecretsDir =
+    let envOverride = builtins.getEnv "OIDC_SECRETS_DIR"; in
+    if envOverride != "" then envOverride else "/persist/etc/authelia/oidc-clients";
+  oidcSecretHashFile = name: oidcSecretsDir + "/${name}_secret_hash";
+
   # Second "hot-pluggable" table, same shape/spirit as
   # candidateProtectedServices above but for services that get real OIDC
   # client passthrough instead of a plain forward-auth gate. Adding one
-  # later (e.g. MinIO) is one entry here plus that service's own module
-  # reading its plaintext client secret from a matching /etc/authelia
-  # secret file — see docs/DEPLOYMENT.md's secrets table.
-  #
-  # clientSecretHash is the argon2id *digest*, not the plaintext secret —
-  # confirmed against Authelia's own `authelia crypto hash generate`
-  # guide: modern Authelia (this flake's pin, 4.39.20) stores a hash here
-  # and the plaintext only ever goes into the client application's own
-  # config (modules/filebrowser.nix etc.), read from
-  # /etc/authelia/oidc-clients/<name>_secret — never written into this
-  # repo.
+  # later is one entry here plus that service's own module reading its
+  # plaintext client secret from oidcSecretsDir/<name>_secret — see
+  # docs/DEPLOYMENT.md's secrets table.
   candidateOidcClients = {
     filebrowser = {
       enable = true; # Phase 4
-      clientSecretHash = "$argon2id$v=19$m=65536,t=3,p=4$aFblAB65E8E3yeHaBVln0w$FRqWs+EwgRIz/CHoEgHCQuPXQ3W07WEkg6fJuPRDiR4";
       # Must match modules/traefik.nix's `backends` key for this service,
       # NOT the client_id — confirmed the hard way: registering redirect
       # URIs under "filebrowser.<host>.<domain>" while the real Traefik
@@ -130,10 +148,25 @@ let
       # /api/auth/oidc/callback.
       redirectPaths = [ "/api/auth/oidc/callback" ];
       scopes = [ "openid" "profile" "email" "groups" ];
+      # FileBrowser Quantum's OIDC callback (backend/internal/web/oidc.go)
+      # uses golang.org/x/oauth2's Config.Exchange unmodified, with no
+      # token_endpoint_auth_method setting of its own — Go's oauth2
+      # defaults a cold process to client_secret_post and never retries
+      # with a different style on failure (confirmed against a live
+      # Authelia log: 3 separate login attempts on a freshly-bootstrapped
+      # host, all client_secret_post, all rejected). Without this
+      # override the client fell back to Authelia's own default
+      # (client_secret_basic), which only "worked" on young because that
+      # host's already-running FileBrowser process happened to have
+      # negotiated (and cached in-memory) client_secret_basic at some
+      # point in the past — a fresh host like metis cold-starts straight
+      # into client_secret_post and gets a hard "invalid_client" 500.
+      # Explicit here to match what FileBrowser actually sends, not
+      # young's incidental cached state.
+      extra.token_endpoint_auth_method = "client_secret_post";
     };
     "minio-console" = {
       enable = true; # Phase 4
-      clientSecretHash = "$argon2id$v=19$m=65536,t=3,p=4$585RxXTFigxige43ZgJOdQ$nF5t4Vb2fI8vBd0Xc0IrUBO/EBrqwv5rG7FUUL4TRNw";
       vhost = "minio-console";
       # Confirmed against Authelia's own official MinIO integration guide
       # (authelia.com/integration/openid-connect/clients/minio/) — MinIO
@@ -186,8 +219,16 @@ let
     authorization_policy = c.policy or "one_factor";
     public = c.public or false;
   } // (lib.optionalAttrs (!(c.public or false)) {
-    client_secret = c.clientSecretHash;
+    client_secret = lib.removeSuffix "\n" (builtins.readFile (oidcSecretHashFile name));
   }) // (c.extra or { });
+
+  # Confidential clients only — a public client (homeassistant) has no
+  # secret to hash in the first place. Checked once here rather than
+  # inline in oidcClientFor's readFile so a missing file fails with a
+  # clear message instead of Nix's own "path does not exist" trace.
+  missingOidcSecretHashes = builtins.filter
+    (name: !(candidateOidcClients.${name}.public or false) && !builtins.pathExists (oidcSecretHashFile name))
+    (builtins.attrNames oidcClients);
 
   # MinIO-specific workaround the official guide calls for — a named,
   # reusable claim set the "minio-console" client references via
@@ -204,7 +245,19 @@ in
         assertion = f.sso.enable;
         message = "mySystem.features.sso.authelia.enable requires mySystem.features.sso.enable (LLDAP) too.";
       }
-    ];
+    ] ++ (map
+      (name: {
+        assertion = false;
+        message = ''
+          ${builtins.toString (oidcSecretHashFile name)} is missing — a fresh
+          install's own installer wizard writes this automatically; for an
+          already-installed host, run scripts/migrate-oidc-client-secrets.sh
+          as root (or generate it by hand with the `argon2` CLI —
+          NOT mkpasswd, this repo's nixpkgs pin's mkpasswd has no argon2
+          support at all).
+        '';
+      })
+      missingOidcSecretHashes);
 
     mySystem.sso.protectedServices = protectedServices;
 

@@ -485,6 +485,18 @@
       vim
       git
       smartmontools
+      # For hand-generating a new sha512crypt hash (modules/users.nix's
+      # *_INITIAL_HASH, see secrets/initial-passwords.env) — the installer
+      # ISO already has this, but that doesn't carry over to the
+      # installed system on its own.
+      mkpasswd
+      # For the one-time "generate this OIDC client's secret hash" step
+      # modules/authelia.nix's own assertion message walks through (also
+      # scripts/migrate-oidc-client-secrets.sh) — NOT mkpasswd above,
+      # confirmed the hard way this nixpkgs pin's mkpasswd has no argon2
+      # support at all. Same reasoning as hosts/installer/configuration.nix's
+      # copy of this.
+      libargon2
     ];
   };
 }

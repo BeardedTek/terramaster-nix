@@ -36,6 +36,11 @@ in
     pkgs.zfs
     pkgs.curl # wizard's secrets stage: fetching a user's key from github.com/<user>.keys
     pkgs.openssl # 90-install.sh: generating SSO's machine-credential secrets
+    # 90-install.sh's gen_oidc_client_secret: computing each confidential
+    # OIDC client's argon2id secret hash offline, no network fetch needed
+    # at install time — mkpasswd (above) can't do this, see that
+    # function's own comment.
+    pkgs.libargon2
     disko.packages.x86_64-linux.disko
   ];
 

@@ -27,3 +27,11 @@ node_modules/
 secrets/**
 !secrets/**/
 !secrets/**/*.example
+
+# Each real host's own variables.nix (hostname, contact info, which
+# features are on) — copy variables.nix.example to
+# hosts/<manufacturer>/<instance>/variables.nix and fill it in locally;
+# never committed. flake.nix reads these through a real absolute
+# filesystem path specifically so this stays readable by `nix build`/
+# `nix eval` despite being gitignored — see its own repoRoot comment.
+hosts/*/*/variables.nix

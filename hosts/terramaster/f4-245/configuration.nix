@@ -32,8 +32,8 @@
       "/var/lib/qBittorrent"
       "/var/lib/traefik"
       "/var/lib/frigate"
-      "/var/lib/hass"
-      "/var/lib/mosquitto"
+      { directory = "/var/lib/hass"; user = "hass"; group = "hass"; mode = "0755"; }
+      { directory = "/var/lib/mosquitto"; user = "mosquitto"; group = "mosquitto"; mode = "0755"; }
       "/etc/minio"
       "/var/lib/filebrowser"
       "/etc/filebrowser"

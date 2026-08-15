@@ -46,8 +46,20 @@ let
   # CSS/JS bundles are vendored pre-built into dashboard/static (see
   # docs/ARCHITECTURE.md) specifically to keep this a single lightweight
   # `hugo` invocation, nothing heavier.
+  # dashboard/hugo.toml is committed with "young" (this repo's own
+  # reference host) hardcoded as both the page title and params.hostname —
+  # every layout (nav badge, footer, <title>, index heading) reads from
+  # it. Without this override every host built from this repo shows
+  # "young" in its own dashboard regardless of its real hostname, since
+  # the file is never otherwise templated. Single source of truth stays
+  # dashboard/hugo.toml; this just substitutes the one placeholder value
+  # at build time rather than duplicating the whole file's contents here.
+  hugoConfigFile = pkgs.writeText "hugo.toml" (
+    lib.replaceStrings [ "young" ] [ hostName ] (builtins.readFile ../dashboard/hugo.toml)
+  );
+
   dashboardSite = pkgs.stdenv.mkDerivation {
-    pname = "young-dashboard";
+    pname = "${hostName}-dashboard";
     version = "1";
     src = ../dashboard;
     nativeBuildInputs = [ pkgs.hugo ];
@@ -56,7 +68,7 @@ let
       mkdir -p data
       cp ${contactDataFile} data/contact.json
       cp ${networkInterfacesDataFile} data/networkinterfaces.json
-      hugo --minify -d $out
+      hugo --minify -d $out --config ${hugoConfigFile}
     '';
   };
 
@@ -216,7 +228,21 @@ in
         { addr = "[::]"; port = 8097; }
       ];
       root = dashboardSite;
-      extraConfig = lib.optionalString loginEnabled ''
+      # nginx builds an absolute URL for any bare-path `return`/redirect
+      # (including modules/dashboard-login.nix's @dashboard_login_redirect
+      # below) from its own view of scheme/host/port by default — since
+      # Traefik proxies HTTPS on 443 to this vhost's plain-HTTP internal
+      # listener on 8097, that produces a Location header pointing at
+      # http://<host>:8097/login/, which browsers then block as mixed
+      # content on an HTTPS page. Confirmed live via Chrome DevTools:
+      # every gated static asset (e.g. favicon.ico/.svg, which aren't in
+      # the public locations list below) 401'd, then failed exactly this
+      # way. `absolute_redirect off` makes nginx emit just the relative
+      # path instead, which the browser correctly resolves against
+      # whatever origin it's actually on.
+      extraConfig = ''
+        absolute_redirect off;
+      '' + lib.optionalString loginEnabled ''
         error_page 401 = @dashboard_login_redirect;
       '';
       locations = {

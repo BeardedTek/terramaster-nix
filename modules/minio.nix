@@ -13,6 +13,17 @@ let
   # credentials) regardless of access path, the same reasoning
   # modules/filebrowser.nix's OIDC integration already relies on.
   oidcEnabled = config.mySystem.features.sso.authelia.enable;
+
+  # Same OIDC_SECRETS_DIR override as modules/filebrowser.nix's own copy
+  # of this — see its comment.
+  oidcSecretsDir =
+    let envOverride = builtins.getEnv "OIDC_SECRETS_DIR"; in
+    if envOverride != "" then envOverride else "/persist/etc/authelia/oidc-clients";
+  # Same file, same rationale as modules/filebrowser.nix's
+  # oidcClientSecret — modules/authelia.nix hashes this exact file to
+  # register the matching "minio-console" client, so the two can never
+  # drift apart the way a hardcoded hash in the repo could.
+  oidcClientSecret = lib.removeSuffix "\n" (builtins.readFile "${oidcSecretsDir}/minio-console_secret");
 in
 {
   config = lib.mkIf cfg.enable {
@@ -35,26 +46,22 @@ in
       # deploy, and MinIO refused to start ("file access denied").
       dataDir = [ "/rust/minio/data" ];
       configDir = "/rust/minio/config";
-      # Root credentials are out-of-repo, same pattern as Traefik's
+      # Root credentials only — out-of-repo, same pattern as Traefik's
       # LINODE_TOKEN — see secrets/extra-files/persist/etc/minio/minio.env.example
       # and docs/DEPLOYMENT.md's secrets table. Missing the file is a
       # clean no-start (services.minio sets ConditionPathExists on it),
-      # not a crash loop.
-      # MINIO_IDENTITY_OPENID_CLIENT_SECRET (the one genuinely secret OIDC
-      # value below) is delivered as one more line in this same file, not
-      # a separate one — services.minio has no generic settings/environment
-      # passthrough to hang a second EnvironmentFile off declaratively
-      # without relying on NixOS's list-merge behavior for this specific
-      # option, and this file is already exactly "secrets MinIO reads at
-      # its own startup." See docs/DEPLOYMENT.md's secrets table.
+      # not a crash loop. The OIDC client secret used to be delivered as
+      # one more manually-typed line in this same file — moved to
+      # systemd.services.minio.environment below (Nix eval-time
+      # readFile, same as MINIO_IDENTITY_OPENID_CLIENT_SECRET's own
+      # comment) once that became install-time-generated instead of
+      # manual, matching modules/filebrowser.nix's oidcClientSecret.
       rootCredentialsFile = "/etc/minio/minio.env";
     };
 
     # Non-secret OIDC settings — plain systemd Environment=, safe to
     # derive straight from Nix-known values (no drift risk the way a
-    # manually-typed env-file line would have). The secret
-    # (MINIO_IDENTITY_OPENID_CLIENT_SECRET) is NOT here; see
-    # rootCredentialsFile's comment above.
+    # manually-typed env-file line would have).
     #
     # CLAIM_NAME=groups + the matching Authelia claims_policy
     # (modules/authelia.nix) is the official, if awkward, Authelia<->MinIO
@@ -75,6 +82,7 @@ in
       MINIO_IDENTITY_OPENID_DISPLAY_NAME = "Authelia";
       MINIO_IDENTITY_OPENID_CLAIM_NAME = "groups";
       MINIO_IDENTITY_OPENID_CLAIM_USERINFO = "on";
+      MINIO_IDENTITY_OPENID_CLIENT_SECRET = oidcClientSecret;
     };
 
     # No automatic ordering between a plain fileSystems mount and a

@@ -7,9 +7,29 @@ stage_90_install() {
   host_dir="$WIZ_REPO_WORKDIR/hosts/$manufacturer/$instance"
   mkdir -p "$host_dir"
 
+  # flake.nix reads each host's (gitignored, never-committed) variables.nix
+  # through a real absolute filesystem path, built from $PWD, whenever the
+  # ordinary self-relative path isn't visible (see its own repoRoot
+  # comment) — which happens whenever $WIZ_REPO_WORKDIR is an actual git
+  # checkout (stage_10_repo_update's "check for updates" -> real `git
+  # clone` path) rather than the baked-in ISO snapshot (no .git at all,
+  # so nothing's filtered and this fallback is never needed there).
+  # run.sh is launched from whatever directory the console's login shell
+  # started in — never $WIZ_REPO_WORKDIR itself — so without this, that
+  # $PWD-based fallback would silently point at the wrong place the one
+  # time it's actually needed. Every flake-evaluating command below
+  # (disko, nixos-install) needs $PWD to genuinely be $WIZ_REPO_WORKDIR,
+  # not just the "$WIZ_REPO_WORKDIR#..." flake ref they already pass.
+  cd "$WIZ_REPO_WORKDIR"
+
   wiz_msgbox "Writing config" "Generating variables.nix, configuration.nix, and secrets into $WIZ_REPO_WORKDIR now."
 
-  gen_variables_nix > "$WIZ_REPO_WORKDIR/variables.nix"
+  # variables.nix lives inside host_dir (not $WIZ_REPO_WORKDIR's top
+  # level) — flake.nix discovers every hosts/<manufacturer>/<instance>/
+  # directory that has its own variables.nix, so multiple real machines'
+  # configs coexist in one checkout with no top-level file to clobber
+  # between hosts.
+  gen_variables_nix > "$host_dir/variables.nix"
   if [ "$(wiz_get storage_path)" = "existing" ]; then
     gen_configuration_nix_existing > "$host_dir/configuration.nix"
   else
@@ -163,15 +183,48 @@ stage_90_install() {
         /mnt/persist/etc/authelia/oidc_hmac_secret \
         /mnt/persist/etc/authelia/oidc_issuer_private_key.pem
 
-      # modules/filebrowser.nix reads this at eval time (builtins.readFile,
-      # not a runtime *File option) whenever ssoEnabled — the file has to
-      # exist before nixos-install even evaluates the config, not just
-      # before FileBrowser starts. Caught by the VM install test: without
-      # this, nixos-install fails outright with "path
-      # '/persist/etc/filebrowser/oidc_client_secret' does not exist".
+      # Confidential OIDC client secret + its argon2id hash, one pair per
+      # client name — modules/authelia.nix reads the hash (Nix eval-time
+      # builtins.readFile) to register that client, and the matching
+      # service module (modules/filebrowser.nix, modules/minio.nix) reads
+      # the plaintext the same way, so the two can never independently
+      # drift the way a hash hardcoded into the repo did (broke on every
+      # host except whichever one it was originally derived from — see
+      # modules/authelia.nix's oidcSecretsDir comment).
+      #
+      # `argon2` (pkgs.libargon2, baked into this ISO's systemPackages),
+      # not mkpasswd -m argon2id: confirmed the hard way, this repo's
+      # nixpkgs pin's mkpasswd (whois 5.6.6 / libxcrypt 4.5.2) has no
+      # argon2 support at all ("Invalid method 'argon2id'") — only
+      # yescrypt/scrypt/bcrypt/sha512crypt/etc. argon2's `-e` flag prints
+      # just the encoded PHC string (self-describing m/t/p params, so
+      # Authelia can verify it regardless of which parameters were used
+      # here) with nothing else to strip out.
+      gen_oidc_client_secret() {
+        local name="$1"
+        local secret salt
+        secret=$(openssl rand -hex 32)
+        salt=$(openssl rand -hex 16)
+        mkdir -p /mnt/persist/etc/authelia/oidc-clients
+        printf '%s' "$secret" > "/mnt/persist/etc/authelia/oidc-clients/${name}_secret"
+        printf '%s' "$secret" | argon2 "$salt" -id -t 3 -m 16 -p 4 -e \
+          > "/mnt/persist/etc/authelia/oidc-clients/${name}_secret_hash"
+        chmod 600 "/mnt/persist/etc/authelia/oidc-clients/${name}_secret" \
+          "/mnt/persist/etc/authelia/oidc-clients/${name}_secret_hash"
+      }
+
+      # modules/filebrowser.nix reads its secret at eval time
+      # (builtins.readFile, not a runtime *File option) whenever
+      # ssoEnabled — the file has to exist before nixos-install even
+      # evaluates the config, not just before FileBrowser starts. Caught
+      # by the VM install test: without this, nixos-install fails
+      # outright with "path .../filebrowser_secret does not exist".
+      # candidateOidcClients.filebrowser is unconditionally enable = true
+      # (matching modules/authelia.nix), so this runs regardless of
+      # feature_filebrowser — same reasoning as oidc_hmac_secret above.
+      gen_oidc_client_secret filebrowser
       if [ "$(wiz_get feature_filebrowser)" = "true" ]; then
         mkdir -p /mnt/persist/etc/filebrowser
-        openssl rand -hex 32 > /mnt/persist/etc/filebrowser/oidc_client_secret
         # Separate from the OIDC client secret above — this is
         # FileBrowser's own *local* break-glass admin account
         # (filebrowser-setup.service's FILEBROWSER_ADMIN_USER/PASSWORD,
@@ -183,8 +236,19 @@ stage_90_install() {
           echo "FILEBROWSER_ADMIN_USER=admin"
           echo "FILEBROWSER_ADMIN_PASSWORD=$(openssl rand -hex 16)"
         } > /mnt/persist/etc/filebrowser/admin.env
-        chmod 600 /mnt/persist/etc/filebrowser/oidc_client_secret /mnt/persist/etc/filebrowser/admin.env
+        chmod 600 /mnt/persist/etc/filebrowser/admin.env
       fi
+
+      # Same pattern for MinIO's console client — modules/minio.nix reads
+      # this the same way filebrowser does, so MinIO's console OIDC login
+      # no longer needs the plaintext secret hand-typed into
+      # secrets/extra-files/persist/etc/minio/minio.env.
+      # candidateOidcClients."minio-console" is unconditionally
+      # enable = true too (matching filebrowser's own comment above), so
+      # this runs regardless of feature_minio — Authelia registers this
+      # client, and expects a matching hash, whether or not MinIO itself
+      # is actually installed on this host.
+      gen_oidc_client_secret minio-console
 
       # modules/frigate.nix's proxyAuthSecret is the same eval-time
       # readFile pattern, forced once frigate lands in
@@ -208,7 +272,9 @@ stage_90_install() {
   nixos-install --root /mnt --flake "$flake_attr" --no-root-password --impure
 
   mkdir -p /mnt/persist/nixos-installer-output
-  cp "$WIZ_REPO_WORKDIR/variables.nix" /mnt/persist/nixos-installer-output/
+  # host_dir already contains variables.nix alongside configuration.nix/
+  # disko.nix — no separate top-level copy needed now that all three live
+  # together.
   cp -r "$host_dir" "/mnt/persist/nixos-installer-output/$instance"
 
   local sso_note=""
@@ -218,14 +284,32 @@ stage_90_install() {
 SSO is enabled: once rebooted, each user you added can already log into the dashboard and (if enabled) console/sudo with the same password set for them during setup. LLDAP's own admin UI is at http://<this box's LAN IP>:17170, signed in as \"admin\" with the bootstrap password you set earlier — only needed if you want to manage accounts/groups directly there beyond what this wizard already set up."
   fi
 
+  # modules/minio.nix's rootCredentialsFile (MINIO_ROOT_USER/PASSWORD) is
+  # out-of-repo, same as Traefik's LINODE_TOKEN — but unlike that one,
+  # there's no "harmlessly inert" default seeded for it: a missing file
+  # just means minio.service never starts (ConditionPathExists), silently,
+  # with nothing anywhere in this wizard's flow telling the admin that's
+  # what happened. Confirmed the hard way on a real install: MinIO
+  # selected, no secrets USB minio.env, box came up with MinIO simply
+  # absent and no error to chase. Only warn if it's genuinely still
+  # missing after the secrets_usb copy above — a USB that already had
+  # etc/minio/minio.env needs no extra nagging.
+  local minio_note=""
+  if [ "$(wiz_get feature_minio)" = "true" ] && [ ! -f /mnt/persist/etc/minio/minio.env ]; then
+    minio_note="
+
+MinIO is enabled but has no root credentials yet (/etc/minio/minio.env) — it will not start until you create one. See secrets/extra-files/persist/etc/minio/minio.env.example for the format, or scripts/migrate-oidc-client-secrets.sh's own comment if you're also missing its OIDC client secret."
+  fi
+
   wiz_msgbox "Done" "Install complete.
 
-Generated config was left at /persist/nixos-installer-output/ on the new system — retrieve it after reboot and commit it into your real git checkout:
-  variables.nix
+Generated config was left at /persist/nixos-installer-output/ on the new system — retrieve it after reboot and drop it into hosts/$manufacturer/$instance/ in your real git checkout:
+  ${instance}/variables.nix
   ${instance}/configuration.nix
   ${instance}/disko.nix
+Commit configuration.nix and disko.nix. variables.nix is intentionally NOT committed (it's gitignored — see variables.nix.example at the repo root) — just leave it there on disk; it stays local-only and nix build/eval still finds it fine.
 
-secrets/initial-passwords.env was NOT copied there (it only ever mattered for this install) — recreate it in your own checkout from secrets/initial-passwords.env.example if you'll be rebuilding this box from your workstation later.${sso_note}"
+secrets/initial-passwords.env was NOT copied there (it only ever mattered for this install) — recreate it in your own checkout from secrets/initial-passwords.env.example if you'll be rebuilding this box from your workstation later.${sso_note}${minio_note}"
 
   if wiz_yesno "Reboot now?" "Unmount and reboot into the new system?"; then
     # `umount -R /mnt` alone isn't reliable here — confirmed the hard way

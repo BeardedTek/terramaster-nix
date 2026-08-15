@@ -83,8 +83,11 @@ manufacturer=$(wiz_get manufacturer)
 instance=$(wiz_get instance)
 hostname=$(wiz_get hostname)
 host_dir="$WIZ_REPO_WORKDIR/hosts/$manufacturer/$instance"
+mkdir -p "$host_dir"
 
-gen_variables_nix > "$WIZ_REPO_WORKDIR/variables.nix"
+# variables.nix now lives in host_dir alongside configuration.nix/disko.nix
+# — see stages/90-install.sh's own comment on why.
+gen_variables_nix > "$host_dir/variables.nix"
 if [ "$(wiz_get storage_path)" = "existing" ]; then
   gen_configuration_nix_existing > "$host_dir/configuration.nix"
 else
@@ -103,6 +106,20 @@ while IFS= read -r local_name; do
   export "$(echo "$local_name" | tr '[:lower:]' '[:upper:]')_INITIAL_HASH=$DUMMY_HASH"
 done <<< "$(wiz_get user_list)"
 
+# modules/authelia.nix's assertions just need real files to exist at
+# OIDC_SECRETS_DIR — the actual hash content is never checked against
+# anything in an eval-only test. candidateOidcClients.filebrowser and
+# ."minio-console" are both unconditionally enable = true (see that
+# module's own comments), so both need a dummy hash regardless of this
+# fixture's feature flags.
+OIDC_SECRETS_DIR="$SCRATCH/oidc-secrets"
+export OIDC_SECRETS_DIR
+mkdir -p "$OIDC_SECRETS_DIR"
+for oidc_name in filebrowser minio-console; do
+  printf 'dummy-plaintext' > "$OIDC_SECRETS_DIR/${oidc_name}_secret"
+  printf '%s' "$DUMMY_HASH" > "$OIDC_SECRETS_DIR/${oidc_name}_secret_hash"
+done
+
 # Also written to disk (unlike a real run, which only sets these in the
 # environment via 90-install.sh's own gen_initial_passwords_env + source)
 # so run-vm-install.sh (Tier 2) can copy this scratch checkout onto the
@@ -118,8 +135,8 @@ gen_initial_passwords_env > "$WIZ_REPO_WORKDIR/secrets/initial-passwords.env" 2>
 }
 
 echo "== Generated files (in $WIZ_REPO_WORKDIR) ==" >&2
-echo "-- variables.nix --" >&2
-cat "$WIZ_REPO_WORKDIR/variables.nix" >&2
+echo "-- $host_dir/variables.nix --" >&2
+cat "$host_dir/variables.nix" >&2
 echo "-- $host_dir/configuration.nix --" >&2
 cat "$host_dir/configuration.nix" >&2
 echo "-- $host_dir/disko.nix --" >&2

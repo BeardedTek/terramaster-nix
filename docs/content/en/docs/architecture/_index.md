@@ -16,44 +16,55 @@ extending the flake itself.
 
 The one file to edit for host-level tuning — hostname, contact info,
 which service groups/services are enabled, and which hardware profile
-this instance uses. Imported two ways by `flake.nix`: once as a plain
-`import` (evaluated *before* `nixosSystem` is even called, purely to read
-`mySystem.manufacturer`/`mySystem.model` — see below) and once as an
-ordinary module in the `modules` list, same as any file under `modules/`.
-Both reads see the exact same file, so there's no risk of the two
-disagreeing.
+this instance uses. Lives at `hosts/<manufacturer>/<instance>/variables.nix`
+— one per real machine, not a single top-level file — and is imported two
+ways by `flake.nix`: once as a plain `import` (evaluated *before*
+`nixosSystem` is even called, purely to read `networking.hostName` — see
+below) and once as an ordinary module in that host's `modules` list, same
+as any file under `modules/`. Both reads see the exact same file, so
+there's no risk of the two disagreeing.
 
-- **`mySystem.manufacturer` / `mySystem.model`**: selects which
-  `hosts/<manufacturer>/<model>/` directory supplies this instance's
-  hardware profile (`disko.nix` — disk partitioning — and
-  `configuration.nix` — filesystems, `hostId`, persistence list).
-  `flake.nix` builds the path as
-  `./hosts + "/${manufacturer}/${model}"` and imports
-  `<that>/disko.nix` and `<that>/configuration.nix` directly, instead of
-  those paths being hardcoded in `flake.nix` itself. A typo or nonexistent
-  pair fails loudly at eval time (`path does not exist`), pointing at the
-  exact directory that wasn't found.
-  Currently `"terramaster"` / `"young"`, pointing at
-  `hosts/terramaster/young/` — the real, deployed configuration for this
-  specific physical box (its actual `hostId`, its actual USB drive's
-  `by-id` path, both already filled in, not placeholders). The second
-  path segment doesn't have to be a hardware model name; it's just
-  whichever directory identifies *this instance*. `hosts/terramaster/`
-  also has `f4-245/`, a separate, generic **template** for provisioning a
-  *different, blank* TerraMaster F4-245 — `CHANGEME` placeholders instead
-  of real device paths, no real `hostId`, and (see "Automated ZFS pool
-  creation" below) a from-scratch ZFS pool instead of the
-  manually-imported one `young` already has. Nothing in `variables.nix`
-  points at `f4-245/` today; it exists to be copied to a new
-  `hosts/<manufacturer>/<new-instance-name>/` and filled in when a second
-  box shows up, not to be run as-is.
-  **Not yet built**: multiple *simultaneous* `nixosConfigurations` in this
-  one flake (today there's still only `nixosConfigurations.young`). Adding
-  a genuinely second NAS alongside this one would mean giving it its own
-  variables file and its own `nixosConfigurations.<name>` entry in
-  `flake.nix`, each pointing at whichever `hosts/<manufacturer>/<model>/`
-  fits its hardware — this change makes that a small, mechanical addition
-  rather than a restructuring, but doesn't do it preemptively.
+Unlike `configuration.nix`/`disko.nix`, each host's `variables.nix` is
+**gitignored** — never committed (`.gitignore`'s `hosts/*/*/variables.nix`
+rule) — since it's the one file with host-identifying details (hostname,
+domain, contact info) rather than hardware config. Copy
+`variables.nix.example` (repo root) to `hosts/<manufacturer>/<instance>/
+variables.nix` and fill it in locally; a fresh install's own wizard does
+this automatically. Being gitignored means `flake.nix` can't always find
+it through the ordinary self-relative (`./hosts/...`) path Nix resolves
+against its own git-filtered source — that path is invisible whenever
+the file isn't tracked, gitignored or simply never `git add`ed, confirmed
+the hard way. `flake.nix`'s own `variablesFileFor`/`repoRoot` fall back to
+reading it through a real absolute filesystem path when the self-relative
+one isn't visible — the same trick every `/persist/...` read elsewhere in
+this repo already relies on, and (like those) requires `nix build`/`nix
+eval` to be invoked from this repo's own root.
+
+`flake.nix` discovers every `hosts/<manufacturer>/<instance>/` directory
+that has its own `variables.nix` (via `builtins.readDir`, two levels
+deep) and builds a `nixosConfigurations.<hostname>` entry for each one
+automatically — multiple real machines' configs coexist in the same
+checkout with no swapping files around, and each rebuilds independently
+via `nixos-rebuild --flake .#<hostname>`. Currently that's `young`
+(`hosts/terramaster/young/`, a real TerraMaster F4-245) and `metis`
+(`hosts/qnap/ts-x53D/`, a real QNAP TS-x53D) — both real, deployed boxes
+with their actual `hostId`s and actual disk `by-id` paths filled in, not
+placeholders. `hosts/terramaster/` also has `f4-245/`, a separate,
+generic **template** for provisioning a *different, blank* TerraMaster
+F4-245 — `CHANGEME` placeholders instead of real device paths, no real
+`hostId`, no `variables.nix` of its own (so it's invisible to `flake.nix`
+until one is added), and (see "Automated ZFS pool creation" below) a
+from-scratch ZFS pool instead of a manually-imported one. It exists to be
+copied to a new `hosts/<manufacturer>/<new-instance-name>/`, given its
+own `variables.nix`, and filled in when a new box shows up — not to be
+run as-is.
+
+- **`mySystem.manufacturer` / `mySystem.model`**: informational metadata
+  set alongside `networking.hostName` in each host's own `variables.nix`
+  — since `flake.nix` now finds a host's directory by discovery rather
+  than by reading these two fields, they no longer drive path resolution
+  themselves, but stay as a record of which `hosts/<manufacturer>/<model>/`
+  directory a given host's config lives in.
 - **`networking.hostName`**: the single source of truth for the box's
   name. `modules/traefik.nix`, `modules/frigate.nix`, and
   `modules/samba.nix` all read `config.networking.hostName` rather than
@@ -1202,30 +1213,41 @@ hit in practice:
   `nebula.beardedtek.com` itself (a self-referential loop: nothing is ever
   actually there to find).
 - `no subdomain because the domain and the zone are identical:
-  <zone>.` — happened for `young.beardedtek.com`, where
-  `_acme-challenge.young.beardedtek.com` had a CNAME pointing straight at
-  the zone apex (`beardedtek.com`), which the Linode API can't accept a
-  record "under" since it's not a subdomain of itself.
+  <zone>.` — happened for `young.beardedtek.com` (a leftover
+  `_acme-challenge.young.beardedtek.com` CNAME pointing straight at the
+  zone apex, `beardedtek.com`), and again for a second, differently-caused
+  host: `metis.beardedtek.com` and `_acme-challenge.metis.beardedtek.com`
+  were both *freshly created* (not leftover) as CNAMEs pointing at the
+  bare apex, apparently from copy-pasting a "point this at the main site"
+  pattern when the DNS records for that new host were first set up —
+  the same practical error, but at record-*creation* time instead of
+  record-*leftover* time. Either way, the Linode API can't accept a
+  record "under" the zone apex since it's not a subdomain of itself.
 
-**Cause:** a leftover `_acme-challenge.<domain>` CNAME record already
-existed in the Linode zone for both domains used by `modules/traefik.nix`,
-predating this setup. Per the DNS-01 spec, lego (correctly) follows a
-CNAME at the challenge FQDN instead of writing a TXT record there directly
-— so a stray CNAME left over from unrelated/earlier configuration silently
-hijacks every future ACME validation for that name, no matter how correct
-the Traefik/NixOS config is.
+**Cause:** whatever's actually in the Linode zone for the challenge FQDN
+takes priority over anything Traefik/NixOS say. Per the DNS-01 spec, lego
+(correctly) follows a CNAME at the challenge FQDN instead of writing a TXT
+record there directly — so *any* CNAME already sitting on that name,
+whether stray/leftover or freshly (mis)created for a brand new host,
+silently hijacks every future ACME validation for it, no matter how
+correct the Traefik/NixOS config is.
 
-**Fix:** in Linode's DNS Manager, delete the specific
-`_acme-challenge.<domain>` CNAME record for whichever domain is failing.
-Nothing in this repo creates or needs one — lego creates its own TXT
-record directly once the CNAME is gone. Then `sudo systemctl restart
-traefik` and watch `traefik.log` again.
+**Fix:** in Linode's DNS Manager, either delete the
+`_acme-challenge.<domain>` CNAME entirely (lego creates its own TXT record
+directly once it's gone) or — the working pattern `young` actually
+uses — point it at `<domain>` itself (a real, self-referential CNAME,
+*not* the zone apex): `_acme-challenge.<host>.beardedtek.com CNAME
+<host>.beardedtek.com`. Also fix `<host>.beardedtek.com` itself if it's
+also a CNAME to the apex (metis's case) — it should be an **A** record
+pointing at that host's own real address (young's is its Nebula IP).
+Then `sudo systemctl restart traefik` and watch `traefik.log` again.
 
-**Given this has now happened for every wildcard domain added to this
-setup so far:** before adding a *new* wildcard domain to
-`modules/traefik.nix`, check the Linode zone for an existing
-`_acme-challenge.<new-domain>` record first, rather than debugging it
-after the fact.
+**Given this has now happened three times, for three different
+domains:** this isn't a one-off — check the Linode zone for
+`<new-host>.beardedtek.com` and `_acme-challenge.<new-host>.beardedtek.com`
+*every* time a new host's DNS records are created (not just when adding a
+new wildcard domain to `modules/traefik.nix`), and confirm neither is a
+CNAME to the bare apex before moving on to Traefik/ACME debugging.
 
 ### Traefik/qBittorrent port collision
 
