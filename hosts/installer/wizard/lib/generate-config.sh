@@ -33,6 +33,17 @@ ${users_nix}  ];
 
   mySystem.security.sshPasswordAuth = $(wiz_get use_password_auth);
 
+  mySystem.smtp = $(if [ "$(wiz_get have_smtp)" = "true" ]; then cat <<SMTPEOF
+{
+    host = "$(wiz_get smtp_host)";
+    port = $(wiz_get smtp_port);
+    scheme = "$(wiz_get smtp_scheme)";
+    sender = "$(wiz_get smtp_sender)";
+    username = "$(wiz_get smtp_username)";
+  }
+SMTPEOF
+else printf null; fi);
+
   mySystem.features = {
     jellyfin.enable = $(f jellyfin);
     plex.enable = $(f plex);

@@ -139,6 +139,37 @@ stage_90_install() {
     cp -r "$secrets_usb/etc/." /mnt/persist/etc/
   fi
 
+  # OpenSMTPd relay credentials — same table(5) format
+  # secrets/extra-files/persist/etc/opensmtpd/secrets.example documents.
+  # modules/smtp-relay.nix reads this at runtime (services.opensmtpd's own
+  # secrets file), not at eval time, so this is just a plain file write,
+  # no argon2/openssl involved.
+  if [ "$(wiz_get have_smtp)" = "true" ]; then
+    mkdir -p /mnt/persist/etc/opensmtpd
+    printf 'relay %s:%s\n' "$(wiz_get smtp_username)" "$(wiz_get smtp_password)" > /mnt/persist/etc/opensmtpd/secrets
+    chmod 600 /mnt/persist/etc/opensmtpd/secrets
+  fi
+
+  # Tailscale — either a pasted reusable auth key (modules/tailscale.nix's
+  # authKeyFile) or, for the live-login flow, this installer session's own
+  # now-authenticated tailscaled state copied straight onto the target so
+  # it resumes the same node identity on first real boot. Neither branch
+  # runs anything if the wizard's own stage was skipped/declined — no
+  # authkey file at all is the same "clean no-op" modules/dashboard-
+  # tailscale.nix's defaultsScript already handles on first real boot.
+  case "$(wiz_get have_tailscale)" in
+    authkey)
+      mkdir -p /mnt/persist/etc/tailscale
+      printf '%s' "$(wiz_get tailscale_authkey)" > /mnt/persist/etc/tailscale/authkey
+      chmod 600 /mnt/persist/etc/tailscale/authkey
+      ;;
+    live)
+      systemctl stop tailscaled 2>/dev/null || true
+      mkdir -p /mnt/persist/var/lib/tailscale
+      cp -a /var/lib/tailscale/. /mnt/persist/var/lib/tailscale/
+      ;;
+  esac
+
   # SSO secrets. Two things here are ever typed by a human: LLDAP's
   # bootstrap admin password, and each user's own password from
   # 50-users.sh (retained in $WIZ as plainpw_<name> specifically for
@@ -287,6 +318,23 @@ stage_90_install() {
   # builtins.getEnv calls need real impure evaluation, not just the env
   # vars being exported.
   nixos-install --root /mnt --flake "$flake_attr" --no-root-password --impure
+
+  # The authorized_keys write above (if any) happened before this
+  # user even existed anywhere — this live ISO's own user database has
+  # never heard of $first_user, so a chown right there couldn't have
+  # resolved a real UID/GID, only nixos-install's activation above
+  # actually creates the account. Left un-owned (root:root, from the
+  # plain `mkdir`/redirect that wrote it), sshd's StrictModes silently
+  # refuses that key outright — confirmed the hard way in a real Tier 3
+  # run: publickey auth was declined without even attempting a
+  # signature check, and password auth is off by default, so this
+  # locked the account out of SSH entirely with no error surfaced
+  # anywhere in the wizard's own flow. modules/users.nix's isNormalUser
+  # gives every user the shared "users" group (not a same-named private
+  # group), confirmed against a real installed system.
+  if [ -n "$(wiz_get ssh_pubkey)" ]; then
+    nixos-enter --root /mnt -c "chown -R '$first_user:users' '/home/$first_user/.ssh'"
+  fi
 
   mkdir -p /mnt/persist/nixos-installer-output
   # host_dir already contains variables.nix alongside configuration.nix/

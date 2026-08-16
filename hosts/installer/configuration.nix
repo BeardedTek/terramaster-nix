@@ -41,8 +41,17 @@ in
     # at install time — mkpasswd (above) can't do this, see that
     # function's own comment.
     pkgs.libargon2
+    pkgs.tailscale # wizard's tailscale stage: live `tailscale up` login-link flow
     disko.packages.x86_64-linux.disko
   ];
+
+  # Minimal — no authKeyFile/extraSetFlags (those are target-host policy,
+  # modules/tailscale.nix's own concern). Just enough for tailscaled to
+  # exist on this live session for the wizard's "get an auth link" flow
+  # (hosts/installer/wizard/stages/66-tailscale.sh's
+  # _wiz_tailscale_live_login) — 90-install.sh persists the resulting
+  # authenticated /var/lib/tailscale state onto the target afterward.
+  services.tailscale.enable = true;
 
   # Runs on every login (console autologin, or SSH) — see
   # hosts/installer/wizard/lib/common.sh for what it actually does.

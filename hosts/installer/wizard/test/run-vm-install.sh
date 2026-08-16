@@ -90,6 +90,7 @@ TEST_ROOT_PW="TestRootPass123!"
 TEST_ADMIN_PW="TestAdminPass123!"
 TEST_USER2_PW="TestUser2Pass123!"
 TEST_LDAP_PW="TestLdapAdmin123!"
+TEST_SMTP_PW="TestSmtpPass123!"
 
 SCRATCH="$(mktemp -d)"
 VM_CREATED=0
@@ -120,6 +121,17 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+
+# Everything below is wrapped in one function so
+# hosts/installer/wizard/test/run-webui-check.sh (Tier 3) can `source`
+# this file and call it directly to get a running, installed VM —
+# reusing ssh_cmd/vkey_*/$SCRATCH/$SSH_PORT instead of re-implementing VM
+# setup — while this file's own standalone behavior (the dual-mode
+# trailer at the bottom) stays exactly what it was before. Left at the
+# original flat indentation rather than reindented for the wrap: purely
+# cosmetic, and reindenting ~250 lines by hand risked introducing a typo
+# into the vkey_text string literals for no functional benefit.
+tier2_run_and_install_wizard() {
 
 echo "== Generating a throwaway SSH keypair ==" >&2
 ssh-keygen -t ed25519 -N "" -C "wizard-vm-test" -f "$SCRATCH/test_key" -q
@@ -312,28 +324,63 @@ vkey_text "$TEST_USER2_PW"; vkey_enter  # confirm
 vkey_enter                              # Add a user -> blank name ends the loop
 wiz_note "users added (root, testadmin, testuser2)"
 
-# Services checklist: defaults already match this test's "everything but
-# minio/filebrowser/immich/zwave" target — minio (index 14), filebrowser
-# (index 15), and immich (index 16) all default OFF and are consecutive
-# in the checklist's current order (hosts/installer/wizard/stages/60-features.sh),
-# so one run of downs reaches all three. Immich is toggled on for the
-# same reason minio is: exercises the rust/<name> dataset-creation
-# safety net (see hosts/installer/wizard/lib/generate-config.sh's
-# _gen_zfs_ensure_block) rather than leaving it untested at its OFF
-# default.
-for _ in $(seq 1 14); do vkey_down; done
-vkey_space
-vkey_down; vkey_space
-vkey_down; vkey_space
+# Services checklist: toggle ON every item that defaults OFF, except
+# Z-Wave (homeassistant_zwave, item 13) — zwave-js hardcodes
+# serialPort = "/dev/ttyUSB0" (modules/home-assistant.nix:52), and no VM
+# can plug in a real Z-Wave USB dongle, so enabling it here would just
+# leave the service permanently crash-looping instead of testing
+# anything. Every other feature gets real coverage. Item numbers/deltas
+# below are against hosts/installer/wizard/stages/60-features.sh's fixed
+# checklist order — recompute these if that file's item order ever
+# changes.
+for _ in $(seq 1 3); do vkey_down; done   # -> plex (item 4)
+vkey_space                                 # plex ON
+for _ in $(seq 1 11); do vkey_down; done   # -> minio (item 15)
+vkey_space                                 # minio ON
+vkey_down; vkey_space                      # filebrowser ON (item 16)
+vkey_down; vkey_space                      # immich ON (item 17)
+for _ in $(seq 1 2); do vkey_down; done    # -> tailscale (item 19), skipping nebula (18, already ON)
+vkey_space                                 # tailscale ON
+vkey_down; vkey_space                      # vaultwarden ON (item 20)
+vkey_down; vkey_space                      # scrutiny ON (item 21)
 vkey_enter
-wiz_note "services selected"
+wiz_note "services selected (everything but Z-Wave)"
 
-vkey_down; vkey_down; vkey_enter # SSH access -> "password" (3rd item)
-vkey_enter                       # Use password login? -> Yes
+vkey_enter                                 # Outbound email? -> Yes (default)
+vkey_text "smtp.test.invalid"; vkey_enter  # SMTP host
+vkey_enter                                 # SMTP port -> accept default 587
+vkey_enter                                 # SMTP scheme -> accept default "submission"
+vkey_text "nas@test.invalid"; vkey_enter   # Sender address
+vkey_text "relay-test"; vkey_enter         # SMTP username
+vkey_text "$TEST_SMTP_PW"; vkey_enter      # SMTP password
+vkey_text "$TEST_SMTP_PW"; vkey_enter      # confirm
+wiz_note "SMTP relay configured"
+
+# Tailscale menu -> "skip" (3rd item): no human is here to click a real
+# browser login link in an unattended run, so this deliberately never
+# drives either live-auth branch — the feature stays enabled but
+# unauthenticated, same posture Nebula already has below.
+vkey_down; vkey_down; vkey_enter
+wiz_note "tailscale left unauthenticated (no live auth in an unattended run)"
+
+# SSH access -> "paste" (2nd item), pasting the SAME throwaway test key
+# already authorized on the live ISO's root account — not "password".
+# run-webui-check.sh (Tier 3) needs a reliable, scriptable way back into
+# the INSTALLED target after reboot (root SSH login is disabled there by
+# policy regardless of this choice, modules/common.nix's own posture —
+# see that script's own comment), and a key it already holds is far more
+# robust for that than driving a password through plink, which turned
+# out to segfault intermittently when run non-interactively/backgrounded
+# on Windows — confirmed the hard way. Password-auth's own config-
+# generation path (mySystem.security.sshPasswordAuth) is still covered
+# by Tier 1's fixture (test/fixtures/answers-new-pool.sh), just no longer
+# also driven end-to-end here.
+vkey_down; vkey_enter
+vkey_text "$(cat "$SCRATCH/test_key.pub")"; vkey_enter
 vkey_right; vkey_enter           # Nebula? -> No
 vkey_text "$TEST_LDAP_PW"; vkey_enter # LLDAP admin password
 vkey_text "$TEST_LDAP_PW"; vkey_enter # confirm
-wiz_note "secrets stage done (SSH access, Nebula skipped, LLDAP admin pw set)"
+wiz_note "secrets stage done (SSH key pasted, Nebula skipped, LLDAP admin pw set)"
 
 vkey_enter                        # Review
 vkey_text "DESTROY"; vkey_enter   # typed destructive confirmation
@@ -376,3 +423,12 @@ fi
 echo >&2
 echo "TIER 2 PASSED: the real installer wizard completed against the VM's real disks." >&2
 WIZ_TEST_PASSED=1
+
+}
+
+# Standalone-vs-sourced dual-mode idiom: only auto-runs when this file is
+# executed directly (`bash run-vm-install.sh`), not when Tier 3 sources it
+# for tier2_run_and_install_wizard/ssh_cmd/etc.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  tier2_run_and_install_wizard "$@"
+fi

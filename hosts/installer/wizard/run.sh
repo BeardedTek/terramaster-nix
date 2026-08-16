@@ -26,6 +26,8 @@ stage_30_instance
 stage_40_storage
 stage_50_users
 stage_60_features
+stage_65_smtp
+stage_66_tailscale
 stage_70_secrets
 stage_80_review
 stage_90_install
