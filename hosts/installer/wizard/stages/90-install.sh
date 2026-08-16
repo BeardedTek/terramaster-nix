@@ -99,6 +99,23 @@ stage_90_install() {
   mkdir -p /persist
   mount --bind /mnt/persist /persist
 
+  # modules/system-rebuild.nix (self-update and dashboard-svcconfig's own
+  # rebuild trigger) needs this persisted here permanently, not just in
+  # $WIZ_REPO_WORKDIR — it downloads a fresh release tarball from GitHub
+  # on every single update and rebuilds directly against that, so the
+  # workstation-only secrets/initial-passwords.env would otherwise never
+  # exist anywhere in that freshly-downloaded tree. (variables.nix has
+  # the same problem, since it's gitignored — but that's already solved
+  # below, where $host_dir gets copied to nixos-installer-output/
+  # $instance/; modules/system-rebuild.nix reads its own copy straight
+  # from there, no separate copy needed here.) Confirmed the hard way:
+  # without this, self-update fails outright the first time it's ever
+  # used, with no indication anywhere in the install flow that anything
+  # was missing.
+  mkdir -p /mnt/persist/secrets
+  cp "$WIZ_REPO_WORKDIR/secrets/initial-passwords.env" /mnt/persist/secrets/initial-passwords.env
+  chmod 600 /mnt/persist/secrets/initial-passwords.env
+
   local first_user
   first_user=$(wiz_get user_list | head -n1)
   if [ -n "$(wiz_get ssh_pubkey)" ]; then
@@ -274,7 +291,11 @@ stage_90_install() {
   mkdir -p /mnt/persist/nixos-installer-output
   # host_dir already contains variables.nix alongside configuration.nix/
   # disko.nix — no separate top-level copy needed now that all three live
-  # together.
+  # together. This copy is also modules/system-rebuild.nix's own source
+  # of truth for this host's variables.nix on every future update (its
+  # persistedVariablesFile) — not just a one-time "retrieve after
+  # reboot" convenience, so don't remove/relocate it without updating
+  # that module's path to match.
   cp -r "$host_dir" "/mnt/persist/nixos-installer-output/$instance"
 
   local sso_note=""
@@ -307,7 +328,7 @@ Generated config was left at /persist/nixos-installer-output/ on the new system 
   ${instance}/variables.nix
   ${instance}/configuration.nix
   ${instance}/disko.nix
-Commit configuration.nix and disko.nix. variables.nix is intentionally NOT committed (it's gitignored — see variables.nix.example at the repo root) — just leave it there on disk; it stays local-only and nix build/eval still finds it fine.
+Commit configuration.nix and disko.nix. variables.nix is intentionally NOT committed (it's gitignored — see variables.nix.example at the repo root); don't delete /persist/nixos-installer-output/ though — every future update reads this host's variables.nix from there permanently, not just this once.
 
 secrets/initial-passwords.env was NOT copied there (it only ever mattered for this install) — recreate it in your own checkout from secrets/initial-passwords.env.example if you'll be rebuilding this box from your workstation later.${sso_note}${minio_note}"
 

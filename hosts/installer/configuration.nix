@@ -46,6 +46,16 @@ in
 
   # Runs on every login (console autologin, or SSH) — see
   # hosts/installer/wizard/lib/common.sh for what it actually does.
+  # Prompts first rather than launching unconditionally: installation-cd-
+  # minimal.nix (imported above) auto-logs-in *every* virtual console
+  # (tty1-tty6), not just tty1, so a live ISO always has spare debug
+  # shells available — without this prompt, every one of those consoles
+  # silently started its own independent copy of the wizard instead of
+  # being a normal shell (confusing, and wasteful — e.g. Alt+F2 to check
+  # `lsblk` output mid-install used to spawn a second wizard instance).
+  # Defaults to yes (Enter alone accepts) since booting this ISO to
+  # install is the overwhelmingly common case; explicitly typing "n"
+  # drops straight to a plain shell instead, on any console or over SSH.
   # Always via sudo: installation-cd-minimal.nix's console autologin is
   # the unprivileged "nixos" user (wheel, passwordless sudo), not root —
   # confirmed the hard way (the wizard needs root for /root, mount,
@@ -54,7 +64,15 @@ in
   # even traverse into /root). A no-op when already root (SSH as root
   # via the baked-in key).
   environment.loginShellInit = ''
-    sudo bash /etc/nas-installer-repo/hosts/installer/wizard/run.sh
+    read -r -p "Start the Bearded NAS installer? [Y/n] " start_installer
+    case "$start_installer" in
+      [Nn]*)
+        echo "Skipping the installer — run 'sudo bash /etc/nas-installer-repo/hosts/installer/wizard/run.sh' any time to start it."
+        ;;
+      *)
+        sudo bash /etc/nas-installer-repo/hosts/installer/wizard/run.sh
+        ;;
+    esac
   '';
 
   image.baseName = lib.mkForce "beardednas-installer";

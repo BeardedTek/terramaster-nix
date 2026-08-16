@@ -273,9 +273,10 @@ wait_for_ssh_true() {
 
 echo "== Driving the real installer wizard via VirtualBox keyboard injection ==" >&2
 # Give the console's autologin + loginShellInit a moment to actually reach
-# run.sh's first whiptail dialog before the first keystroke arrives.
+# the "Start the installer?" prompt before the first keystroke arrives.
 sleep 5
 
+vkey_enter                             # "Start the Bearded NAS installer? [Y/n]" -> accept default (yes)
 vkey_enter                             # Welcome
 vkey_right; vkey_enter                 # Check for updates? -> No (use baked-in snapshot)
 vkey_enter                             # LAN interface (only one candidate NIC in this VM)

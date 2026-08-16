@@ -9,6 +9,25 @@ let
 
   versionFile = "/persist/nixos-version";
   secretsEnv = "/persist/secrets/initial-passwords.env";
+  manufacturer = config.mySystem.manufacturer;
+  model = config.mySystem.model;
+  # This host's own variables.nix — the exact same copy
+  # hosts/installer/wizard/stages/90-install.sh already leaves at
+  # /persist/nixos-installer-output/<instance>/ for retrieval into a
+  # real git checkout, reused here rather than introducing a second,
+  # separately-maintained copy. For a host installed before that
+  # convention existed, a one-time manual copy to this same path — see
+  # docs/DEPLOYMENT.md. Needed because variables.nix is gitignored (see
+  # flake.nix's own repoRoot comment) — the tag tarball fetched below is
+  # downloaded fresh from GitHub every single time, straight from git
+  # history, so it can never contain any host's variables.nix on its
+  # own. Copied into the extracted tree below, at the same
+  # hosts/<manufacturer>/<model>/ path flake.nix expects to find it, so
+  # nixosConfigurations.${hostName} is actually discoverable in that
+  # fresh checkout — without this, every update would fail with "flake
+  # does not provide attribute nixosConfigurations.${hostName}", no
+  # matter how correct everything else here is.
+  persistedVariablesFile = "/persist/nixos-installer-output/${model}/variables.nix";
   stagingDir = "/persist/nixos-system-rebuild-staging";
 
   runDir = "/run/system-rebuild";
@@ -132,6 +151,13 @@ let
         write_progress "failed" "${secretsEnv} is missing — see docs/DEPLOYMENT.md"
         exit 1
       fi
+
+      if [ ! -f ${persistedVariablesFile} ]; then
+        write_progress "failed" "${persistedVariablesFile} is missing — see docs/DEPLOYMENT.md"
+        exit 1
+      fi
+      mkdir -p "$src_dir/hosts/${manufacturer}/${model}"
+      cp ${persistedVariablesFile} "$src_dir/hosts/${manufacturer}/${model}/variables.nix"
 
       # "Rebuilding (this can take a while)..." is matched verbatim by
       # dashboard/content/preferences.md's Update-modal STEPS regex
