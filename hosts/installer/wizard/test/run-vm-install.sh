@@ -290,9 +290,19 @@ sleep 5
 
 vkey_enter                             # "Start the Bearded NAS installer? [Y/n]" -> accept default (yes)
 vkey_enter                             # Welcome
-vkey_right; vkey_enter                 # Check for updates? -> No (use baked-in snapshot)
+# Check for updates? -> Yes (default) — a REAL `git clone --depth 1` of
+# WIZ_REPO_URL, not the baked-in snapshot. Deliberately exercised here,
+# not skipped: this is the one path where $WIZ_REPO_WORKDIR ends up a
+# real git checkout, and stages/90-install.sh's flake refs need to stay
+# correct against that (a brand-new instance's just-generated, never-
+# `git add`ed files being invisible to a git-based flake eval — see that
+# file's own "path:" comment) — confirmed the hard way this was the one
+# real-world path none of Tier 1/2/3 exercised, since this always
+# answered "no" before.
+vkey_enter                             # Check for updates? -> Yes
+sleep 15                               # real network git clone, not instant like the baked-in copy
 vkey_enter                             # LAN interface (only one candidate NIC in this VM)
-wiz_note "network configured"
+wiz_note "network configured (real git clone of WIZ_REPO_URL used, not the baked-in snapshot)"
 
 vkey_enter                             # Manufacturer -> accept default "terramaster"
 vkey_text "$TEST_INSTANCE"; vkey_enter # Instance name

@@ -22,6 +22,27 @@ stage_90_install() {
   # not just the "$WIZ_REPO_WORKDIR#..." flake ref they already pass.
   cd "$WIZ_REPO_WORKDIR"
 
+  # Below, every flake ref built from $WIZ_REPO_WORKDIR is prefixed
+  # "path:" — forces Nix to read it as a plain directory rather than
+  # auto-detecting the "check for updates" git clone as a real git repo
+  # and evaluating strictly against its last COMMITTED revision. Without
+  # this, a brand-new instance name (this stage's own variables.nix/
+  # configuration.nix/disko.nix, just written above — never `git add`ed)
+  # is invisible to that evaluation: not merely "variables.nix missing"
+  # (which the repoRoot fallback above already covers), but the entire
+  # hosts/<manufacturer>/<instance>/ directory doesn't exist in the git
+  # tree at all, so it's never even discovered as a candidate host —
+  # flake.nix's own instanceNames enumeration (builtins.readDir on the
+  # git-relative manufacturer directory) simply can't see an untracked
+  # directory. Confirmed the hard way on a real install: nixos-install
+  # failed with "does not provide attribute ...nixosConfigurations.
+  # '<instance>'..." — not an eval error inside the host, a complete
+  # absence of it from the flake's outputs. The baked-in-snapshot path
+  # (no .git at all) was never affected, which is exactly why this
+  # wasn't caught earlier — every existing automated test happened to
+  # answer "no" to "check for updates?".
+  local path_prefix="path:"
+
   wiz_msgbox "Writing config" "Generating variables.nix, configuration.nix, and secrets into $WIZ_REPO_WORKDIR now."
 
   # variables.nix lives inside host_dir (not $WIZ_REPO_WORKDIR's top
@@ -51,7 +72,7 @@ stage_90_install() {
   export NIX_CONFIG="pure-eval = false"
 
   local flake_attr
-  flake_attr="$WIZ_REPO_WORKDIR#$(wiz_get hostname)"
+  flake_attr="${path_prefix}$WIZ_REPO_WORKDIR#$(wiz_get hostname)"
 
   if [ "$(wiz_get storage_path)" = "new" ]; then
     wiz_msgbox "Running disko" "About to format and mount every disk selected earlier. This is the point of no return."
@@ -64,7 +85,7 @@ stage_90_install() {
     # the new-pool path needed the exact same fix, just applied earlier,
     # before creation instead of before import).
     wiz_set_hostid "$(wiz_get hostid)"
-    pool_new_run_disko "$WIZ_REPO_WORKDIR" "$(wiz_get hostname)"
+    pool_new_run_disko "${path_prefix}$WIZ_REPO_WORKDIR" "$(wiz_get hostname)"
   else
     # Boot drive only — disko doesn't know about the adopted pool.
     disko --mode destroy,format,mount --flake "$flake_attr"
