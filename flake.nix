@@ -182,5 +182,20 @@
           ];
         };
       };
+
+      packages.${system} = {
+        # The published installer artifact: the plain ISO
+        # (nixosConfigurations.installer's own system.build.isoImage) with
+        # a NAS-SECRETS partition appended — see
+        # hosts/installer/installer-image.nix for why/how. secrets/
+        # nas-secrets-usb/ is gitignored except its *.example templates
+        # (same convention as secrets/extra-files/), so this stays empty
+        # by default; populate it locally for a fully baked-in image.
+        installer-iso = import ./hosts/installer/installer-image.nix {
+          pkgs = nixpkgs.legacyPackages.${system};
+          isoImage = self.nixosConfigurations.installer.config.system.build.isoImage;
+          secretsDir = ./secrets/nas-secrets-usb;
+        };
+      };
     };
 }

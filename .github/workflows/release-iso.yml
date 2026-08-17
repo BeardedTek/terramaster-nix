@@ -22,18 +22,23 @@ jobs:
       - name: Build installer ISO
         # --impure: hosts/installer/configuration.nix checks for a local
         # secrets/extra-files/.../authorized_keys to bake in (see its own
-        # comment) — that path is gitignored and won't exist on this
-        # runner, so bakedInKey just evaluates to [] here. Every ISO built
-        # by this workflow ships with no baked-in key, same as the stock
-        # NixOS ISO: passwd-then-SSH at the console, or one of the
-        # wizard's own Secrets-step options (GitHub username, paste,
-        # password) once it's running.
-        run: nix build --impure --print-build-logs '.#nixosConfigurations.installer.config.system.build.isoImage'
+        # comment), and hosts/installer/installer-image.nix similarly
+        # checks secrets/nas-secrets-usb/ for real (non-.example) files to
+        # bake onto the appended NAS-SECRETS partition — neither path
+        # exists on this runner, so both just produce their empty/no-key
+        # defaults. Every ISO built by this workflow ships with no
+        # baked-in key and an empty NAS-SECRETS partition, same as the
+        # stock NixOS ISO plus a ready-to-use (but blank) secrets volume:
+        # passwd-then-SSH at the console, one of the wizard's own
+        # Secrets-step options, or just dropping files onto the
+        # NAS-SECRETS drive before boot.
+        run: nix build --impure --print-build-logs '.#packages.x86_64-linux.installer-iso'
 
       - name: Stage release asset
-        run: |
-          iso=$(find result/iso -name '*.iso' | head -n1)
-          cp "$iso" "beardednas-installer-${GITHUB_REF_NAME}.iso"
+        # result is now a single file (hosts/installer/installer-image.nix's
+        # own $out), not a directory with an iso/ subfolder like the plain
+        # system.build.isoImage output used to be.
+        run: cp result "beardednas-installer-${GITHUB_REF_NAME}.iso"
 
       - name: Create release
         uses: softprops/action-gh-release@v2

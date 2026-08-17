@@ -20,6 +20,34 @@ Flash it to a USB drive the same way as any Linux ISO
 machine, or Rufus/balenaEtcher on Windows/macOS), then boot your NAS from
 it.
 
+### Pre-loading secrets — no second USB drive needed
+
+The published image already carries a second, empty partition labeled
+`NAS-SECRETS` right alongside the bootable installer, on the very same
+file — no separate drive, no command-line tooling, no WSL. After
+flashing, that USB stick shows up as **two** volumes when plugged into
+any everyday computer: the boot volume, and a plain removable
+`NAS-SECRETS` drive you can open in Explorer/Finder/any file manager and
+drop files onto directly, before booting the NAS from it. The layout the
+wizard's Secrets step (below) looks for:
+
+```
+authorized_keys           # first user's SSH public key(s)
+etc/nebula/config.yaml    # Nebula mesh config (+ certs alongside)
+etc/traefik/traefik.env   # Traefik DNS-01 provider credentials
+etc/minio/minio.env       # MinIO root credentials
+```
+
+All of it is optional — anything you leave out just falls back to the
+interactive prompt or a generated placeholder, same as always.
+
+For a fully hands-off image with secrets already baked in (so there's
+nothing to drag-and-drop after flashing): populate
+`secrets/nas-secrets-usb/` in your own checkout (see the `*.example`
+templates there for the exact layout) and build it yourself —
+`nix build --impure .#packages.x86_64-linux.installer-iso` — instead of
+downloading the generic release image.
+
 ## What the wizard does
 
 Boots to a TUI (also reachable over SSH if you'd rather drive it
@@ -36,11 +64,12 @@ remotely) that walks through, in order:
 6. **Services** — a checklist of everything covered on the
    [Available Services](/docs/usage/services/) page: pick what you want
    running.
-7. **Secrets** — how the first user gets SSH access. Looks for a USB
-   drive labeled `NAS-SECRETS` first; if none is found, offers to fetch a
-   public key from a GitHub username, paste one directly, or fall back to
-   password-based SSH login (off by default everywhere else — the wizard
-   warns before enabling it).
+7. **Secrets** — how the first user gets SSH access. Looks for a drive
+   labeled `NAS-SECRETS` first (see "Pre-loading secrets" above — this
+   can be a partition on the boot USB itself or a separate drive); if
+   none is found, offers to fetch a public key from a GitHub username,
+   paste one directly, or fall back to password-based SSH login (off by
+   default everywhere else — the wizard warns before enabling it).
 8. **Review** — a full summary, then a confirmation before anything
    destructive happens.
 9. **Install** — writes the configuration, sets up storage, and installs
