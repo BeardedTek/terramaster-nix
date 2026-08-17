@@ -53,6 +53,18 @@ in
   # authenticated /var/lib/tailscale state onto the target afterward.
   services.tailscale.enable = true;
 
+  # Test tooling only (hosts/installer/wizard/test/run-vm-install.sh):
+  # once this is running inside a VirtualBox guest, `VBoxManage
+  # guestproperty get <vm> /VirtualBox/GuestInfo/Net/0/V4/IP` reports the
+  # guest's real IP directly, regardless of NAT vs bridged networking —
+  # replacing an earlier nmap-ping-sweep + arp-table MAC-matching
+  # discovery scheme, which worked but was awkward (depended on ARP cache
+  # timing, needed nmap installed on the test host, needed the VM's own
+  # MAC normalized to match Windows' arp -a dash-separated format).
+  # Irrelevant on real hardware — the guest-property service only ever
+  # activates inside an actual VirtualBox VM in the first place.
+  virtualisation.virtualbox.guest.enable = true;
+
   # Runs on every login (console autologin, or SSH) — see
   # hosts/installer/wizard/lib/common.sh for what it actually does.
   # Prompts first rather than launching unconditionally: installation-cd-

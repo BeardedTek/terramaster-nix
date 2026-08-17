@@ -186,13 +186,29 @@ in
       # posture as everywhere else in this repo) before Traefik's first
       # ever start.
       #
-      # No explicit `resolvers` override (previously hardcoded to
-      # Linode-specific nameservers, 92.123.94.2/3, undocumented why) —
-      # doesn't generalize across the ~15 providers the dashboard now
-      # supports, so this falls back to lego's own default
-      # authoritative-nameserver auto-discovery instead.
       certificatesResolvers.dns01-nebula.acme = {
         dnsChallenge.provider = "\${TRAEFIK_DNS_PROVIDER}";
+        # Explicit public resolvers for lego's OWN propagation check
+        # (confirming the TXT record it just wrote is actually live,
+        # before ever telling Let's Encrypt to look) — NOT the DNS
+        # provider's own nameservers, and not specific to any one of
+        # the ~15 providers the dashboard supports, so this is safe to
+        # leave generic rather than provider-specific (an earlier
+        # version of this file hardcoded Linode-specific nameservers
+        # here for a different reason, undocumented, before being
+        # removed in favor of "lego's own default auto-discovery" —
+        # that assumption turned out to be wrong). Without this, lego
+        # falls back to whatever the system's own /etc/resolv.conf
+        # points at — on a normal home network that's the router's own
+        # DNS relay, which is commonly unreliable for TXT record
+        # lookups specifically. Confirmed the hard way on a real
+        # install: DNS-01 failed 100% of the time with "recursive
+        # nameservers: NS 192.168.3.1:53 did not return the expected
+        # TXT record" even though the record was genuinely live on the
+        # provider's real nameservers the whole time — this was purely
+        # local-router DNS relay flakiness, not a credentials or
+        # provider problem.
+        dnsChallenge.resolvers = [ "8.8.8.8:53" "1.1.1.1:53" ];
         email = "le@beardedtek.com";
         storage = "/var/lib/traefik/acme.json";
       };

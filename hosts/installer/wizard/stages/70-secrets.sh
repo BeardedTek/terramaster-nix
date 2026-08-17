@@ -90,12 +90,6 @@ stage_70_secrets() {
     wiz_set have_nebula "false"
   fi
 
-  if [ -n "$(wiz_get secrets_usb)" ] && [ -f "$(wiz_get secrets_usb)/etc/traefik/traefik.env" ]; then
-    wiz_set have_traefik "true"
-  else
-    wiz_set have_traefik "false"
-  fi
-
   # LLDAP's bootstrap admin password — the one new SSO-related secret a
   # human actually needs to know, since it's used to log into LLDAP's own
   # admin UI right after install (see 90-install.sh's final message).

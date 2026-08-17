@@ -56,4 +56,10 @@ MOCK_YESNO["Use password login?"]="true"
 MOCK_ANSWERS["LLDAP admin password"]="TestLdapAdmin123!"
 MOCK_YESNO["Nebula"]="false"
 
+MOCK_YESNO["DNS-01 certificates"]="true"
+MOCK_ANSWERS["DNS provider"]="linode"
+MOCK_ANSWERS["Extra domain"]="custom.wiztest.test.invalid"
+MOCK_ANSWERS["Extra wildcard"]="*.custom.wiztest.test.invalid"
+MOCK_ANSWERS["LINODE_TOKEN"]="test-linode-token"
+
 MOCK_ANSWERS["Confirm"]="DESTROY"

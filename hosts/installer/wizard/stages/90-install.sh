@@ -160,6 +160,26 @@ stage_90_install() {
     cp -r "$secrets_usb/etc/." /mnt/persist/etc/
   fi
 
+  # MinIO root credentials — same "generate one automatically unless
+  # something already provided a real file" treatment as FileBrowser's
+  # own admin.env below, so a no-secrets-USB install ends up with a
+  # working MinIO instead of one that silently never starts (services.
+  # minio's ConditionPathExists on this exact file — see modules/
+  # minio.nix's rootCredentialsFile comment). Checked after the
+  # secrets_usb copy above, so a USB-provided etc/minio/minio.env is
+  # always left untouched. Deliberately does NOT print the generated
+  # password anywhere in this wizard's own output — same posture as
+  # FileBrowser's admin.env below: retrieve it from the file itself, or
+  # rotate it from the dashboard's Service Configuration page, after boot.
+  if [ "$(wiz_get feature_minio)" = "true" ] && [ ! -f /mnt/persist/etc/minio/minio.env ]; then
+    mkdir -p /mnt/persist/etc/minio
+    {
+      echo "MINIO_ROOT_USER=minioadmin"
+      echo "MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)"
+    } > /mnt/persist/etc/minio/minio.env
+    chmod 600 /mnt/persist/etc/minio/minio.env
+  fi
+
   # OpenSMTPd relay credentials — same table(5) format
   # secrets/extra-files/persist/etc/opensmtpd/secrets.example documents.
   # modules/smtp-relay.nix reads this at runtime (services.opensmtpd's own
@@ -190,6 +210,24 @@ stage_90_install() {
       cp -a /var/lib/tailscale/. /mnt/persist/var/lib/tailscale/
       ;;
   esac
+
+  # Traefik DNS-01 — stage_71_dns01 already built the exact final
+  # traefik.env content (unquoted KEY=VALUE lines, matching modules/
+  # traefik-dns01.nix's own applyScript format); this just writes it
+  # verbatim. No chown to root:traefik-dns01 needed the way applyScript
+  # itself does post-boot — that system user doesn't exist yet on this
+  # live ISO, and that module's own "z /etc/traefik/traefik.env 0640
+  # root traefik-dns01" tmpfiles rule fixes ownership/permissions on
+  # every real boot regardless of what this write leaves behind. A
+  # USB-provided traefik.env (secrets_usb/etc/traefik/traefik.env) was
+  # already copied in wholesale by the blanket etc/ copy above — this
+  # only ever runs when stage_71_dns01 itself collected values
+  # interactively, never both.
+  if [ "$(wiz_get have_traefik_dns01)" = "true" ]; then
+    mkdir -p /mnt/persist/etc/traefik
+    printf '%s' "$(wiz_get traefik_env_content)" > /mnt/persist/etc/traefik/traefik.env
+    chmod 600 /mnt/persist/etc/traefik/traefik.env
+  fi
 
   # SSO secrets. Two things here are ever typed by a human: LLDAP's
   # bootstrap admin password, and each user's own password from
@@ -375,20 +413,26 @@ SSO is enabled: once rebooted, each user you added can already log into the dash
   fi
 
   # modules/minio.nix's rootCredentialsFile (MINIO_ROOT_USER/PASSWORD) is
-  # out-of-repo, same as Traefik's LINODE_TOKEN — but unlike that one,
-  # there's no "harmlessly inert" default seeded for it: a missing file
-  # just means minio.service never starts (ConditionPathExists), silently,
-  # with nothing anywhere in this wizard's flow telling the admin that's
-  # what happened. Confirmed the hard way on a real install: MinIO
-  # selected, no secrets USB minio.env, box came up with MinIO simply
-  # absent and no error to chase. Only warn if it's genuinely still
-  # missing after the secrets_usb copy above — a USB that already had
-  # etc/minio/minio.env needs no extra nagging.
+  # out-of-repo, same as Traefik's LINODE_TOKEN. The generation block
+  # above (right after the secrets_usb copy) already guarantees a real
+  # file exists whenever feature_minio is on, whether USB-provided or
+  # auto-generated — the "still missing" branch below is
+  # just the leftover safety net for that write somehow not happening
+  # (e.g. /mnt/persist unwritable), so the admin still isn't left
+  # chasing a silent ConditionPathExists no-start with nothing in this
+  # wizard's own output explaining why — confirmed the hard way on a
+  # real install before either the generation or this note existed.
   local minio_note=""
-  if [ "$(wiz_get feature_minio)" = "true" ] && [ ! -f /mnt/persist/etc/minio/minio.env ]; then
-    minio_note="
+  if [ "$(wiz_get feature_minio)" = "true" ]; then
+    if [ -f /mnt/persist/etc/minio/minio.env ]; then
+      minio_note="
+
+MinIO root credentials were generated automatically at /etc/minio/minio.env (left untouched if your secrets USB already provided one) — retrieve or rotate them there, or from the dashboard's Service Configuration page, after reboot."
+    else
+      minio_note="
 
 MinIO is enabled but has no root credentials yet (/etc/minio/minio.env) — it will not start until you create one. See secrets/extra-files/persist/etc/minio/minio.env.example for the format, or scripts/migrate-oidc-client-secrets.sh's own comment if you're also missing its OIDC client secret."
+    fi
   fi
 
   wiz_msgbox "Done" "Install complete.

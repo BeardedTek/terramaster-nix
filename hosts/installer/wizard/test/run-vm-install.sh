@@ -70,8 +70,21 @@ to_wsl_path() {
 # to skew the next one) rather than reusing one fixed VM across runs.
 VM_NAME="${WIZ_VM_NAME:-wiz-test-$(date +%Y%m%d-%H%M%S)-$$}"
 VBM="/c/Program Files/Oracle/VirtualBox/VBoxManage.exe"
-SSH_PORT="${WIZ_SSH_PORT:-2222}"
 BOOT_TIMEOUT_SECS="${WIZ_BOOT_TIMEOUT_SECS:-300}"
+# Bridged, not NAT+port-forward: across this session's many VM create/
+# destroy cycles all reusing the same host port, VirtualBox's NAT engine
+# repeatedly failed to (re)bind its port-forward listener — "NAT#0:
+# configuration error: failed to set up redirection of 2222 to 22.
+# Probably a conflict with existing services or other rules", confirmed
+# in the VM's own VBox.log, reproducible even after a full VBoxSVC
+# restart. A real, repeatable VirtualBox NAT limitation under heavy
+# reuse, not something fixable from this script's own logic. Bridged
+# networking gives the VM its own real DHCP lease on the LAN instead,
+# sidestepping NAT/port-forward state entirely — also closer to how a
+# real install is actually deployed. Trade-off: no fixed, known address
+# to connect to anymore — see wait_for_vm_ip() below.
+BRIDGE_ADAPTER="${WIZ_BRIDGE_ADAPTER:-Realtek PCIe GbE Family Controller #2}"
+IP_DISCOVERY_TIMEOUT_SECS="${WIZ_IP_DISCOVERY_TIMEOUT_SECS:-120}"
 # Matches the hand-built terramaster-nix-installer VM's own spec (checked
 # via VBoxManage showvminfo/list hdds) — same topology the wizard's new-
 # pool path is meant for: one small boot disk, four equal pool disks.
@@ -94,6 +107,7 @@ TEST_SMTP_PW="TestSmtpPass123!"
 
 SCRATCH="$(mktemp -d)"
 VM_CREATED=0
+VM_IP=""
 # Set to keep the VM running (rebooted into the *installed* system, not
 # powered off/destroyed) for post-install verification — e.g. checking
 # that LLDAP/dashboard/services actually work, not just that
@@ -102,7 +116,7 @@ VM_CREATED=0
 WIZ_TEST_KEEP_VM="${WIZ_TEST_KEEP_VM:-0}"
 cleanup() {
   if [ "$WIZ_TEST_KEEP_VM" = "1" ] && [ "${WIZ_TEST_PASSED:-0}" = "1" ]; then
-    echo "== WIZ_TEST_KEEP_VM=1: leaving $VM_NAME running (SSH port $SSH_PORT), not destroying. ==" >&2
+    echo "== WIZ_TEST_KEEP_VM=1: leaving $VM_NAME running (${VM_IP:-IP not discovered}), not destroying. ==" >&2
     echo "Scratch dir (test key, etc.) preserved: $SCRATCH" >&2
     return 0
   fi
@@ -125,7 +139,7 @@ trap cleanup EXIT
 # Everything below is wrapped in one function so
 # hosts/installer/wizard/test/run-webui-check.sh (Tier 3) can `source`
 # this file and call it directly to get a running, installed VM —
-# reusing ssh_cmd/vkey_*/$SCRATCH/$SSH_PORT instead of re-implementing VM
+# reusing ssh_cmd/vkey_*/$SCRATCH/$VM_IP instead of re-implementing VM
 # setup — while this file's own standalone behavior (the dual-mode
 # trailer at the bottom) stays exactly what it was before. Left at the
 # original flat indentation rather than reindented for the wrap: purely
@@ -183,7 +197,7 @@ echo "== Creating fresh VM $VM_NAME ==" >&2
 VM_CREATED=1
 "$VBM" modifyvm "$VM_NAME" \
   --memory "$VM_MEMORY_MB" --cpus "$VM_CPUS" --chipset ich9 --firmware efi \
-  --nic1 nat --natpf1 "wizard-test-ssh,tcp,127.0.0.1,$SSH_PORT,,22"
+  --nic1 bridged --bridgeadapter1 "$BRIDGE_ADAPTER"
 "$VBM" storagectl "$VM_NAME" --name SATA --add sata --controller IntelAhci
 
 echo "== Creating fresh disks (1x ${BOOT_DISK_MB}MB boot, 4x ${POOL_DISK_MB}MB pool) ==" >&2
@@ -203,9 +217,53 @@ echo "== Attaching the built ISO ==" >&2
 echo "== Booting $VM_NAME headless ==" >&2
 "$VBM" startvm "$VM_NAME" --type headless
 
+# hosts/installer/configuration.nix's virtualisation.virtualbox.guest.
+# enable installs VirtualBox Guest Additions on the ISO specifically for
+# this — once VBoxService is up in the guest and DHCP has assigned an
+# address, this guest-property reports it directly, regardless of NAT
+# vs bridged networking. Simpler and more reliable than an earlier
+# nmap-ping-sweep + arp-table MAC-matching scheme (worked, but depended
+# on ARP cache timing and needed nmap installed on the test host) —
+# confirmed the hard way that scheme was fragile enough to be worth
+# replacing outright rather than just patching. Reusable across both
+# this initial boot and the post-install reboot further down, since a
+# reboot clears the guest-property value until VBoxService reports a
+# fresh one.
+wait_for_vm_ip() {
+  echo "== Waiting for $VM_NAME's IP via VirtualBox guest properties (up to ${IP_DISCOVERY_TIMEOUT_SECS}s) ==" >&2
+  VM_IP=""
+  local ip_waited=0 raw
+  while [ -z "$VM_IP" ]; do
+    # MSYS_NO_PATHCONV=1: Git Bash auto-rewrites any argument that looks
+    # like a POSIX absolute path before it reaches a native Windows exe
+    # — "/VirtualBox/GuestInfo/..." qualifies just like the already-known
+    # /nix/store or /tmp cases. Without this, the guest property lookup
+    # silently mangles into nonsense and *always* returns "No value
+    # set!" regardless of whether the property is actually set —
+    # confirmed the hard way: `VBoxManage guestproperty enumerate` (a
+    # single plain argument, nothing to mangle) showed the real IP
+    # sitting there the whole time while `guestproperty get` with the
+    # explicit property-path argument kept failing.
+    raw=$(MSYS_NO_PATHCONV=1 "$VBM" guestproperty get "$VM_NAME" "/VirtualBox/GuestInfo/Net/0/V4/IP" 2>/dev/null | tr -d '\r') || true
+    case "$raw" in
+      "Value: "*) VM_IP="${raw#Value: }" ;;
+    esac
+    if [ -z "$VM_IP" ]; then
+      ip_waited=$((ip_waited + 5))
+      if [ "$ip_waited" -ge "$IP_DISCOVERY_TIMEOUT_SECS" ]; then
+        echo "TIER 2 FAILED: never got $VM_NAME's IP via guest properties within ${IP_DISCOVERY_TIMEOUT_SECS}s (is virtualisation.virtualbox.guest.enable actually on this ISO?)." >&2
+        exit 1
+      fi
+      sleep 5
+    fi
+  done
+  echo "$VM_NAME is at $VM_IP (found after ~${ip_waited}s)." >&2
+}
+wait_for_vm_ip
+
 ssh_cmd() {
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    -o ConnectTimeout=5 -i "$SCRATCH/test_key" -p "$SSH_PORT" root@127.0.0.1 "$@"
+    -o ConnectTimeout=5 -i "$SCRATCH/test_key" root@"$VM_IP" "$@"
 }
 
 echo "== Waiting for SSH (up to ${BOOT_TIMEOUT_SECS}s) ==" >&2
@@ -392,6 +450,13 @@ vkey_text "$TEST_LDAP_PW"; vkey_enter # LLDAP admin password
 vkey_text "$TEST_LDAP_PW"; vkey_enter # confirm
 wiz_note "secrets stage done (SSH key pasted, Nebula skipped, LLDAP admin pw set)"
 
+vkey_enter                             # DNS-01 certificates? -> Yes (default)
+vkey_enter                             # DNS provider -> "linode" (1st item)
+vkey_enter                             # Extra domain -> accept default (custom.<hostname>.<domain>)
+vkey_enter                             # Extra wildcard -> accept default
+vkey_text "test-linode-token"; vkey_enter # LINODE_TOKEN
+wiz_note "DNS-01 configured (linode, dummy token)"
+
 vkey_enter                        # Review
 vkey_text "DESTROY"; vkey_enter   # typed destructive confirmation
 wiz_note "destructive confirmation typed — install starting"
@@ -428,6 +493,12 @@ if [ "$WIZ_TEST_KEEP_VM" = "1" ]; then
   # first time this flag was used, manually, before this was scripted).
   "$VBM" storageattach "$VM_NAME" --storagectl SATA --port 0 --device 0 --type dvddrive --medium none
   "$VBM" startvm "$VM_NAME" --type headless
+  # Reboot = a fresh DHCP transaction — most servers hand the same MAC
+  # its previous lease back, but that's server-side policy this script
+  # doesn't control, so don't assume it. ssh_cmd() closes over $VM_IP by
+  # reference (a plain variable, not a literal baked in at definition
+  # time), so re-running this updates every subsequent call automatically.
+  wait_for_vm_ip
 fi
 
 echo >&2

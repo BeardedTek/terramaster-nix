@@ -688,7 +688,12 @@ here does — no special-casing needed, unlike Frigate or qBittorrent.
   and `tmpfiles` rules all come from nixpkgs, unmodified.
 - **Root credentials**: out-of-repo, same pattern as Traefik's
   `LINODE_TOKEN` — `rootCredentialsFile = "/etc/minio/minio.env";`, an
-  `EnvironmentFile=` with `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`. See
+  `EnvironmentFile=` with `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`. The
+  wizard (`hosts/installer/wizard/stages/90-install.sh`) auto-generates
+  this file with a random password (same pattern as FileBrowser's
+  `admin.env`) whenever MinIO is enabled and a secrets USB didn't already
+  provide one — retrieve or rotate the value from the file itself, or
+  from the dashboard's Service Configuration page, after boot. See
   `secrets/extra-files/persist/etc/minio/minio.env.example` and the
   [nixos-anywhere installation guide](/docs/installation/nixos-anywhere/)'s secrets section. Missing the file is
   a clean no-start (nixpkgs' module sets `ConditionPathExists` on it), not

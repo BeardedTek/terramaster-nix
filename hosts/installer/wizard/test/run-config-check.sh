@@ -79,6 +79,7 @@ stage_60_features
 stage_65_smtp
 stage_66_tailscale
 stage_70_secrets
+stage_71_dns01
 stage_80_review
 
 manufacturer=$(wiz_get manufacturer)
