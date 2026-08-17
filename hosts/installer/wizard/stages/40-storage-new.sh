@@ -22,14 +22,14 @@ stage_40_storage_new() {
   local dirty_disks=()
   for d in "${disks[@]}"; do
     [ "$d" = "$boot_disk" ] && continue
-    local sig size_h
+    local sig label
     sig=$(pool_new_disk_signature "$d")
-    size_h=$(pool_new_human_size "$(pool_new_disk_size_bytes "$d")")
+    label=$(pool_new_disk_label "$d")
     if [ -n "$sig" ]; then
       dirty_disks+=("$d")
-      pool_menu+=("$d" "$size_h — HAS EXISTING DATA, will be excluded unless confirmed" "OFF")
+      pool_menu+=("$d" "$label — HAS EXISTING DATA, will be excluded unless confirmed" "OFF")
     else
-      pool_menu+=("$d" "$size_h — blank" "ON")
+      pool_menu+=("$d" "$label — blank" "ON")
     fi
   done
 
@@ -63,10 +63,10 @@ Are you certain you want to include $d?" || wiz_die "Aborted: $d has existing da
 
   local raid
   raid=$(wiz_menu "RAID level" "Redundancy across the ${#pool_disks[@]} selected disk(s):" \
-    "raidz1" "Single-parity, matches young's own pool (needs 3+ disks)" \
+    "raidz1" "RAID-Z1 — single-parity (needs 3+ disks)" \
     "mirror" "Mirror (needs exactly 2 disks per mirror group)" \
-    "raidz2" "Double-parity (needs 4+ disks)" \
-    "" "Stripe — no redundancy at all, not recommended")
+    "raidz2" "RAID-Z2 — double-parity (needs 4+ disks)" \
+    "" "Striping — no redundancy at all, not recommended")
   wiz_set raid_level "$raid"
 
   local pool
@@ -81,6 +81,5 @@ Are you certain you want to include $d?" || wiz_die "Aborted: $d has existing da
   pool_new_generate_disko "$disko_out" "$pool" "$raid" "$boot_disk" "${pool_disks[@]}"
   wiz_set disko_file "$disko_out"
 
-  whiptail --backtitle "$WHIPTAIL_BACKTITLE" --title "Generated disko.nix" \
-    --textbox "$disko_out" 30 90
+  wiz_textbox "Generated disko.nix" "$disko_out"
 }

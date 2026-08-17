@@ -43,7 +43,8 @@ stage_90_install() {
   # answer "no" to "check for updates?".
   local path_prefix="path:"
 
-  wiz_msgbox "Writing config" "Generating variables.nix, configuration.nix, and secrets into $WIZ_REPO_WORKDIR now."
+  wiz_notice "Writing config" "Generating variables.nix, configuration.nix, and secrets into $WIZ_REPO_WORKDIR now."
+  wiz_progress "write-config" "running"
 
   # variables.nix lives inside host_dir (not $WIZ_REPO_WORKDIR's top
   # level) — flake.nix discovers every hosts/<manufacturer>/<instance>/
@@ -59,6 +60,7 @@ stage_90_install() {
   mkdir -p "$WIZ_REPO_WORKDIR/secrets"
   gen_initial_passwords_env > "$WIZ_REPO_WORKDIR/secrets/initial-passwords.env"
   chmod 600 "$WIZ_REPO_WORKDIR/secrets/initial-passwords.env"
+  wiz_progress "write-config" "done"
 
   # disko.nix was already written by the storage stage (40-storage-existing.sh
   # or 40-storage-new.sh) — it's the one file generated before this point,
@@ -74,8 +76,9 @@ stage_90_install() {
   local flake_attr
   flake_attr="${path_prefix}$WIZ_REPO_WORKDIR#$(wiz_get hostname)"
 
+  wiz_progress "disko" "running"
   if [ "$(wiz_get storage_path)" = "new" ]; then
-    wiz_msgbox "Running disko" "About to format and mount every disk selected earlier. This is the point of no return."
+    wiz_notice "Running disko" "About to format and mount every disk selected earlier. This is the point of no return."
     # Stamp the live session's hostid to match the target BEFORE disko
     # creates the pool — otherwise `zpool create` stamps it with this
     # live ISO's own hostid (hardcoded "00000000"), and the target
@@ -85,10 +88,21 @@ stage_90_install() {
     # the new-pool path needed the exact same fix, just applied earlier,
     # before creation instead of before import).
     wiz_set_hostid "$(wiz_get hostid)"
-    pool_new_run_disko "${path_prefix}$WIZ_REPO_WORKDIR" "$(wiz_get hostname)"
+    # tee'd to install.log (a no-op if $WIZ_RUN_DIR doesn't exist — same
+    # as nixos-install's own tee below) so the WebUI's log panel has real
+    # content during this stretch too, not just once nixos-install starts.
+    if [ -d "$WIZ_RUN_DIR" ]; then
+      pool_new_run_disko "${path_prefix}$WIZ_REPO_WORKDIR" "$(wiz_get hostname)" 2>&1 | tee -a "$WIZ_RUN_DIR/install.log"
+    else
+      pool_new_run_disko "${path_prefix}$WIZ_REPO_WORKDIR" "$(wiz_get hostname)"
+    fi
   else
     # Boot drive only — disko doesn't know about the adopted pool.
-    disko --mode destroy,format,mount --flake "$flake_attr"
+    if [ -d "$WIZ_RUN_DIR" ]; then
+      disko --mode destroy,format,mount --flake "$flake_attr" 2>&1 | tee -a "$WIZ_RUN_DIR/install.log"
+    else
+      disko --mode destroy,format,mount --flake "$flake_attr"
+    fi
 
     local pool home media data
     pool=$(wiz_get pool_name)
@@ -105,6 +119,7 @@ stage_90_install() {
     mount -t zfs "$media" "/mnt/$pool/media"
     mount -t zfs "$data" "/mnt/$pool/data"
   fi
+  wiz_progress "disko" "done"
 
   # modules/filebrowser.nix and modules/frigate.nix both read a secret via
   # builtins.readFile "/persist/etc/..." — an *eval-time* read (not a
@@ -117,6 +132,7 @@ stage_90_install() {
   # agree. Bind-mounting closes that gap for every secret written under
   # /mnt/persist below, present and future, without each module needing
   # its own special case.
+  wiz_progress "secrets" "running"
   mkdir -p /persist
   mount --bind /mnt/persist /persist
 
@@ -158,6 +174,23 @@ stage_90_install() {
   if [ -n "$secrets_usb" ] && [ -d "$secrets_usb/etc" ]; then
     mkdir -p /mnt/persist/etc
     cp -r "$secrets_usb/etc/." /mnt/persist/etc/
+  fi
+
+  # Nebula config pasted directly into the wizard (stage_70_secrets,
+  # WebUI-only — see lib/ui-web.sh's wiz_textarea / lib/ui-tui.sh's own
+  # fallback). Checked after the secrets_usb copy above, so a
+  # USB-provided etc/nebula/config.yaml always wins over anything pasted
+  # — same "USB beats interactive" precedent every other secret here
+  # already follows.
+  if [ "$(wiz_get have_nebula)" = "true" ] && [ -n "$(wiz_get nebula_config_yaml)" ] && [ ! -f /mnt/persist/etc/nebula/config.yaml ]; then
+    mkdir -p /mnt/persist/etc/nebula
+    wiz_get nebula_config_yaml > /mnt/persist/etc/nebula/config.yaml
+    [ -n "$(wiz_get nebula_ca_crt)" ] && wiz_get nebula_ca_crt > /mnt/persist/etc/nebula/ca.crt
+    [ -n "$(wiz_get nebula_host_crt)" ] && wiz_get nebula_host_crt > /mnt/persist/etc/nebula/host.crt
+    if [ -n "$(wiz_get nebula_host_key)" ]; then
+      wiz_get nebula_host_key > /mnt/persist/etc/nebula/host.key
+      chmod 600 /mnt/persist/etc/nebula/host.key
+    fi
   fi
 
   # MinIO root credentials — same "generate one automatically unless
@@ -369,14 +402,28 @@ stage_90_install() {
     fi
   fi
 
-  wiz_msgbox "Installing NixOS" "Running nixos-install now — this can take a while (downloading/building packages). The console will show progress."
+  wiz_progress "secrets" "done"
+  wiz_notice "Installing NixOS" "Running nixos-install now — this can take a while (downloading/building packages). The console will show progress."
+  wiz_progress "nixos-install" "running"
 
   # --impure: confirmed the hard way that nixos-install's own internal
   # nix invocation doesn't pick up NIX_CONFIG=pure-eval=false from this
   # shell's environment (unlike plain `nix build`) — modules/users.nix's
   # builtins.getEnv calls need real impure evaluation, not just the env
   # vars being exported.
-  nixos-install --root /mnt --flake "$flake_attr" --no-root-password --impure
+  #
+  # tee'd to $WIZ_RUN_DIR/install.log (a no-op if that directory doesn't
+  # exist — see wiz_progress's own comment) purely for the WebUI's
+  # log-tail view; this doesn't change or delay the console's own
+  # existing real-time output, still the primary way to watch progress
+  # over the TUI/SSH.
+  if [ -d "$WIZ_RUN_DIR" ]; then
+    nixos-install --root /mnt --flake "$flake_attr" --no-root-password --impure \
+      2>&1 | tee "$WIZ_RUN_DIR/install.log"
+  else
+    nixos-install --root /mnt --flake "$flake_attr" --no-root-password --impure
+  fi
+  wiz_progress "nixos-install" "done"
 
   # The authorized_keys write above (if any) happened before this
   # user even existed anywhere — this live ISO's own user database has
@@ -444,6 +491,7 @@ Generated config was left at /persist/nixos-installer-output/ on the new system 
 Commit configuration.nix and disko.nix. variables.nix is intentionally NOT committed (it's gitignored — see variables.nix.example at the repo root); don't delete /persist/nixos-installer-output/ though — every future update reads this host's variables.nix from there permanently, not just this once.
 
 secrets/initial-passwords.env was NOT copied there (it only ever mattered for this install) — recreate it in your own checkout from secrets/initial-passwords.env.example if you'll be rebuilding this box from your workstation later.${sso_note}${minio_note}"
+  wiz_progress "done" "done"
 
   if wiz_yesno "Reboot now?" "Unmount and reboot into the new system?"; then
     # `umount -R /mnt` alone isn't reliable here — confirmed the hard way

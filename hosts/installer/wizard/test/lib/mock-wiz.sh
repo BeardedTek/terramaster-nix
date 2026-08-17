@@ -89,6 +89,14 @@ wiz_input() { _mock_pop_or_scalar "$1"; }
 wiz_password() { _mock_pop_or_scalar "$1"; }
 wiz_menu() { _mock_pop_or_scalar "$1"; }
 wiz_checklist() { _mock_pop_or_scalar "$1"; }
+# Empty by default (matches the "skip — nothing pasted" path every
+# existing fixture exercises); add a scalar/queued answer for a specific
+# title the same way as wiz_input if a fixture ever needs to test the
+# "something was pasted" branch.
+wiz_textarea() { [ -n "${MOCK_ANSWERS[$1]+x}" ] && _mock_pop_or_scalar "$1" || printf ''; }
+# Pure progress waypoint — nothing to script an answer for (see
+# lib/ui-web.sh's own wiz_notice comment).
+wiz_notice() { :; }
 
 wiz_die() {
   echo "mock-wiz: wiz_die: ${1:-}" >&2
@@ -100,7 +108,6 @@ wiz_abort() {
   exit 1
 }
 
-# Catch-all for the one direct (unwrapped) whiptail call in
-# 40-storage-new.sh (the generated-disko.nix preview textbox) — bash
-# resolves a function of this name before the real whiptail binary.
-whiptail() { return 0; }
+# stages/40-storage-new.sh's generated-disko.nix preview — a plain
+# read-only display, nothing to script an answer for.
+wiz_textbox() { :; }

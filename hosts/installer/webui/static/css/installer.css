@@ -1,0 +1,83 @@
+/* Small additions on top of the dashboard's own vendored design system
+   (app.css/custom.css/fonts.css, copied in unmodified at build time —
+   see hosts/installer/configuration.nix) — same "patch only what's
+   missing" approach custom.css itself already documents, not a parallel
+   design system. */
+
+body {
+  min-height: 100vh;
+}
+
+.installer-option-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgb(229 231 235);
+}
+.dark .installer-option-row {
+  border-bottom-color: rgb(55 65 81);
+}
+.installer-option-row:last-child {
+  border-bottom: none;
+}
+.installer-option-row input {
+  margin-top: 0.3rem;
+  flex-shrink: 0;
+}
+.installer-option-row label {
+  font-size: 0.875rem;
+  color: rgb(55 65 81);
+}
+.dark .installer-option-row label {
+  color: rgb(209 213 219);
+}
+.installer-option-row:has(input:disabled) {
+  opacity: 0.5;
+}
+
+/* Tailwind utility classes referenced in index.html/installer.js that
+   this vendored bundle (app.css) never compiled in — confirmed by
+   grepping for each one there and finding nothing. Same exact class of
+   problem dashboard/static/css/custom.css's own "Update page modal"
+   comment already documents (that page's whitespace-pre-wrap/break-all/
+   dark: variants "don't error, they just silently do nothing") — this
+   is that page's fix pattern applied to the same gap, not a new
+   discovery. --color-primary-600 is app.css's own token (already used
+   elsewhere there via the same var()), not a new color. */
+.font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+.break-all {
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+@keyframes installer-spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: installer-spin 1s linear infinite;
+}
+.border-t-primary-600 {
+  border-top-color: var(--color-primary-600, #2563eb);
+}
+
+/* Same gap as above, specifically for the red "destructive warning"
+   line and the failed-step icon — confirmed via a real browser's
+   computed style (getComputedStyle) that text-red-700/dark:text-red-400
+   and text-red-600/dark:text-red-500 render as plain default gray/white
+   text, not red, on this bundle. Named classes instead of trying every
+   remaining shade combination against this bundle's actual (and, per
+   custom.css's own comment, undocumented) coverage. */
+.installer-warning {
+  color: #b91c1c;
+}
+.dark .installer-warning {
+  color: #f87171;
+}
+.installer-icon-failed {
+  color: #dc2626;
+}
+.dark .installer-icon-failed {
+  color: #f87171;
+}

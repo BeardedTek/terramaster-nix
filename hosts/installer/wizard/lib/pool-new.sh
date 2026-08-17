@@ -80,6 +80,19 @@ pool_new_disk_signature() {
   wipefs -n "/dev/disk/by-id/$dev" 2>/dev/null | tail -n +2
 }
 
+
+# Trailing whitespace trimmed — lsblk pads MODEL to a fixed column width
+# by default even with -n (no headers), which otherwise leaves a visible
+# gap before anything appended after it (e.g. " — blank").
+pool_new_disk_model() {
+  local dev="$1"
+  if [ "${WIZ_DRY_RUN:-0}" = "1" ]; then
+    printf '%s' "${WIZ_DRY_RUN_MODEL:-}"
+    return 0
+  fi
+  lsblk -ndo MODEL "/dev/disk/by-id/$dev" 2>/dev/null | sed 's/[[:space:]]*$//'
+}
+
 pool_new_human_size() {
   local bytes="$1"
   awk -v b="$bytes" 'BEGIN {
@@ -88,6 +101,23 @@ pool_new_human_size() {
     while (b >= 1024 && u < 6) { b /= 1024; u++ }
     printf "%.1f %s", b, units[u]
   }'
+}
+
+# "<size> - <model>" (falls back to just the size if the disk reports no
+# model at all) — every disk-picking menu shows this instead of size
+# alone, since same-capacity disks (the common case for a pool's own
+# member disks, and confirmed the hard way in this wizard's own VM
+# testing — every disk was reported as an identical size) are otherwise
+# indistinguishable from each other in the list.
+pool_new_disk_label() {
+  local dev="$1" size model
+  size=$(pool_new_human_size "$(pool_new_disk_size_bytes "$dev")")
+  model=$(pool_new_disk_model "$dev")
+  if [ -n "$model" ]; then
+    printf '%s - %s' "$size" "$model"
+  else
+    printf '%s' "$size"
+  fi
 }
 
 # Writes a disko.nix using lib/zfs-pool.nix, same shape as
@@ -198,7 +228,7 @@ wiz_pick_boot_disk() {
 
   local menu=()
   for d in "${disks[@]}"; do
-    menu+=("$d" "$(pool_new_human_size "$(pool_new_disk_size_bytes "$d")")")
+    menu+=("$d" "$(pool_new_disk_label "$d")")
   done
   wiz_menu "Boot drive" "Which disk should hold the boot/system partition?" "${menu[@]}"
 }

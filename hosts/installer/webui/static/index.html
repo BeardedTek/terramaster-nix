@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Bearded NAS installer">
+<title>Bearded NAS Installer</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Kanit:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/custom.css">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/installer.css">
+
+<script>
+  if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+</script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900">
+
+<header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+  <div class="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+    <span class="kanit-semibold text-lg text-gray-900 dark:text-white">Bearded NAS Installer</span>
+    <span id="stage-label" class="text-xs text-gray-500 dark:text-gray-400"></span>
+  </div>
+</header>
+
+<main class="max-w-2xl mx-auto px-4 py-8">
+
+  <div id="lost-banner" class="hidden mb-4 text-sm rounded-lg p-4 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
+    <p class="font-semibold mb-1">This install session has moved elsewhere.</p>
+    <p id="lost-banner-text"></p>
+  </div>
+
+  <div id="connection-banner" class="hidden mb-4 text-sm rounded-lg p-4 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+    Waiting to reach the installer&hellip;
+  </div>
+
+  <!-- Question card — the whole flow is rendered here, question by
+       question, mirroring exactly what a whiptail dialog would show. -->
+  <div id="question-card" class="hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6">
+    <h2 id="q-title" class="text-lg font-semibold text-gray-900 dark:text-white mb-3"></h2>
+    <p id="q-message" class="text-sm text-gray-700 dark:text-gray-300 mb-4 whitespace-pre-line"></p>
+    <form id="q-form">
+      <div id="q-fields" class="mb-4"></div>
+      <div class="flex justify-end gap-2">
+        <button id="q-cancel-btn" type="button" class="hidden text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600">Cancel</button>
+        <button id="q-no-btn" type="button" class="hidden text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600">No</button>
+        <button id="q-submit-btn" type="submit" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Continue</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Install progress — shown alongside the question card once
+       stage_90_install starts, mirroring dashboard/content/update.md's
+       own step-list/spinner/log-panel component for visual consistency. -->
+  <div id="progress-card" class="hidden mt-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6">
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">Installing</h3>
+    <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">The install is running unattended now — this can take a while (downloading/building packages). No further input is needed until it finishes.</p>
+    <div class="flex items-center gap-3 mb-4">
+      <div id="progress-spinner" class="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 dark:border-gray-600 border-t-primary-600 shrink-0"></div>
+      <svg id="progress-icon-success" class="hidden w-6 h-6 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      <svg id="progress-icon-failed" class="hidden w-6 h-6 update-icon-failed shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      <span id="progress-status-text" class="text-sm text-gray-700 dark:text-gray-300">Starting&hellip;</span>
+    </div>
+    <!-- .update-step/.update-step-icon/.update-step-done/.update-log-output
+         are the dashboard's own step-list component classes
+         (dashboard/static/css/custom.css, dashboard/content/update.md) —
+         reused verbatim rather than duplicated under a new name, so this
+         is pixel-identical to the dashboard's own update-progress view. -->
+    <ul id="progress-step-list" class="text-sm mb-4"></ul>
+    <button id="log-toggle-btn" type="button" class="flex items-center gap-1 text-sm text-primary-700 dark:text-primary-500 hover:underline mb-2">
+      <svg id="log-toggle-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      <span>Show log</span>
+    </button>
+    <div id="log-panel" class="hidden">
+      <pre id="log-tail" class="update-log-output text-xs p-3 rounded-lg overflow-y-auto"></pre>
+    </div>
+  </div>
+
+</main>
+
+<script src="js/installer.js"></script>
+</body>
+</html>

@@ -10,6 +10,52 @@ let
   # PermitRootLogin off there, unaffected by this).
   authorizedKeyPath = ../../secrets/extra-files/home/beardedtek/.ssh/authorized_keys;
   bakedInKey = lib.optional (builtins.pathExists authorizedKeyPath) (builtins.readFile authorizedKeyPath);
+
+  # Browser-based alternative to the whiptail TUI below — see
+  # hosts/installer/wizard/lib/ui-web.sh for the IPC protocol and
+  # hosts/installer/wizard/lib/wiz-claim.sh for how the two are kept from
+  # racing each other. Every stage_NN_*.sh file is unchanged either way;
+  # only the wiz_* primitive implementation differs.
+  wizWebUser = "wiz-web";
+  wizRunDir = "/run/wiz-web";
+  wizWebPort = 8080;
+
+  # dashboard/static/{css,js} is the same vendored Tailwind v4 + Flowbite
+  # bundle + fonts + accordion.js modules/dashboard.nix's own dashboardSite
+  # uses — copied in verbatim (not via Hugo: this is fundamentally one
+  # page that mutates entirely via installer.js polling /api/question,
+  # not a multi-page content site, so Hugo's templating buys nothing
+  # here) so the installer WebUI matches the dashboard's look and feel
+  # exactly. Dashboard-specific JS (auth-nav.js, dashboard.js,
+  # preferences-toggles.js — LLDAP/session-cookie coupled) is deliberately
+  # NOT pulled in; none of that infrastructure exists on a live installer.
+  installerWebuiSite = pkgs.runCommand "installer-webui-site" { } ''
+    mkdir -p $out/css $out/js
+    cp -r ${../../dashboard/static/css}/. $out/css/
+    cp -r ${../../dashboard/static/js}/.  $out/js/
+    cp -r ${./webui/static/css}/. $out/css/
+    cp -r ${./webui/static/js}/.  $out/js/
+    cp ${./webui/static/index.html} $out/index.html
+  '';
+
+  # hosts/installer/wizard/cgi/*.sh are real, standalone, directly
+  # testable bash scripts (confirmed the hard way against a scripted
+  # question.json/answer.json fixture before this was wired up) — read in
+  # here rather than duplicated inline the way modules/dashboard-login.nix's
+  # own CGIs are, since these are non-trivial enough to want a real,
+  # lint-able file. writeShellApplication prepends its own shebang/`set
+  # -euo pipefail`; the ones already at the top of each .sh file just
+  # become harmless comments/redundant re-sets in the generated script.
+  wizAnswerCgi = pkgs.writeShellApplication {
+    name = "wiz-web-answer-cgi";
+    runtimeInputs = [ pkgs.jq pkgs.coreutils ];
+    text = builtins.readFile ./wizard/cgi/answer.sh;
+  };
+  wizInstallProgressCgi = pkgs.writeShellApplication {
+    name = "wiz-web-install-progress-cgi";
+    runtimeInputs = [ pkgs.jq pkgs.coreutils ];
+    text = builtins.readFile ./wizard/cgi/install-progress.sh;
+  };
 in
 {
   imports = [ "${modulesPath}/installer/cd-dvd/installation-cd-minimal.nix" ];
@@ -53,6 +99,128 @@ in
   # authenticated /var/lib/tailscale state onto the target afterward.
   services.tailscale.enable = true;
 
+  # Browser-based installer WebUI — reachable the moment this live ISO
+  # finishes its own normal DHCP boot (independent of anything the wizard
+  # itself does; see hosts/installer/wizard/stages/20-network.sh's own
+  # comment), same as SSH already is. Coexists with the TUI below —
+  # lib/wiz-claim.sh's flock decides which one actually gets to drive a
+  # given boot, whichever a human answers first.
+  users.users.${wizWebUser} = { isSystemUser = true; group = wizWebUser; };
+  users.groups.${wizWebUser} = { };
+
+  systemd.tmpfiles.rules = [
+    # 0775, not 0770: nginx runs as its own dedicated user, in neither the
+    # root nor wiz-web group, and needs to traverse this directory to
+    # serve question.json/textbox-current.txt via plain `alias`
+    # (confirmed the hard way against a real VM boot: 0770 gave nginx a
+    # bare 403, unable to even stat into the directory). The wiz-web GROUP
+    # needs write, not just read, for the same reason — the answer.sh CGI
+    # (runs as user/group wiz-web) creates answer-<seq>.json files here;
+    # confirmed the hard way a second time that 0755 (group read-only)
+    # made that CGI fail with "Permission denied" trying to write its own
+    # answer file. Nothing written here is a secret from other local
+    # processes on this single-purpose live ISO; only root/wiz-web can
+    # WRITE into it either way (0775 leaves "other" at r-x, not rwx).
+    "d ${wizRunDir} 0775 root ${wizWebUser} - -"
+  ];
+
+  services.fcgiwrap.instances.${wizWebUser} = {
+    process = {
+      user = wizWebUser;
+      group = wizWebUser;
+    };
+    socket = {
+      user = config.services.nginx.user;
+      group = config.services.nginx.group;
+    };
+  };
+
+  services.nginx = {
+    enable = true;
+    virtualHosts."installer-webui" = {
+      listen = [{ addr = "0.0.0.0"; port = wizWebPort; }];
+      root = installerWebuiSite;
+      locations = {
+        # The static site (index.html/css/js) itself needs the same
+        # no-cache treatment as the API endpoints below — confirmed the
+        # hard way mid-session: a browser that already loaded this
+        # origin once (e.g. from an earlier boot/ISO build reusing the
+        # same LAN IP, which this repo's own test tooling deliberately
+        # does via a pinned MAC address) will keep serving a STALE
+        # cached installer.js/installer.css on later plain navigations
+        # without this, silently running old frontend code against a
+        # newer backend. Every boot of this ephemeral live ISO should
+        # always get the exact static assets it shipped with.
+        "/".extraConfig = ''
+          add_header Cache-Control "no-store, must-revalidate";
+        '';
+        # No CGI needed at all — writes are atomic (.tmp + mv) and reads
+        # never mutate anything, so a plain nginx alias is sufficient and
+        # simpler than routing this through fcgiwrap.
+        "= /api/question".extraConfig = ''
+          alias ${wizRunDir}/question.json;
+          add_header Cache-Control no-store;
+        '';
+        # Fixed filename (not per-request) — there's only ever one
+        # blocking question at a time in this single wizard process, so
+        # no per-call uniqueness is needed and this avoids any
+        # path-traversal surface a dynamic path would otherwise need
+        # guarding against.
+        "= /api/textbox/current".extraConfig = ''
+          alias ${wizRunDir}/textbox-current.txt;
+          add_header Cache-Control no-store;
+          default_type text/plain;
+        '';
+        "= /api/answer".extraConfig = ''
+          fastcgi_pass unix:/run/fcgiwrap-${wizWebUser}.sock;
+          fastcgi_param SCRIPT_FILENAME ${lib.getExe wizAnswerCgi};
+          fastcgi_param REQUEST_METHOD $request_method;
+          fastcgi_param CONTENT_TYPE $content_type;
+          fastcgi_param CONTENT_LENGTH $content_length;
+          fastcgi_param SERVER_PROTOCOL $server_protocol;
+          fastcgi_param GATEWAY_INTERFACE CGI/1.1;
+          fastcgi_param SERVER_SOFTWARE nginx;
+        '';
+        "= /api/install-progress".extraConfig = ''
+          fastcgi_pass unix:/run/fcgiwrap-${wizWebUser}.sock;
+          fastcgi_param SCRIPT_FILENAME ${lib.getExe wizInstallProgressCgi};
+          fastcgi_param REQUEST_METHOD $request_method;
+          fastcgi_param SERVER_PROTOCOL $server_protocol;
+          fastcgi_param GATEWAY_INTERFACE CGI/1.1;
+          fastcgi_param SERVER_SOFTWARE nginx;
+        '';
+      };
+    };
+  };
+
+  networking.firewall.allowedTCPPorts = [ wizWebPort ];
+
+  # Runs the exact same run.sh the TUI uses, just with WIZ_UI_BACKEND=web
+  # (see run.sh's own dispatch) — starts unconditionally at boot, no
+  # prompt, since reaching it just means opening a browser to the printed
+  # URL. Restart=no is deliberate: a finished/aborted/lock-losing run
+  # must not respawn a fresh $WIZ and silently re-ask everything from
+  # question 1.
+  systemd.services.installer-wizard-web = {
+    description = "Web-driven Bearded NAS installer wizard";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network.target" "nginx.service" ];
+    serviceConfig = {
+      Type = "simple";
+      ExecStart = "${pkgs.bash}/bin/bash /etc/nas-installer-repo/hosts/installer/wizard/run.sh";
+      # A systemd service does NOT inherit the interactive login shell's
+      # PATH the way environment.loginShellInit's `sudo bash run.sh`
+      # does — confirmed the hard way against a real VM boot: run.sh
+      # crashed instantly (exit 127) because lib/wiz-claim.sh's `flock`
+      # and lib/ui-web.sh's `jq` calls resolved to nothing. Every package
+      # environment.systemPackages installs (including the wizard's own
+      # git/jq/zfs/curl/openssl/etc.) lands in /run/current-system/sw/bin
+      # — the same PATH entry an interactive shell already gets for free.
+      Environment = [ "WIZ_UI_BACKEND=web" "PATH=/run/wrappers/bin:/run/current-system/sw/bin" ];
+      Restart = "no";
+    };
+  };
+
   # Test tooling only (hosts/installer/wizard/test/run-vm-install.sh):
   # once this is running inside a VirtualBox guest, `VBoxManage
   # guestproperty get <vm> /VirtualBox/GuestInfo/Net/0/V4/IP` reports the
@@ -85,6 +253,23 @@ in
   # even traverse into /root). A no-op when already root (SSH as root
   # via the baked-in key).
   environment.loginShellInit = ''
+    # A bounded retry, not a one-shot `hostname -I` — this console autologin
+    # fires as soon as boot reaches it, which can genuinely race DHCP still
+    # completing. Confirmed the hard way against real VM boots twice: the
+    # first login landed here before the interface had an address at all,
+    # and a first attempt at a bounded retry (10x1s) still wasn't always
+    # enough — one real boot's DHCP lease legitimately took longer than
+    # that. 25x1s is a more generous margin without hanging the login
+    # prompt indefinitely if the network genuinely never comes up.
+    wiz_ip=""
+    wiz_tries=0
+    while [ "$wiz_tries" -lt 25 ]; do
+      wiz_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+      [ -n "$wiz_ip" ] && break
+      wiz_tries=$((wiz_tries + 1))
+      sleep 1
+    done
+    echo "WebUI also available at: http://''${wiz_ip:-<IP once the network is up>}:${toString wizWebPort}/"
     read -r -p "Start the Bearded NAS installer? [Y/n] " start_installer
     case "$start_installer" in
       [Nn]*)

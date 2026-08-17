@@ -40,7 +40,9 @@ Next screen asks for final confirmation."
 
   if [ "$(wiz_get storage_path)" = "new" ]; then
     wiz_type_to_confirm \
-      "About to run disko against $(wiz_get pool_disks | tr '\n' ' ') and $(wiz_get boot_disk).
+      "About to run disko against these disks:
+$(wiz_get pool_disks | sed 's/^/  /')
+  $(wiz_get boot_disk) (boot)
 
 THIS PERMANENTLY DESTROYS ALL DATA on those disks. There is no undo." \
       "DESTROY" \

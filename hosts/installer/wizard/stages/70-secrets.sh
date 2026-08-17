@@ -84,8 +84,22 @@ stage_70_secrets() {
   if [ -n "$(wiz_get secrets_usb)" ] && [ -f "$(wiz_get secrets_usb)/etc/nebula/config.yaml" ]; then
     wiz_set have_nebula "true"
   elif wiz_yesno "Nebula" "Configure Nebula mesh VPN now? You'll need its config.yaml + certs pasted in (skip to configure it manually later — see docs/DEPLOYMENT.md)."; then
-    wiz_msgbox "Not yet supported here" "Pasting a full Nebula config through this wizard isn't implemented — skipping. Copy secrets/extra-files/persist/etc/nebula/ in manually after first boot, or re-run with a NAS-SECRETS USB attached."
-    wiz_set have_nebula "false"
+    # wiz_textarea is WebUI-only (lib/ui-web.sh) — the TUI backend's own
+    # implementation (lib/ui-tui.sh) just explains that and returns
+    # empty, which the "nothing pasted" branch below already handles
+    # gracefully, so this needs no separate TUI-vs-web branching here.
+    local nebula_config
+    nebula_config=$(wiz_textarea "Nebula config.yaml" "Paste the full contents of config.yaml (pki.cert/pki.key/pki.ca should reference host.crt/host.key/ca.crt — the exact names the next three prompts save as).")
+    if [ -n "$nebula_config" ]; then
+      wiz_set nebula_config_yaml "$nebula_config"
+      wiz_set nebula_ca_crt "$(wiz_textarea "Nebula ca.crt" "Paste the contents of ca.crt.")"
+      wiz_set nebula_host_crt "$(wiz_textarea "Nebula host.crt" "Paste the contents of host.crt (this node's own signed certificate).")"
+      wiz_set nebula_host_key "$(wiz_textarea "Nebula host.key" "Paste the contents of host.key (this node's own private key).")"
+      wiz_set have_nebula "true"
+    else
+      wiz_msgbox "Skipped" "No config pasted — configure Nebula manually later. See docs/DEPLOYMENT.md, or re-run with a NAS-SECRETS USB attached."
+      wiz_set have_nebula "false"
+    fi
   else
     wiz_set have_nebula "false"
   fi
