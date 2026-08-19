@@ -204,6 +204,12 @@ in
       "/etc/minio"
       "/var/lib/filebrowser"
       "/etc/filebrowser"
+      # AdGuard Home's own state (users, blocklists, everything set
+      # through its web UI) is already covered by the "/var/lib/private"
+      # entry below — it runs with DynamicUser = true. This is only for
+      # modules/dns-cache.nix's own bootstrap admin.env + rewrite-sync
+      # state, unrelated to AGH's internals.
+      "/etc/adguardhome"
       "/etc/lldap"
       # Not "/var/lib/lldap": modules/lldap.nix's services.lldap runs
       # with DynamicUser = true, and systemd's own DynamicUser handling

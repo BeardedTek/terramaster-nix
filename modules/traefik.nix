@@ -29,6 +29,21 @@ let
     # redirects unauthenticated requests to a hostname with no router at
     # all). Keep the two in sync if either changes.
     auth = 9091;
+    # Traefik's own built-in API/dashboard (staticConfigOptions.api below,
+    # served on its dedicated "traefik" entrypoint :8099) — proxying it
+    # back through ourselves like any other backend, rather than linking
+    # straight at :8099, is what lets modules/authelia.nix's
+    # candidateProtectedServices gate it (that insecure dashboard has no
+    # auth of its own otherwise). No loop: the router this creates listens
+    # on the "https" entrypoint (443) and forwards to 127.0.0.1:8099, a
+    # different port than the entrypoint itself.
+    traefik = 8099;
+    # AdGuard Home's own web UI (modules/dns-cache.nix) — loopback-bound
+    # there deliberately, reached only through this router+Authelia, same
+    # posture as the traefik backend just above. NOT AGH's conventional
+    # default (3000): that's already "immich-share" above, and two
+    # backends can't both bind the same real port on this box.
+    adguardhome = 3080;
   };
 
   backendEnabled = {
@@ -49,6 +64,11 @@ let
     immich = f.immich.enable;
     "immich-share" = f.immich.enable && f.immich.publicProxy.enable;
     auth = f.sso.authelia.enable;
+    # Traefik always runs (this whole file has no top-level mkIf), so its
+    # own dashboard backend is unconditional too — same posture as `auth`
+    # would be if Authelia had no feature flag.
+    traefik = true;
+    adguardhome = f.dnsCache.enable;
   };
 
   enabledBackends = lib.filterAttrs (name: _: backendEnabled.${name}) backends;

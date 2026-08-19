@@ -253,6 +253,21 @@ in
   # even traverse into /root). A no-op when already root (SSH as root
   # via the baked-in key).
   environment.loginShellInit = ''
+    # Only for an actual human at a real console or an interactive `ssh
+    # root@<ip>` session (both allocate a real tty) — never for a
+    # scripted, single-command `ssh root@<ip> some-command` (no tty
+    # unless `-t` is forced). Without this guard every single one of
+    # those non-interactive invocations still ran this whole block: its
+    # banner text landed on stdout ahead of the actual command's own
+    # output (silently corrupting anything that captures it, like
+    # hosts/installer/wizard/test/run-vm-install.sh's disk-by-id
+    # enumeration — confirmed the hard way, it counted one extra "line"
+    # every time), and its `read -r -p ...` blocked on stdin until EOF,
+    # at which point the empty answer fell through to the `sudo bash
+    # .../run.sh` default — meaning a plain scripted health-check command
+    # could unintentionally kick off a real install. Interactive-only
+    # sidesteps both.
+    if [ -t 0 ] && [ -t 1 ]; then
     # A bounded retry, not a one-shot `hostname -I` — this console autologin
     # fires as soon as boot reaches it, which can genuinely race DHCP still
     # completing. Confirmed the hard way against real VM boots twice: the
@@ -279,6 +294,7 @@ in
         sudo bash /etc/nas-installer-repo/hosts/installer/wizard/run.sh
         ;;
     esac
+    fi
   '';
 
   image.baseName = lib.mkForce "beardednas-installer";

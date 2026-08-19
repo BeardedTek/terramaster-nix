@@ -2,6 +2,22 @@
 title: Services
 ---
 
+<div id="cert-pending-banner" class="hidden mb-6 text-sm rounded-lg p-4 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+  <p class="font-semibold mb-2"><span id="cert-pending-services"></span> can't finish starting up yet</p>
+  <p class="mb-2">
+    These services log into Authelia over HTTPS, which needs a valid
+    Let's Encrypt certificate for this box's domain. That certificate
+    hasn't been issued yet, so they're stuck offline until it is.
+  </p>
+  <p class="mb-1">To fix it:</p>
+  <ol class="list-decimal list-inside space-y-1">
+    <li>Open <a href="/preferences/" class="underline">Preferences</a> and expand "Let's Encrypt SSL Certs".</li>
+    <li>Pick your DNS provider, enter its API credentials, and save.</li>
+    <li>Traefik requests the certificate automatically — this can take a few minutes for DNS propagation.</li>
+    <li>Once it's issued, these services retry automatically and should come online within about 2 minutes. No further action needed.</li>
+  </ol>
+</div>
+
 <div id="service-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-4">
   <a data-service="jellyfin" href="#" target="_blank" rel="noopener noreferrer" class="flex flex-col aspect-square p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:border-primary-500 dark:hover:border-primary-500 text-center transition-opacity">
     <div class="flex justify-end">
@@ -213,6 +229,51 @@ title: Services
       </div>
     </div>
   </a>
+  <a data-service="traefik" href="#" target="_blank" rel="noopener noreferrer" class="flex flex-col aspect-square p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:border-primary-500 dark:hover:border-primary-500 text-center transition-opacity">
+    <div class="flex justify-end">
+      <span class="status-badge inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+        <span class="status-dot w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+        <span class="status-text">&hellip;</span>
+      </span>
+    </div>
+    <div class="flex-1 flex items-center justify-center gap-3">
+      <img src="/images/services/traefik.svg" alt="" class="w-10 h-10 shrink-0" />
+      <div class="flex flex-col items-start text-left">
+        <span class="text-lg font-semibold text-gray-900 dark:text-white">Traefik</span>
+        <span class="text-sm text-gray-500 dark:text-gray-400">Reverse Proxy</span>
+      </div>
+    </div>
+  </a>
+  <a data-service="letsencrypt" href="/letsencrypt/" class="flex flex-col aspect-square p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:border-primary-500 dark:hover:border-primary-500 text-center transition-opacity">
+    <div class="flex justify-end">
+      <span class="status-badge inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+        <span class="status-dot w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+        <span class="status-text">&hellip;</span>
+      </span>
+    </div>
+    <div class="flex-1 flex items-center justify-center gap-3">
+      <img src="/images/services/letsencrypt.svg" alt="" class="w-10 h-10 shrink-0" />
+      <div class="flex flex-col items-start text-left">
+        <span class="text-lg font-semibold text-gray-900 dark:text-white">Let's Encrypt</span>
+        <span class="text-sm text-gray-500 dark:text-gray-400">SSL Certificates</span>
+      </div>
+    </div>
+  </a>
+  <a data-service="adguardhome" href="#" target="_blank" rel="noopener noreferrer" class="flex flex-col aspect-square p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:border-primary-500 dark:hover:border-primary-500 text-center transition-opacity">
+    <div class="flex justify-end">
+      <span class="status-badge inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+        <span class="status-dot w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+        <span class="status-text">&hellip;</span>
+      </span>
+    </div>
+    <div class="flex-1 flex items-center justify-center gap-3">
+      <img src="/images/services/adguardhome.svg" alt="" class="w-10 h-10 shrink-0" />
+      <div class="flex flex-col items-start text-left">
+        <span class="text-lg font-semibold text-gray-900 dark:text-white">DNS Cache</span>
+        <span class="text-sm text-gray-500 dark:text-gray-400">Ad-Blocking &amp; Local DNS</span>
+      </div>
+    </div>
+  </a>
 </div>
 
 <script>
@@ -221,38 +282,95 @@ title: Services
   var onNebula = host.indexOf(".nebula.") !== -1;
   var onLocalPath = window.location.port === "8090";
 
+  // "online"/"warning" (2 legacy up/down states, plus a 3rd for cards
+  // like Let's Encrypt that carry an s.state instead of a plain s.up) —
+  // "warning" stays full-opacity (still up, just needs attention) while
+  // "offline"/"disabled" both dim the card.
+  function badgeClasses(kind) {
+    if (kind === "online") {
+      return {
+        badge: "status-badge inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300",
+        dot: "status-dot w-1.5 h-1.5 rounded-full bg-green-500",
+        text: "ONLINE"
+      };
+    }
+    if (kind === "warning") {
+      return {
+        badge: "status-badge inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300",
+        dot: "status-dot w-1.5 h-1.5 rounded-full bg-yellow-500",
+        text: "WARNING"
+      };
+    }
+    return {
+      badge: "status-badge inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300",
+      dot: "status-dot w-1.5 h-1.5 rounded-full bg-red-500",
+      text: kind === "disabled" ? "DISABLED" : "OFFLINE"
+    };
+  }
+
   function applyStatus(data) {
     var names = {};
     (data.services || []).forEach(function (s) {
       names[s.name] = true;
       var card = document.querySelector('#service-grid a[data-service="' + s.name + '"]');
       if (!card) return;
-      if (onLocalPath && s.port) {
-        card.href = "http://" + host + ":" + s.port + "/";
-      } else if (data.host) {
-        var target = onNebula
-          ? s.name + "-" + data.host + ".nebula.beardedtek.com"
-          : s.name + "." + data.host + ".beardedtek.com";
-        card.href = "https://" + target + "/";
+      // Let's Encrypt's card links to the dedicated /letsencrypt/ page
+      // (already set in the markup) — it has no proxied backend/port, so
+      // it must never get the generic external-hostname treatment below.
+      if (s.name !== "letsencrypt") {
+        if (onLocalPath && s.port) {
+          card.href = "http://" + host + ":" + s.port + "/";
+        } else if (data.host) {
+          var target = onNebula
+            ? s.name + "-" + data.host + ".nebula.beardedtek.com"
+            : s.name + "." + data.host + ".beardedtek.com";
+          card.href = "https://" + target + "/";
+        }
       }
       var badge = card.querySelector(".status-badge");
       var dot = card.querySelector(".status-dot");
       var text = card.querySelector(".status-text");
-      if (s.up) {
-        card.classList.remove("opacity-40", "grayscale");
-        if (badge) badge.className = "status-badge inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300";
-        if (dot) dot.className = "status-dot w-1.5 h-1.5 rounded-full bg-green-500";
-        if (text) text.textContent = "ONLINE";
-      } else {
+      var kind = s.state || (s.up ? "online" : "offline");
+      var classes = badgeClasses(kind);
+      if (kind === "offline" || kind === "disabled") {
         card.classList.add("opacity-40", "grayscale");
-        if (badge) badge.className = "status-badge inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300";
-        if (dot) dot.className = "status-dot w-1.5 h-1.5 rounded-full bg-red-500";
-        if (text) text.textContent = "OFFLINE";
+      } else {
+        card.classList.remove("opacity-40", "grayscale");
       }
+      if (badge) badge.className = classes.badge;
+      if (dot) dot.className = classes.dot;
+      if (text) text.textContent = classes.text;
     });
     document.querySelectorAll("#service-grid a[data-service]").forEach(function (a) {
       a.style.display = names[a.getAttribute("data-service")] ? "" : "none";
     });
+
+    // Explains an otherwise-mysterious OFFLINE badge on a fresh install:
+    // FileBrowser and MinIO both validate their OIDC config against
+    // Authelia over HTTPS at startup (see modules/filebrowser.nix,
+    // modules/minio.nix), which fails until Traefik actually has a real
+    // Let's Encrypt cert for this box's domain. Only shown when SSO is
+    // actually enabled (data.ssoEnabled) — without it neither service
+    // depends on the cert at all, so a coincidentally-offline card would
+    // otherwise get a misleading explanation.
+    var certDependentServices = { files: "Files", "minio-console": "MinIO" };
+    var pendingLabels = [];
+    if (data.ssoEnabled && data.certIssued === false) {
+      Object.keys(certDependentServices).forEach(function (svc) {
+        if (!names[svc]) return;
+        var text = document.querySelector('#service-grid a[data-service="' + svc + '"] .status-text');
+        if (text && text.textContent === "OFFLINE") pendingLabels.push(certDependentServices[svc]);
+      });
+    }
+    var banner = document.getElementById("cert-pending-banner");
+    if (banner) {
+      if (pendingLabels.length > 0) {
+        document.getElementById("cert-pending-services").textContent = pendingLabels.join(" and ");
+        banner.classList.remove("hidden");
+      } else {
+        banner.classList.add("hidden");
+      }
+    }
   }
 
   function refresh() {

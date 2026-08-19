@@ -176,6 +176,46 @@ in
       };
     };
 
+    # Retries FileBrowser's bootstrap once a real cert covers
+    # auth.${hostName}.${domain}. On a fresh install DNS-01 often isn't
+    # configured (or hasn't propagated) by the time this box first boots,
+    # so filebrowser-setup's OIDC validation against that HTTPS URL fails
+    # against Traefik's default self-signed cert — and since that unit is
+    # deliberately oneshot/no-self-restart (see its own comment above),
+    # it just sits failed, taking filebrowser.service down with it until
+    # something restarts them by hand. Checks Traefik's actual ACME
+    # storage rather than "has an admin saved *some* DNS-01 provider
+    # config" (modules/traefik-dns01.nix's traefik.env existing is no
+    # guarantee a cert was ever issued) — ${hostName}.${domain} is the
+    # wildcard modules/traefik.nix's lanTls requests, which covers
+    # auth.${hostName}.${domain} too. The `..` recursive descent (rather
+    # than indexing a fixed ["dns01-nebula"]["Certificates"] path) is
+    # deliberately tolerant of exactly which resolver key Traefik/lego
+    # nests this under, since that's undocumented and unverified here.
+    systemd.services.filebrowser-cert-retry = {
+      description = "Retry FileBrowser setup once its Let's Encrypt cert is issued";
+      after = [ "traefik.service" ];
+      path = [ pkgs.jq pkgs.systemd ];
+      serviceConfig.Type = "oneshot";
+      script = ''
+        systemctl is-active --quiet filebrowser.service && exit 0
+        [ -f /var/lib/traefik/acme.json ] || exit 0
+        jq -e --arg d "${hostName}.${domain}" \
+          '[.. | objects | select(has("domain")) | .domain | select(.main == $d or ((.sans // []) | index($d)))] | length > 0' \
+          /var/lib/traefik/acme.json >/dev/null 2>&1 || exit 0
+        systemctl restart filebrowser-setup.service || true
+        systemctl restart filebrowser.service || true
+      '';
+    };
+    systemd.timers.filebrowser-cert-retry = {
+      description = "Check every 2 minutes whether FileBrowser's cert is now issued";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "2min";
+        OnUnitActiveSec = "2min";
+      };
+    };
+
     networking.firewall.interfaces."nebula1".allowedTCPPorts = [ port ];
     networking.firewall.interfaces.${lanIf}.allowedTCPPorts = [ port ];
   };

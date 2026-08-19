@@ -3,6 +3,7 @@
 let
   lanIf = config.mySystem.lanInterface;
   hostName = config.networking.hostName;
+  domain = config.mySystem.domain;
   backends = config.mySystem.serviceBackends; # set by modules/traefik.nix
   f = config.mySystem.features;
   # nixpkgs' own default, but read from config rather than hardcoded so
@@ -179,10 +180,48 @@ let
         jq -n --arg name "$name" --argjson up "$up" --argjson port "$port" \
           '{name:$name, up:$up, port:$port}'
       }
+      # Whether a real Let's Encrypt cert has actually been issued for
+      # ${hostName}.${domain} (the wildcard modules/traefik.nix's lanTls
+      # requests, covering auth.${hostName}.${domain} too) — checked
+      # directly against Traefik's own ACME storage, not just "has an
+      # admin saved *some* DNS-01 provider config" (traefik.env existing
+      # is no guarantee a cert was ever issued). Consumed by
+      # dashboard/content/services.md's frontend to explain *why*
+      # OIDC-dependent services (FileBrowser, MinIO) are showing OFFLINE
+      # on a fresh install, rather than leaving that a silent mystery —
+      # see modules/filebrowser.nix's filebrowser-cert-retry, the
+      # matching backend-side auto-recovery for this exact condition.
+      cert_issued="false"
+      if [ -f /var/lib/traefik/acme.json ]; then
+        if jq -e --arg d "${hostName}.${domain}" \
+          '[.. | objects | select(has("domain")) | .domain | select(.main == $d or ((.sans // []) | index($d)))] | length > 0' \
+          /var/lib/traefik/acme.json >/dev/null 2>&1; then
+          cert_issued="true"
+        fi
+      fi
+
+      # Coarse (disabled/warning/online) classification for the Services
+      # page's Let's Encrypt card — the expensive part (actual DNS
+      # lookups, log scanning) is deliberately NOT done here on every 30s
+      # tick; that only runs on-demand from the dedicated /letsencrypt/
+      # page itself (modules/traefik-dns01.nix's diagRunScript). "disabled"
+      # covers both the feature being off and an untouched/incomplete
+      # provider config (seeded placeholder with no real credentials) —
+      # modules/traefik-dns01.nix's providerConfiguredScript already
+      # collapses those into one "configured" boolean.
+      le_state="disabled"
+      ${lib.optionalString (f.traefikDns01.enable && config.mySystem.traefikDns01.providerConfiguredScript != null) ''
+        provider_configured=$(${lib.getExe config.mySystem.traefikDns01.providerConfiguredScript} 2>/dev/null | jq -r '.configured' || echo false)
+        if [ "$provider_configured" = "true" ]; then
+          if [ "$cert_issued" = "true" ]; then le_state="online"; else le_state="warning"; fi
+        fi
+      ''}
+
       services=$(jq -s '.' \
         ${lib.concatStringsSep " \\\n        " (
           lib.mapAttrsToList (name: port: "<(service_json ${name} ${toString port})") backends
-        )})
+        )} \
+        <(jq -n --arg name letsencrypt --arg state "$le_state" '{name:$name, state:$state}'))
 
       jq -n --arg generated_at "$(date -Is)" \
             --arg host "${hostName}" \
@@ -191,7 +230,9 @@ let
             --argjson memory "$memory" \
             --argjson network "$network" \
             --argjson services "$services" \
-            '{generated_at:$generated_at, host:$host, disks:$disks, load:$load, memory:$memory, network:$network, services:$services}' \
+            --argjson certIssued "$cert_issued" \
+            --argjson ssoEnabled ${if f.sso.authelia.enable then "true" else "false"} \
+            '{generated_at:$generated_at, host:$host, disks:$disks, load:$load, memory:$memory, network:$network, services:$services, certIssued:$certIssued, ssoEnabled:$ssoEnabled}' \
             > "$tmp"
 
       chmod 644 "$tmp"

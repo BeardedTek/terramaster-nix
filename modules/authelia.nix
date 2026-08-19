@@ -85,6 +85,17 @@ let
     # at all, so this gate is its only authentication, not a second
     # layer on top of one.
     scrutiny = { enable = true; policy = "one_factor"; };
+    # Traefik's own built-in API/dashboard (modules/traefik.nix's
+    # `backends.traefik`, :8099) has no auth of its own at all — unlike
+    # the apps above this is infrastructure control, not a household app,
+    # so it's restricted to the admins LLDAP group on top of the usual
+    # gate rather than any authenticated user.
+    traefik = { enable = true; policy = "one_factor"; group = "admins"; };
+    # AdGuard Home (modules/dns-cache.nix) has its own login, but it's
+    # infrastructure control (can redirect every device on the LAN's DNS
+    # resolution) rather than a household app — same "admins only, on
+    # top of whatever auth it has itself" posture as traefik just above.
+    adguardhome = { enable = true; policy = "one_factor"; group = "admins"; };
     # No minio-console entry: it gets native OIDC (candidateOidcClients
     # below) instead of this plain ForwardAuth gate — MinIO has a real
     # OIDC client, unlike the gate-only apps above.

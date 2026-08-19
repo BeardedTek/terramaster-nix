@@ -51,6 +51,8 @@
         '<a href="/service-configuration/" class="auth-nav-item">Service Configuration</a>';
       items +=
         '<a href="/update/" id="auth-nav-update-link" class="auth-nav-item">System Update</a>';
+      items +=
+        '<a href="/letsencrypt/" class="auth-nav-item">Let\'s Encrypt</a>';
     }
     items += '<a href="/account/" target="_blank" rel="noopener noreferrer" class="auth-nav-item">Manage Profile</a>';
     items += '<a href="/logout" class="auth-nav-item">Logout</a>';

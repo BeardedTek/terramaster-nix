@@ -55,6 +55,7 @@ let
     [ "tailscale" "enable" ]
     [ "vaultwarden" "enable" ]
     [ "scrutiny" "enable" ]
+    [ "dnsCache" "enable" ]
   ];
   flagKey = path: lib.concatStringsSep "." path;
   flagVarName = path: lib.replaceStrings [ "." ] [ "_" ] (flagKey path);

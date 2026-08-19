@@ -333,6 +333,180 @@ let
       fi
     '';
   };
+  # One boolean that answers "does the currently-selected provider have
+  # every field it needs, not just *some* provider name set" — the same
+  # question both dashboard.nix's Services-page badge (disabled vs
+  # warning) and diagRunScript below need, computed once here since both
+  # readEnvFn/providerFields/providerCaseArms are already private to this
+  # file. Exposed cross-module the same way mySystem.serviceBackends
+  # already is between traefik.nix and dashboard.nix.
+  providerConfiguredScript = pkgs.writeShellApplication {
+    name = "traefik-dns01-provider-status";
+    runtimeInputs = [ pkgs.jq pkgs.coreutils ];
+    text = ''
+      ${readEnvFn}
+      provider=$(env_get TRAEFIK_DNS_PROVIDER)
+      configured=false
+      case "$provider" in
+        ${providerCaseArms})
+          configured=true
+          ${lib.concatMapStringsSep "\n" (p: ''
+            if [ "$provider" = "${p}" ]; then
+              ${lib.concatMapStringsSep "\n" (field: ''
+                [ -n "$(env_get ${field})" ] || configured=false
+              '') providerFields.${p}}
+            fi
+          '') (builtins.attrNames providerFields)}
+          ;;
+      esac
+      jq -n --arg provider "$provider" --argjson configured "$configured" \
+        '{provider:$provider, configured:$configured}'
+    '';
+  };
+
+  diagTriggerFile = "${runDir}/diag-trigger";
+  diagResultFile = "${runDir}/diag-result.json";
+
+  # On-demand only (never on a timer) — triggered by loading or refreshing
+  # the dedicated Let's Encrypt dashboard page, not the cheap 30s
+  # dashboard-metrics loop (modules/dashboard.nix), since this does real
+  # network round-trips (dig against public resolvers) and a log-file
+  # scan, unlike everything else that page polls.
+  diagRunScript = pkgs.writeShellApplication {
+    name = "traefik-dns01-diag";
+    runtimeInputs = [ pkgs.jq pkgs.coreutils pkgs.dnsutils pkgs.gnugrep ];
+    text = ''
+      ${readEnvFn}
+      provider=$(env_get TRAEFIK_DNS_PROVIDER)
+      configured=false
+      case "$provider" in
+        ${providerCaseArms})
+          configured=true
+          ${lib.concatMapStringsSep "\n" (p: ''
+            if [ "$provider" = "${p}" ]; then
+              ${lib.concatMapStringsSep "\n" (field: ''
+                [ -n "$(env_get ${field})" ] || configured=false
+              '') providerFields.${p}}
+            fi
+          '') (builtins.attrNames providerFields)}
+          ;;
+      esac
+
+      # Same recursive-descent idiom modules/dashboard.nix's metricsScript
+      # already uses for cert_issued — deliberately duplicated (one small,
+      # well-understood jq filter) rather than exported cross-module for a
+      # single reuse.
+      cert_issued=false
+      if [ -f /var/lib/traefik/acme.json ]; then
+        if jq -e --arg d "${hostName}.${domain}" \
+          '[.. | objects | select(has("domain")) | .domain | select(.main == $d or ((.sans // []) | index($d)))] | length > 0' \
+          /var/lib/traefik/acme.json >/dev/null 2>&1; then
+          cert_issued=true
+        fi
+      fi
+
+      # Best-effort, not a real ACME error parser: most recent
+      # traefik.log line that mentions "acme" alongside something
+      # error-shaped. Traefik's own log format here is whatever
+      # nixpkgs' services.traefik defaults to (no explicit
+      # staticConfigOptions.log.format set) — this grep is deliberately
+      # format-agnostic so it still matches whether that's plain text or
+      # a stray JSON line.
+      last_error=""
+      if [ -f /var/lib/traefik/traefik.log ]; then
+        last_error=$(grep -i 'acme' /var/lib/traefik/traefik.log 2>/dev/null \
+          | grep -iE 'error|unable|fail|denied|unauthorized|invalid' \
+          | tail -n1 | cut -c1-500 || true)
+      fi
+
+      # Same public resolvers lego itself already queries
+      # (modules/traefik.nix's dnsChallenge.resolvers), for consistency.
+      dig_q() {
+        local out
+        out=$(dig +time=3 +tries=1 @8.8.8.8 "$2" "$1" +short 2>/dev/null || true)
+        if [ -z "$out" ]; then
+          out=$(dig +time=3 +tries=1 @1.1.1.1 "$2" "$1" +short 2>/dev/null || true)
+        fi
+        printf '%s' "$out"
+      }
+      ns_records=$(dig_q NS "${domain}")
+      soa_record=$(dig_q SOA "${domain}")
+      a_records=$(dig_q A "${hostName}.${domain}")
+      aaaa_records=$(dig_q AAAA "${hostName}.${domain}")
+      # Ephemeral by design: lego deletes this record after every attempt,
+      # success or failure — its normal steady state is absent, only
+      # meaningful if queried within a minute or two of a Save.
+      txt_records=$(dig_q TXT "_acme-challenge.${hostName}.${domain}")
+
+      hints_json='[]'
+      add_hint() { hints_json=$(printf '%s' "$hints_json" | jq --arg h "$1" '. + [$h]'); }
+
+      if [ -z "$ns_records" ]; then
+        add_hint "No NS (nameserver) records were found for ${domain} — this domain doesn't appear to be delegated to any DNS provider yet. Check your registrar's nameserver settings."
+      elif [ -z "$soa_record" ]; then
+        add_hint "Nameservers are delegated for ${domain}, but they aren't answering reliably right now — this can cause DNS-01 verification to fail intermittently."
+      fi
+
+      if [ "$configured" = "false" ]; then
+        add_hint "No complete DNS-01 credentials are saved yet (or this feature is turned off) — fill in the form below."
+      else
+        case "$last_error" in
+          *[Uu]nauthorized*|*" 401"*|*" 403"*|*[Ii]nvalid*[Kk]ey*|*[Ii]nvalid*[Tt]oken*|*[Ii]nvalid*[Cc]redential*)
+            add_hint "The DNS provider rejected the request — double-check the API credentials saved below." ;;
+          *429*|*[Rr]ate*[Ll]imit*)
+            add_hint "Rate-limited by the DNS provider or Let's Encrypt — wait a while and try again." ;;
+          *) ;;
+        esac
+        if [ -n "$txt_records" ]; then
+          add_hint "A _acme-challenge TXT record was found right now — a certificate request may be in progress; check back in a minute or two."
+        fi
+        if [ "$cert_issued" = "false" ] && [ "$hints_json" = "[]" ]; then
+          add_hint "See the error above, or run journalctl -u traefik on this box for full detail."
+        fi
+      fi
+
+      jq -n \
+        --arg state "ok" \
+        --arg provider "$provider" \
+        --argjson configured "$configured" \
+        --argjson certIssued "$cert_issued" \
+        --arg lastError "$last_error" \
+        --arg ns "$ns_records" --arg soa "$soa_record" \
+        --arg a "$a_records" --arg aaaa "$aaaa_records" --arg txt "$txt_records" \
+        --argjson hints "$hints_json" \
+        '{state:$state, provider:$provider, configured:$configured, certIssued:$certIssued,
+          lastError:$lastError, dns:{ns:$ns,soa:$soa,a:$a,aaaa:$aaaa,txt:$txt}, hints:$hints}' \
+        > ${diagResultFile}.tmp
+      mv ${diagResultFile}.tmp ${diagResultFile}
+    '';
+  };
+
+  diagTriggerCgi = pkgs.writeShellApplication {
+    name = "traefik-dns01-diag-trigger-cgi";
+    runtimeInputs = [ pkgs.coreutils ];
+    text = ''
+      mkdir -p ${runDir}
+      rm -f ${diagResultFile}
+      touch ${diagTriggerFile}
+      printf 'Status: 200 OK\r\nContent-Type: application/json\r\n\r\n{"ok":true}\n'
+    '';
+  };
+
+  diagStatusCgi = pkgs.writeShellApplication {
+    name = "traefik-dns01-diag-status-cgi";
+    runtimeInputs = [ pkgs.coreutils pkgs.findutils ];
+    text = ''
+      printf 'Status: 200 OK\r\nContent-Type: application/json\r\n\r\n'
+      # Same "still fresh" window idiom as statusCgi above.
+      if [ -f ${diagResultFile} ] && [ -n "$(find ${diagResultFile} -mmin -2 2>/dev/null)" ]; then
+        cat ${diagResultFile}
+      elif [ -f ${diagTriggerFile} ]; then
+        echo '{"state":"pending"}'
+      else
+        echo '{"state":"idle"}'
+      fi
+    '';
+  };
 in
 {
   options.mySystem.features.traefikDns01.enable = lib.mkOption {
@@ -348,7 +522,25 @@ in
     '';
   };
 
+  options.mySystem.traefikDns01.providerConfiguredScript = lib.mkOption {
+    type = lib.types.nullOr lib.types.package;
+    default = null;
+    internal = true;
+    description = ''
+      Prints {"provider":"<id>","configured":<bool>} to stdout — whether
+      the currently-selected TRAEFIK_DNS_PROVIDER has every one of its
+      required env vars (providerFields above) actually populated in
+      /etc/traefik/traefik.env. null when traefikDns01 is disabled.
+      Consumed by modules/dashboard.nix's metricsScript to classify the
+      Let's Encrypt Services-page card without duplicating providerFields
+      there — same "one file computes, another consumes" shape as
+      mySystem.serviceBackends.
+    '';
+  };
+
   config = lib.mkIf cfg.enable {
+    mySystem.traefikDns01.providerConfiguredScript = providerConfiguredScript;
+
     users.users.traefik-dns01 = { isSystemUser = true; group = "traefik-dns01"; };
     users.groups.traefik-dns01 = { };
 
@@ -393,6 +585,25 @@ in
       description = "Watch for a web-triggered DNS-01 provider change";
       wantedBy = [ "multi-user.target" ];
       pathConfig.PathExists = triggerFile;
+    };
+
+    # Same "unprivileged writer, privileged watcher" shape as
+    # traefik-dns01-apply above — the dedicated Let's Encrypt dashboard
+    # page's "Refresh diagnostics" button (and its own auto-trigger on
+    # load when the Services-page badge is already WARNING) touches
+    # diagTriggerFile via diagTriggerCgi; this actually runs the dig/log
+    # scan as root.
+    systemd.services.traefik-diag-run = {
+      description = "Run on-demand Let's Encrypt DNS/log diagnostics";
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = lib.getExe diagRunScript;
+      };
+    };
+    systemd.paths.traefik-diag-run = {
+      description = "Watch for a web-triggered Let's Encrypt diagnostics request";
+      wantedBy = [ "multi-user.target" ];
+      pathConfig.PathExists = diagTriggerFile;
     };
 
     services.fcgiwrap.instances.traefik-dns01 = {
@@ -443,6 +654,28 @@ in
           ${lib.optionalString loginEnabled "auth_request /internal/dashboard-admin-check;"}
           fastcgi_pass unix:/run/fcgiwrap-traefik-dns01.sock;
           fastcgi_param SCRIPT_FILENAME ${lib.getExe currentCgi};
+          fastcgi_param REQUEST_METHOD $request_method;
+          fastcgi_param SERVER_PROTOCOL $server_protocol;
+          fastcgi_param GATEWAY_INTERFACE CGI/1.1;
+          fastcgi_param SERVER_SOFTWARE nginx;
+        '';
+      };
+      "= /letsencrypt/diagnose/trigger" = {
+        extraConfig = ''
+          ${lib.optionalString loginEnabled "auth_request /internal/dashboard-admin-check;"}
+          fastcgi_pass unix:/run/fcgiwrap-traefik-dns01.sock;
+          fastcgi_param SCRIPT_FILENAME ${lib.getExe diagTriggerCgi};
+          fastcgi_param REQUEST_METHOD $request_method;
+          fastcgi_param SERVER_PROTOCOL $server_protocol;
+          fastcgi_param GATEWAY_INTERFACE CGI/1.1;
+          fastcgi_param SERVER_SOFTWARE nginx;
+        '';
+      };
+      "= /letsencrypt/diagnose/status" = {
+        extraConfig = ''
+          ${lib.optionalString loginEnabled "auth_request /internal/dashboard-admin-check;"}
+          fastcgi_pass unix:/run/fcgiwrap-traefik-dns01.sock;
+          fastcgi_param SCRIPT_FILENAME ${lib.getExe diagStatusCgi};
           fastcgi_param REQUEST_METHOD $request_method;
           fastcgi_param SERVER_PROTOCOL $server_protocol;
           fastcgi_param GATEWAY_INTERFACE CGI/1.1;

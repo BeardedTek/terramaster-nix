@@ -369,9 +369,6 @@ title: Service Configuration
   </div>
 </div>
 
-<div id="svccfg-message" class="mb-4 text-sm hidden"></div>
-<button id="svccfg-save-btn" type="button" class="hidden mb-8 text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Save Changes</button>
-
 <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
   <div class="flex items-center justify-between p-3">
     <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="svccfg-category-meshvpn-panel">
@@ -506,6 +503,38 @@ title: Service Configuration
 
 <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
   <div class="flex items-center justify-between p-3">
+    <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="svccfg-category-network-panel">
+      <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      <span>Network</span>
+    </button>
+  </div>
+  <div id="svccfg-category-network-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+      <div class="flex items-center justify-between p-3">
+        <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-medium text-gray-900 dark:text-white" data-accordion-target="svccfg-dnscache-panel">
+          <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          <span>AdGuard Home</span>
+        </button>
+      </div>
+      <div id="svccfg-dnscache-panel" class="hidden border-t border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-center justify-between py-2 mb-2">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Enable AdGuard Home</span>
+          <label class="switch"><input type="checkbox" id="svccfg-dnscache-enable" data-svcfield="dnsCache.enable"><span class="slider"></span></label>
+        </div>
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          A caching, ad-blocking local DNS resolver (AdGuard Home). This
+          NAS's own service hostnames are added automatically; blocklists,
+          upstream resolvers, and any of your own custom DNS entries are
+          all managed in its own admin UI, gated by Authelia SSO.
+          <a href="/services/" class="text-primary-700 dark:text-primary-500 hover:underline">Open it from Services</a>.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="border border-gray-200 dark:border-gray-700 rounded-lg mb-3">
+  <div class="flex items-center justify-between p-3">
     <button type="button" class="accordion-toggle flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white" data-accordion-target="svccfg-category-photos-panel">
       <svg class="accordion-chevron w-4 h-4 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
       <span>Photos</span>
@@ -551,6 +580,9 @@ title: Service Configuration
     </div>
   </div>
 </div>
+
+<div id="svccfg-message" class="mb-4 text-sm hidden"></div>
+<button id="svccfg-save-btn" type="button" class="hidden mb-8 text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Save Changes</button>
 
 <!-- Save-changes modal (Authelia theme / MinIO credentials) -->
 <div id="svcconfig-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center update-modal-overlay p-4">
@@ -669,7 +701,8 @@ title: Service Configuration
     "nebula.enable": { type: "checkbox", label: "Nebula", describe: function (v) { return (v ? "Enable" : "Disable") + " Nebula."; } },
     "tailscale.enable": { type: "checkbox", label: "Tailscale", describe: function (v) { return (v ? "Enable" : "Disable") + " Tailscale."; } },
     "scrutiny.enable": { type: "checkbox", label: "Scrutiny", describe: function (v) { return (v ? "Enable" : "Disable") + " Scrutiny."; } },
-    "immich.enable": { type: "checkbox", label: "Immich", describe: function (v) { return (v ? "Enable" : "Disable") + " Immich."; } }
+    "immich.enable": { type: "checkbox", label: "Immich", describe: function (v) { return (v ? "Enable" : "Disable") + " Immich."; } },
+    "dnsCache.enable": { type: "checkbox", label: "AdGuard Home", describe: function (v) { return (v ? "Enable" : "Disable") + " AdGuard Home."; } }
   };
 
   var messageEl = document.getElementById("svccfg-message");
@@ -704,6 +737,7 @@ title: Service Configuration
   var tailscaleEnableInput = document.getElementById("svccfg-tailscale-enable");
   var scrutinyEnableInput = document.getElementById("svccfg-scrutiny-enable");
   var immichEnableInput = document.getElementById("svccfg-immich-enable");
+  var dnsCacheEnableInput = document.getElementById("svccfg-dnscache-enable");
 
   var modal = document.getElementById("svcconfig-modal");
   var modalCloseX = document.getElementById("svcconfig-modal-close-x");
@@ -763,7 +797,8 @@ title: Service Configuration
     "nebula.enable": true,
     "tailscale.enable": false,
     "scrutiny.enable": false,
-    "immich.enable": false
+    "immich.enable": false,
+    "dnsCache.enable": false
   };
   var minioPasswordSet = false;
 
@@ -801,7 +836,8 @@ title: Service Configuration
     "nebula.enable": nebulaEnableInput,
     "tailscale.enable": tailscaleEnableInput,
     "scrutiny.enable": scrutinyEnableInput,
-    "immich.enable": immichEnableInput
+    "immich.enable": immichEnableInput,
+    "dnsCache.enable": dnsCacheEnableInput
   };
 
   function currentValue(key) {
@@ -841,7 +877,7 @@ title: Service Configuration
     homeAssistantEnableInput, homeAssistantZwaveEnableInput, homeAssistantHacsEnableInput, frigateEnableInput,
     seerrEnableInput, radarrEnableInput, sonarrEnableInput, jackettEnableInput, qbittorrentEnableInput,
     ssoEnableInput, autheliaEnableInput, vaultwardenEnableInput, nebulaEnableInput, tailscaleEnableInput,
-    scrutinyEnableInput, immichEnableInput
+    scrutinyEnableInput, immichEnableInput, dnsCacheEnableInput
   ].forEach(function (el) {
     el.addEventListener("input", refreshSaveVisibility);
     el.addEventListener("change", refreshSaveVisibility);
@@ -879,7 +915,8 @@ title: Service Configuration
         "nebula.enable": !!data["nebula.enable"],
         "tailscale.enable": !!data["tailscale.enable"],
         "scrutiny.enable": !!data["scrutiny.enable"],
-        "immich.enable": !!data["immich.enable"]
+        "immich.enable": !!data["immich.enable"],
+        "dnsCache.enable": !!data["dnsCache.enable"]
       };
       minioPasswordSet = !!data["minio.rootPasswordSet"];
       themeInput.value = baseline["authelia.theme"];
@@ -914,6 +951,7 @@ title: Service Configuration
       tailscaleEnableInput.checked = baseline["tailscale.enable"];
       scrutinyEnableInput.checked = baseline["scrutiny.enable"];
       immichEnableInput.checked = baseline["immich.enable"];
+      dnsCacheEnableInput.checked = baseline["dnsCache.enable"];
       document.querySelectorAll("[data-group-toggle]").forEach(function (t) { t.dispatchEvent(new Event("change")); });
       refreshSaveVisibility();
     })

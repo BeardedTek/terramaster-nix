@@ -138,6 +138,7 @@
               ./modules/nebula.nix
               ./modules/traefik.nix
               ./modules/traefik-dns01.nix
+              ./modules/dns-cache.nix
               ./modules/dashboard.nix
               ./modules/dashboard-network.nix
               ./modules/dashboard-smtp.nix
