@@ -37,12 +37,13 @@
       "/etc/minio"
       "/var/lib/filebrowser"
       "/etc/filebrowser"
-      # AdGuard Home's own state (users, blocklists, everything set
-      # through its web UI) is already covered by the "/var/lib/private"
-      # entry below — it runs with DynamicUser = true. This is only for
-      # modules/dns-cache.nix's own bootstrap admin.env + rewrite-sync
-      # state, unrelated to AGH's internals.
-      "/etc/adguardhome"
+      # AdGuard Home itself needs no entry here at all: its own state
+      # (users, blocklists, everything set through its web UI) is
+      # already covered by the "/var/lib/private" entry below (it runs
+      # with DynamicUser = true), and modules/dns-cache.nix's own
+      # bootstrap/rewrite-sync bookkeeping is deliberately ephemeral
+      # (/run, not /etc — see that module's own comment on why losing
+      # it on reboot is harmless).
       "/etc/nas-update"
     ];
     files = [

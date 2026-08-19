@@ -10,54 +10,103 @@ let
   # backend port; colliding here wouldn't be a Nix eval error (different
   # attrset keys) but a real runtime port-bind conflict between the two
   # actual processes if both features are ever enabled on the same host.
+  # Applied via services.adguardhome.extraArgs' --web-addr below, from
+  # AGH's very first start — not via services.adguardhome.settings, see
+  # that option's own (absence of a) comment for why.
   webPort = 3080;
   dnsPort = 53;
 
-  # Persisted under the same tmpfs-root + /persist bind-mount pattern
-  # every other feature module uses (see hosts/*/configuration.nix's
-  # environment.persistence."/persist".directories — "/etc/adguardhome"
-  # needs adding there the same way "/etc/filebrowser" already is).
-  # AdGuard Home's OWN state (users, blocklists, everything set through
-  # its web UI) lives separately under /var/lib/private/AdGuardHome —
-  # services.adguardhome runs with DynamicUser = true (confirmed against
-  # nixpkgs' own module source), so that's already covered by the
-  # existing blanket "/var/lib/private" entry every host already
-  # persists for LLDAP/Scrutiny, no new entry needed for it.
-  credsFile = "/etc/adguardhome/admin.env";
-  bootstrapMarker = "/etc/adguardhome/.bootstrapped";
-  managedRewritesFile = "/etc/adguardhome/managed-rewrites.json";
+  # Fixed, not generated — AdGuard Home's own login is a second,
+  # redundant lock on top of Authelia here, not the real access control:
+  # its web UI is loopback-bound (services.adguardhome's extraArgs
+  # below) and only ever reachable at all through Traefik's Authelia
+  # ForwardAuth gate (modules/authelia.nix's candidateProtectedServices
+  # entry, admins-only). Anyone who can reach webPort on loopback
+  # directly already has shell/service access to this box, at which
+  # point AdGuard Home's own login isn't the thing protecting anything.
+  # This also sidesteps a real gap in AGH itself: it has no API to
+  # change an existing user's password after first-run setup (confirmed
+  # against its own source) — a generated, unrecoverable-without-SSH
+  # password would have been actively worse for a "non-expert admin"
+  # feature than a fixed, known one.
+  adminUser = "admin";
+  # Not plain "admin": AdGuard Home's own install/configure endpoint
+  # enforces a hard minimum of 8 runes (PasswordMinRunes) and rejects
+  # anything shorter with a 422 — confirmed the hard way on a real box.
+  # "adminadmin" is the shortest value that keeps the same fixed/known
+  # intent as the original admin/admin choice while actually clearing
+  # that floor.
+  adminPassword = "adminadmin";
+  # Ephemeral, not persisted — this box's own tmpfs /run, matching every
+  # other feature's own runtime-state convention (e.g.
+  # /run/dashboard-svcconfig, /run/system-rebuild). Losing this on
+  # reboot is harmless either way: bootstrapMarker not surviving just
+  # means one extra (cheap, idempotent — see the 403 branch below)
+  # recheck on next boot; managedRewritesFile not surviving just means
+  # this NAS's own rewrites get safely re-verified/re-added (never
+  # duplicated — see reconcileScript's own "does this already exist"
+  # check) rather than only reconciling removals from *before* that
+  # reboot.
+  runDir = "/run/dns-cache";
+  bootstrapMarker = "${runDir}/bootstrapped";
+  managedRewritesFile = "${runDir}/managed-rewrites.json";
 
-  # The exact same live attrset modules/traefik.nix's own routers are
-  # generated from (mySystem.serviceBackends) — reused rather than
-  # duplicated, so "this NAS's own service hostnames" always matches
-  # whatever's actually enabled, with zero manual entry. Baked into the
-  # generated reconcileScript below at Nix-eval time (not discovered at
-  # runtime) — the ordinary "unit definition changed -> systemd restarts
-  # it" activation behavior is what makes this stay in sync on every
-  # rebuild, not any special path-triggering.
-  wantedDomains = map (name: "${name}.${hostName}.${domain}") (lib.attrNames config.mySystem.serviceBackends);
+  # Two rewrites instead of one exact entry per enabled service (the
+  # original design): the wildcard ("*.<host>.<domain>") covers every
+  # current *and future* service under this host without needing a
+  # rebuild each time a new one is enabled — AdGuard Home's own rewrite
+  # matcher supports "*.suffix" natively (internal/filtering/rewrites.go)
+  # — but a wildcard alone never matches the bare host.domain itself
+  # (matchDomainWildcard requires something *before* the suffix), so
+  # that's added as its own explicit entry alongside it. Exact matches
+  # always take precedence over the wildcard, so neither can collide
+  # with anything more specific an admin later adds by hand. Unlike the
+  # old per-service list generated from mySystem.serviceBackends, both
+  # of these survive a full AdGuard Home state wipe with nothing to
+  # regenerate from Nix at all.
+  wantedDomains = [ "${hostName}.${domain}" "*.${hostName}.${domain}" ];
   wantedDomainsJson = builtins.toJSON wantedDomains;
 
   # Completes AdGuard Home's own first-run setup wizard via its install
   # API instead of a human clicking through it — same "no manual
   # first-boot step" posture as filebrowser-setup.service's own admin
-  # bootstrap. Deliberately does NOT declare `users` in
-  # services.adguardhome.settings below — see that option's own comment
-  # for why (mutableSettings' merge overwrites declared keys on *every*
-  # restart, not just the first, which would silently revert any
-  # password change made through AGH's own UI on the next rebuild).
-  # Guarded on bootstrapMarker so this only ever runs once per box.
+  # bootstrap. Guarded on bootstrapMarker so this only ever runs once
+  # per box (once it's actually succeeded, or found setup already done
+  # elsewhere — see the 403 branch below).
+  #
+  # Talks to webPort directly (not AGH's own built-in first-run default,
+  # 3000) — services.adguardhome.extraArgs below passes AGH's
+  # `--web-addr` flag, which only overrides its *in-memory* bind
+  # address for this run (confirmed against AGH's own source:
+  # setupBindOpts mutates config.HTTPConfig.Address only, no disk I/O)
+  # and is applied independently of AGH's first-run detection. That
+  # detection is a dumb "does a config file already exist on disk"
+  # check (internal/home/home.go's detectFirstRun — a bare os.Stat, it
+  # never looks at *content*, e.g. whether any users are configured) —
+  # so services.adguardhome.settings is deliberately never declared
+  # anywhere in this module: writing ANY settings file before AGH's
+  # first boot, even one that says nothing about users, makes AGH think
+  # setup already happened, permanently 404s every /control/install/*
+  # route, with no supported way to un-stick it short of wiping its
+  # state directory. Confirmed the hard way: an earlier version of this
+  # module declared `settings.http.address`/`settings.dns` up front,
+  # and that alone was enough to lock a real box out of ever
+  # bootstrapping an admin account. AGH's own install/configure call
+  # (below) is the *only* thing that ever sets DNS's bind address (the
+  # web address is already correct from --web-addr) — exactly what a
+  # human clicking through the real wizard would do.
   bootstrapScript = pkgs.writeShellApplication {
     name = "dns-cache-bootstrap";
-    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils pkgs.openssl ];
+    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils ];
     text = ''
       if [ -f ${bootstrapMarker} ]; then
         exit 0
       fi
-      mkdir -p "$(dirname ${credsFile})"
+      mkdir -p ${runDir}
 
-      # Wait for AdGuard Home's HTTP server to actually be listening —
-      # only matters on a genuinely fresh /var/lib/private/AdGuardHome.
+      # Wait for AdGuard Home's install-wizard HTTP server to actually
+      # be listening — only matters on a genuinely fresh
+      # /var/lib/private/AdGuardHome.
       waited=0
       until curl -fsS -o /dev/null "http://127.0.0.1:${toString webPort}/control/install/get_addresses" 2>/dev/null; do
         waited=$((waited + 1))
@@ -65,28 +114,37 @@ let
         sleep 1
       done
 
-      # 403 here means setup already completed out-of-band (e.g. a human
+      # No -f here on purpose: -f makes curl treat a 4xx response as a
+      # curl *failure* (nonzero exit), which both discards the exit code
+      # we need to distinguish 403-from-everything-else AND (since -w
+      # still writes its output before curl exits nonzero) triggers the
+      # `|| echo 000` fallback right after it, concatenating into a
+      # bogus "403000" that matches neither branch below. Confirmed the
+      # hard way on a real box. -sS alone is enough: it just suppresses
+      # curl's own progress meter/errors and gives us the true code.
+      status=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${toString webPort}/control/install/get_addresses" 2>/dev/null || echo 000)
+      # 403 means setup already completed out-of-band (e.g. a human
       # clicked through AGH's own wizard manually before this ran) —
       # nothing to do except record that and stop, never overwriting
-      # whatever credentials already exist.
-      status=$(curl -fsS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${toString webPort}/control/install/get_addresses" 2>/dev/null || echo 000)
+      # whatever credentials already exist. Anything else that isn't a
+      # clean 200 (still starting up, wrong version, genuinely
+      # unreachable) is left un-marked so this retries on the next
+      # boot, rather than silently giving up forever.
       if [ "$status" = "403" ]; then
         touch ${bootstrapMarker}
         exit 0
       fi
+      if [ "$status" != "200" ]; then
+        echo "AdGuard Home's install API returned '$status', not 200/403 — can't bootstrap yet (will retry next boot)." >&2
+        exit 1
+      fi
 
-      password=$(openssl rand -hex 16)
-      body=$(jq -n --arg u admin --arg p "$password" \
+      body=$(jq -n --arg u ${adminUser} --arg p ${adminPassword} \
         --argjson webport ${toString webPort} --argjson dnsport ${toString dnsPort} \
         '{web:{ip:"127.0.0.1",port:$webport}, dns:{ip:"0.0.0.0",port:$dnsport}, username:$u, password:$p, language:"en"}')
       curl -fsS -X POST "http://127.0.0.1:${toString webPort}/control/install/configure" \
         -H 'Content-Type: application/json' -d "$body" >/dev/null
 
-      {
-        echo "DNS_CACHE_ADMIN_USER=admin"
-        echo "DNS_CACHE_ADMIN_PASSWORD=$password"
-      } > ${credsFile}
-      chmod 600 ${credsFile}
       touch ${bootstrapMarker}
     '';
   };
@@ -103,14 +161,14 @@ let
   # (every boot, every rebuild) safe.
   reconcileScript = pkgs.writeShellApplication {
     name = "dns-cache-reconcile";
-    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils pkgs.iproute2 ];
+    # gawk, not just coreutils/iproute2 — awk isn't part of coreutils
+    # (confirmed the hard way: exit 127 "command not found" on a real
+    # box — writeShellApplication's shellcheck only checks shell syntax,
+    # it has no idea whether a given command is actually reachable on
+    # $PATH at runtime, so this class of bug survives a clean build).
+    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils pkgs.iproute2 pkgs.gawk ];
     text = ''
-      [ -f ${credsFile} ] || exit 0
-      # shellcheck disable=SC1090
-      set -a
-      source ${credsFile}
-      set +a
-      auth="$DNS_CACHE_ADMIN_USER:$DNS_CACHE_ADMIN_PASSWORD"
+      auth="${adminUser}:${adminPassword}"
       base="http://127.0.0.1:${toString webPort}"
 
       lan_ip=$(ip -4 -o addr show dev "${lanIf}" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1)
@@ -163,36 +221,27 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Deliberately no `settings`/`mutableSettings`/`host`/`port` here —
+    # see bootstrapScript's own comment above for why: writing *any*
+    # services.adguardhome.settings before AGH's first boot makes it
+    # think setup is already done and permanently disables the install
+    # API this module depends on (this module's own `host`/`port`
+    # options are inert unless `settings` is also set anyway — confirmed
+    # against the nixpkgs module's own source — so setting only those
+    # wouldn't have helped). `extraArgs`' `--web-addr` is different: it
+    # only overrides AGH's *in-memory* bind address for this run, with
+    # no disk write and no effect on first-run detection (confirmed
+    # against AGH's own source) — so the web UI binds straight to its
+    # real, permanent, Traefik-only loopback address from the very
+    # first instant AGH starts, without ever needing AGH's own built-in
+    # first-run default port (3000) at all, and DNS's own bind address
+    # is set the same way `host`/`port` normally would be: by
+    # bootstrapScript's install/configure call below, exactly what a
+    # human clicking through the real wizard would do.
     services.adguardhome = {
       enable = true;
-      host = "127.0.0.1";
-      port = webPort;
-      # Handled explicitly below instead: DNS (53) needs LAN-wide reach,
-      # the web UI (webPort) deliberately doesn't — it's Traefik-only,
-      # loopback-bound, same posture as this repo's own dashboard
-      # backend (127.0.0.1:8097).
       openFirewall = false;
-      mutableSettings = true;
-      # Deliberately minimal — only the infrastructure-level keys this
-      # box's own firewall rules need to match. Everything an admin
-      # would actually want to tune (upstream resolvers, blocklists,
-      # filtering rules, the admin account, local DNS rewrites) is left
-      # OUT of this attrset on purpose: AdGuard Home's mutableSettings
-      # merge overwrites whatever key IS declared here on *every*
-      # restart, not just the first (confirmed against the module's own
-      # yaml-merge behavior) — declaring `users` or `filtering.rewrites`
-      # here would silently wipe a password change or a manually-added
-      # rewrite the very next rebuild. The admin account is bootstrapped
-      # once via AGH's own install API instead (bootstrapScript above),
-      # and this NAS's own service hostnames are reconciled the same way
-      # (reconcileScript above) — both leave `settings` alone entirely.
-      settings = {
-        http.address = "127.0.0.1:${toString webPort}";
-        dns = {
-          bind_hosts = [ "0.0.0.0" ];
-          port = dnsPort;
-        };
-      };
+      extraArgs = [ "--web-addr" "127.0.0.1:${toString webPort}" ];
     };
 
     systemd.services.dns-cache-bootstrap = {

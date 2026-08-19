@@ -11,23 +11,22 @@ let
   secretsEnv = "/persist/secrets/initial-passwords.env";
   manufacturer = config.mySystem.manufacturer;
   model = config.mySystem.model;
-  # This host's own variables.nix — the exact same copy
-  # hosts/installer/wizard/stages/90-install.sh already leaves at
-  # /persist/nixos-installer-output/<instance>/ for retrieval into a
-  # real git checkout, reused here rather than introducing a second,
-  # separately-maintained copy. For a host installed before that
-  # convention existed, a one-time manual copy to this same path — see
-  # docs/DEPLOYMENT.md. Needed because variables.nix is gitignored (see
-  # flake.nix's own repoRoot comment) — the tag tarball fetched below is
-  # downloaded fresh from GitHub every single time, straight from git
-  # history, so it can never contain any host's variables.nix on its
-  # own. Copied into the extracted tree below, at the same
-  # hosts/<manufacturer>/<model>/ path flake.nix expects to find it, so
-  # nixosConfigurations.${hostName} is actually discoverable in that
-  # fresh checkout — without this, every update would fail with "flake
-  # does not provide attribute nixosConfigurations.${hostName}", no
-  # matter how correct everything else here is.
-  persistedVariablesFile = "/persist/nixos-installer-output/${model}/variables.nix";
+  # This host's own persisted install output —
+  # hosts/installer/wizard/stages/90-install.sh already leaves a copy of
+  # variables.nix/configuration.nix/disko.nix here for retrieval into a
+  # real git checkout. Reused here as the *source of truth* for a host
+  # that was never committed to the shared repo at all (see applyScript
+  # below): variables.nix is always copied from here (it's gitignored —
+  # see flake.nix's own repoRoot comment — so the tag tarball fetched
+  # below, downloaded fresh from GitHub every time, can never contain
+  # any host's variables.nix on its own); configuration.nix/disko.nix
+  # are only copied from here when the tarball doesn't already have them
+  # (a host whose config *is* committed, e.g. young/f4-245/ts-x53D,
+  # keeps picking up real repo-side edits that way — this is purely a
+  # gap-filler for hosts that intentionally keep their own hardware
+  # details, like disk serials, out of a shared repo).
+  persistedHostDir = "/persist/nixos-installer-output/${model}";
+  persistedVariablesFile = "${persistedHostDir}/variables.nix";
   stagingDir = "/persist/nixos-system-rebuild-staging";
 
   runDir = "/run/system-rebuild";
@@ -158,6 +157,22 @@ let
       fi
       mkdir -p "$src_dir/hosts/${manufacturer}/${model}"
       cp ${persistedVariablesFile} "$src_dir/hosts/${manufacturer}/${model}/variables.nix"
+
+      # configuration.nix/disko.nix: only fall back to this host's own
+      # persisted copy when the downloaded release doesn't already have
+      # one at this path — see persistedHostDir's own comment above for
+      # why this is gap-filling, not an unconditional override.
+      for f in configuration.nix disko.nix; do
+        dest="$src_dir/hosts/${manufacturer}/${model}/$f"
+        if [ ! -f "$dest" ]; then
+          if [ -f "${persistedHostDir}/$f" ]; then
+            cp "${persistedHostDir}/$f" "$dest"
+          else
+            write_progress "failed" "$f is missing from both the $tag release and ${persistedHostDir} — see docs/DEPLOYMENT.md"
+            exit 1
+          fi
+        fi
+      done
 
       # "Rebuilding (this can take a while)..." is matched verbatim by
       # dashboard/content/preferences.md's Update-modal STEPS regex
