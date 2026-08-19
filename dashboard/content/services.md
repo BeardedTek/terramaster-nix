@@ -269,7 +269,7 @@ title: Services
     <div class="flex-1 flex items-center justify-center gap-3">
       <img src="/images/services/adguardhome.svg" alt="" class="w-10 h-10 shrink-0" />
       <div class="flex flex-col items-start text-left">
-        <span class="text-lg font-semibold text-gray-900 dark:text-white">DNS Cache</span>
+        <span class="text-lg font-semibold text-gray-900 dark:text-white">AdGuard Home</span>
         <span class="text-sm text-gray-500 dark:text-gray-400">Ad-Blocking &amp; Local DNS</span>
       </div>
     </div>
