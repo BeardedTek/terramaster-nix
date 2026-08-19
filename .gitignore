@@ -12,11 +12,15 @@ result-*
 *.iso
 /build/
 
-# Hugo + npm build artifacts for docs/ (the documentation site)
+# Hugo + npm build artifacts for docs/ (the documentation site) and
+# dashboard/ (the NAS web dashboard) — both Hugo sites, same outputs.
 docs/public/
 docs/resources/
 docs/node_modules/
 docs/.hugo_build.lock
+dashboard/public/
+dashboard/resources/
+dashboard/.hugo_build.lock
 node_modules/
 
 # Secrets staged for delivery via `nixos-anywhere --extra-files` (SSH
