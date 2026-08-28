@@ -50,6 +50,8 @@
       items +=
         '<a href="/service-configuration/" class="auth-nav-item">Service Configuration</a>';
       items +=
+        '<a href="/users/" class="auth-nav-item">Users</a>';
+      items +=
         '<a href="/update/" id="auth-nav-update-link" class="auth-nav-item">System Update</a>';
       items +=
         '<a href="/letsencrypt/" class="auth-nav-item">Let\'s Encrypt</a>';
