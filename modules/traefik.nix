@@ -83,8 +83,8 @@ let
     certResolver = "dns01-nebula";
     domains = [
       {
-        main = "nebula.${domain}";
-        sans = [ "*.nebula.${domain}" ];
+        main = "${hostName}.nebula.${domain}";
+        sans = [ "*.${hostName}.nebula.${domain}" ];
       }
     ];
   };
@@ -99,14 +99,14 @@ let
     ];
   };
 
-  # Nebula-variant routers (and the *.nebula.${domain} wildcard cert they
-  # need) only make sense when Nebula is actually running — gated on
-  # mySystem.features.nebula.enable, same flag modules/nebula.nix's own
+  # Nebula-variant routers (and the *.${hostName}.nebula.${domain} wildcard
+  # cert they need) only make sense when Nebula is actually running — gated
+  # on mySystem.features.nebula.enable, same flag modules/nebula.nix's own
   # systemd service is gated on. Requesting/serving a cert for a mesh
   # interface that doesn't exist is just wasted ACME rate-limit budget.
   routersFor = name: extraMiddlewares: (lib.optionalAttrs f.nebula.enable {
     "${name}-${hostName}-nebula" = {
-      rule = "Host(`${name}-${hostName}.nebula.${domain}`)";
+      rule = "Host(`${name}.${hostName}.nebula.${domain}`)";
       service = "${name}-${hostName}";
       entryPoints = [ "https" ];
       tls = nebulaTls;
