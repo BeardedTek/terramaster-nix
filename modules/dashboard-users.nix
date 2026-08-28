@@ -140,7 +140,15 @@ let
         if [ "$existing_count" = "0" ]; then
           fail "no such user: $name"
         fi
-        wheel=$(printf '%s' "$body" | jq -r '.wheel // empty' 2>/dev/null || true)
+        # NOT `.wheel // empty`: jq's `//` falls through on ANY falsy
+        # value, not just null/absent — `false // empty` evaluates to
+        # empty, so that form would reject a genuine `"wheel":false`
+        # payload as "invalid wheel value" (confirmed the hard way via
+        # the dashboard-users Tier 2 test: demoting an admin returned
+        # the wrong error, though still a 400, since it happened to fail
+        # a different check first). has("wheel") distinguishes "absent"
+        # from "present but false" correctly.
+        wheel=$(printf '%s' "$body" | jq -r 'if has("wheel") then (.wheel | tostring) else "" end' 2>/dev/null || true)
         case "$wheel" in
           true|false) ;;
           *) fail "invalid wheel value" ;;
