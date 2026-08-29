@@ -40,7 +40,7 @@
     description = ''
       Set in variables.nix. The base domain every per-service hostname is
       built from — modules/traefik.nix's LAN/Nebula routers
-      (<svc>.<hostName>.$domain, <svc>-<hostName>.nebula.$domain),
+      (<svc>.<hostName>.$domain, <svc>.<hostName>.nebula.$domain),
       modules/frigate.nix's own vhost, and modules/lldap.nix /
       modules/authelia.nix's LDAP base DN and session cookie domain all
       derive from this one value instead of each hardcoding it separately.
@@ -192,8 +192,8 @@
       default = true;
       description = ''
         Nebula overlay mesh VPN — see modules/nebula.nix. Also gates
-        Traefik's *.nebula.<domain> wildcard cert request and the
-        nebula-domain router for every backend service
+        Traefik's *.<hostName>.nebula.<domain> wildcard cert request and
+        the nebula-domain router for every backend service
         (modules/traefik.nix) — no point requesting/serving a cert for a
         mesh that isn't running. Defaults to true (not false, unlike the
         other opt-in flags here) because Nebula ran unconditionally on

@@ -105,7 +105,7 @@ let
     (lib.filterAttrs (_: v: v.enable) candidateProtectedServices);
 
   ruleFor = name: p: {
-    domain = [ "${name}.${hostName}.${domain}" "${name}-${hostName}.nebula.${domain}" ];
+    domain = [ "${name}.${hostName}.${domain}" "${name}.${hostName}.nebula.${domain}" ];
     policy = p.policy;
   } // lib.optionalAttrs (p ? group) { subject = [ "group:${p.group}" ]; };
 
@@ -223,7 +223,7 @@ let
     redirect_uris = lib.concatMap
       (path: [
         "https://${c.vhost}.${hostName}.${domain}${path}"
-        "https://${c.vhost}-${hostName}.nebula.${domain}${path}"
+        "https://${c.vhost}.${hostName}.nebula.${domain}${path}"
       ])
       c.redirectPaths;
     scopes = c.scopes;
@@ -300,7 +300,7 @@ in
       # `settings.session.cookies[].domain = "beardedtek.com"` is meant to
       # cover both this flake's domain shapes
       # (<svc>.${hostName}.beardedtek.com and
-      # <svc>-${hostName}.nebula.beardedtek.com — both subdomains of
+      # <svc>.${hostName}.nebula.beardedtek.com — both subdomains of
       # beardedtek.com) under one session. UNVALIDATED until Phase 2's
       # Sonarr test actually runs both variants through a browser — if it
       # doesn't hold up, split into two services.authelia.instances (one

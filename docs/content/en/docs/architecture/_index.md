@@ -70,7 +70,7 @@ run as-is.
   `modules/samba.nix` all read `config.networking.hostName` rather than
   hardcoding it, so changing it here actually renames every proxied
   domain (`<service>.<hostname>.beardedtek.com`,
-  `<service>-<hostname>.nebula.beardedtek.com`), Frigate's own vhost, and
+  `<service>.<hostname>.nebula.beardedtek.com`), Frigate's own vhost, and
   the Samba server string/NetBIOS name/workgroup, consistently. It does
   **not** touch the ZFS-import-critical `networking.hostId` (a separate,
   arbitrary identifier — see "ZFS dataset map" below) or anything in the
@@ -545,8 +545,9 @@ script — see the [nixos-anywhere installation guide](/docs/installation/nixos-
 A small Hugo-built static site (`dashboard/` at the repo root) served by
 nginx on port 8097, proxied by Traefik at `young.nebula.beardedtek.com`
 (mesh) and `young.beardedtek.com` (LAN) — the box's own landing page,
-separate from the `<name>-young`/`<name>.young` pattern every other
-backend uses.
+lacking the `<name>.` service prefix every other backend's
+`<name>.young.beardedtek.com`/`<name>.young.nebula.beardedtek.com`
+pattern uses.
 
 - **Theme**: styled to match beardedtek.com, using vendored (pre-built,
   not recompiled) CSS/JS bundles from
@@ -651,7 +652,7 @@ everything else here:
 ### Home Assistant
 
 `modules/home-assistant.nix` — `services.home-assistant`, reachable at
-`hass.young.beardedtek.com` / `hass-young.nebula.beardedtek.com` via the
+`hass.young.beardedtek.com` / `hass.young.nebula.beardedtek.com` via the
 generic `backends`-map pattern (no special-casing needed, unlike Frigate
 or qBittorrent — HA doesn't validate the Host header itself). Native
 NixOS services stand in for what would be HAOS/Supervisor "add-ons" on a
@@ -796,7 +797,7 @@ generated programmatically in `modules/traefik.nix` from a single
 `backends = { name = port; ... }` attrset (one source of truth, instead of
 hand-duplicating six services across two domains):
 
-- Over the Nebula mesh: `<name>-young.nebula.beardedtek.com`
+- Over the Nebula mesh: `<name>.young.nebula.beardedtek.com`
 - Over the LAN: `<name>.young.beardedtek.com`
 
 Every entrypoint binds to **all interfaces** (`:80`/`:443`/`:8099`, no
@@ -809,8 +810,9 @@ socket/provider here, dynamic routing is declared directly via
 `dynamicConfigOptions` (file provider, wired automatically by the
 `services.traefik` module) instead of container labels.
 
-- **Certs**: two separate wildcard certs via DNS-01 (Linode provider) —
-  `*.nebula.beardedtek.com` and `*.young.beardedtek.com` — each pinned
+- **Certs**: two separate, per-host wildcard certs via DNS-01 (Linode
+  provider) — `*.young.nebula.beardedtek.com` and `*.young.beardedtek.com`
+  — each pinned
   explicitly via `tls.domains` on every router for that domain scheme
   (**not** the entrypoint-level default `tls.domains`, which was tried
   first and doesn't work: it only propagates as something routers
@@ -834,7 +836,7 @@ socket/provider here, dynamic routing is declared directly via
   routed at `young.nebula.beardedtek.com`/`young.beardedtek.com`) — same
   word, two different things.
 - **DNS is out of scope for this repo.** Traefik only handles TLS and
-  routing once a request actually arrives — `*.nebula.beardedtek.com`
+  routing once a request actually arrives — `*.young.nebula.beardedtek.com`
   needs to resolve to young's Nebula address and `*.young.beardedtek.com`
   to young's LAN address, both managed separately wherever the rest of
   `beardedtek.com`'s DNS lives.
@@ -891,7 +893,7 @@ just more convenient to type an IP than remember a domain.
   IPs — never for private LAN IPs like `192.168.x.x`, since anyone on any
   network could hold the same address and there'd be no way for a CA to
   verify ownership of it. The existing wildcard certs
-  (`*.nebula.beardedtek.com`, `*.young.beardedtek.com`) are DNS-name certs
+  (`*.young.nebula.beardedtek.com`, `*.young.beardedtek.com`) are DNS-name certs
   and can't cover a bare IP either. Practical options if this ever needs
   to be encrypted: keep using the DNS-based HTTPS routes instead of the
   bare IP, or accept a self-signed cert (which still shows a browser

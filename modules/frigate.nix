@@ -62,7 +62,7 @@ in
         { addr = "0.0.0.0"; port = 8098; }
         { addr = "[::]"; port = 8098; }
       ];
-      serverAliases = [ "frigate-${hostName}.nebula.${domain}" ];
+      serverAliases = [ "frigate.${hostName}.nebula.${domain}" ];
     };
 
     networking.firewall.interfaces."nebula1".allowedTCPPorts = lib.optionals directlyReachable [ 8098 ];

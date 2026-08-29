@@ -30,7 +30,7 @@ duplicated here.
 - **[NFS](/docs/usage/services/nfs/)** — Linux/Unix file sharing
 
 Web services are reachable at `https://<service>.<your-nas>.<domain>/` on
-your LAN, and `https://<service>-<your-nas>.nebula.<domain>/` over a
+your LAN, and `https://<service>.<your-nas>.nebula.<domain>/` over a
 Nebula mesh if you've set one up — substitute the actual hostname/domain
 your installation uses. Most are also reachable directly at
 `http://<nas-ip>:<port>/`, bypassing the reverse proxy entirely.
