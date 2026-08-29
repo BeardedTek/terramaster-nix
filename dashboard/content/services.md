@@ -322,7 +322,7 @@ title: Services
           card.href = "http://" + host + ":" + s.port + "/";
         } else if (data.host) {
           var target = onNebula
-            ? s.name + "-" + data.host + ".nebula.beardedtek.com"
+            ? s.name + "." + data.host + ".nebula.beardedtek.com"
             : s.name + "." + data.host + ".beardedtek.com";
           card.href = "https://" + target + "/";
         }
