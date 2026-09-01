@@ -98,10 +98,19 @@ stage_90_install() {
     fi
   else
     # Boot drive only — disko doesn't know about the adopted pool.
+    # --yes-wipe-all-disks: same lesson as pool_new_run_disko in
+    # pool-new.sh — disko has its own separate interactive "type yes"
+    # confirmation before wiping anything, and without this flag it just
+    # sits there waiting for terminal input that never comes when driven
+    # from the WebUI (no TTY attached), silently aborting instead of
+    # actually formatting the boot drive. Confirmed the hard way: the
+    # adopt-pool path hit exactly this after already getting its own
+    # explicit "Ready to write config and install. Proceed?" confirmation
+    # earlier in the wizard, same as the new-pool path's typed DESTROY.
     if [ -d "$WIZ_RUN_DIR" ]; then
-      disko --mode destroy,format,mount --flake "$flake_attr" 2>&1 | tee -a "$WIZ_RUN_DIR/install.log"
+      disko --mode destroy,format,mount --yes-wipe-all-disks --flake "$flake_attr" 2>&1 | tee -a "$WIZ_RUN_DIR/install.log"
     else
-      disko --mode destroy,format,mount --flake "$flake_attr"
+      disko --mode destroy,format,mount --yes-wipe-all-disks --flake "$flake_attr"
     fi
 
     local pool home media data

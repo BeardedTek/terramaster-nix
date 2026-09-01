@@ -37,6 +37,25 @@ to bring a new box up from blank disks.
 
 {{% /blocks/lead %}}
 
+{{% blocks/section color="white" type="row" %}}
+
+{{% blocks/feature title="Dashboard" %}}
+![Dashboard](/images/webui/01-dashboard-public.png)
+Live storage, load, memory, and network status — no login needed.
+{{% /blocks/feature %}}
+
+{{% blocks/feature title="Services" %}}
+![Services page](/images/webui/04-services.png)
+Every enabled service, one click away, with a live up/down badge.
+{{% /blocks/feature %}}
+
+{{% blocks/feature title="System Preferences" %}}
+![System Preferences](/images/webui/05-preferences.png)
+Network, email, updates, and users — managed from the box itself.
+{{% /blocks/feature %}}
+
+{{% /blocks/section %}}
+
 {{% blocks/section color="primary" type="row" %}}
 
 {{% blocks/feature title="Declarative storage" icon="fa-solid fa-server" url="/docs/installation/" %}}

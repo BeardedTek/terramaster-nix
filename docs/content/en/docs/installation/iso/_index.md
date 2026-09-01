@@ -75,6 +75,44 @@ remotely) that walks through, in order:
 9. **Install** — writes the configuration, sets up storage, and installs
    the system.
 
+## Walkthrough (WebUI)
+
+The TUI and the WebUI ask exactly the same questions — these screenshots are
+from the WebUI, reachable from any other device's browser at the IP address
+the console prints on boot.
+
+![Welcome screen](/images/installer/01-welcome.png)
+Welcome screen — explains the two storage paths up front.
+
+![LAN interface picker](/images/installer/03-network.png)
+Pick the LAN interface.
+
+![Storage path choice](/images/installer/09-storage-choice.png)
+Storage: adopt an existing pool, or create a new one from blank disks.
+
+![Existing-data confirmation](/images/installer/12-confirm-existing-data.png)
+Any disk flagged with existing data needs its own explicit confirmation
+before it can join a new pool.
+
+![Generated disko.nix preview](/images/installer/15-disko-preview.png)
+The exact generated `disko.nix` is shown before anything is written.
+
+![Services checklist](/images/installer/19-services.png)
+Services checklist — pick what runs on this box.
+
+![Review screen](/images/installer/25-review.png)
+Full review of every answer before the destructive confirmation screen.
+
+![Type DESTROY to confirm](/images/installer/26-confirm-destroy.png)
+Creating a new pool requires typing `DESTROY` — no accidental data loss.
+
+![Installing progress](/images/installer/27-installing.png)
+Unattended from here — writes the config, partitions storage, and installs
+NixOS, with a live log available the whole way through.
+
+![Install done](/images/installer/28-done.png)
+Done — where the generated config ends up, and what to do with it.
+
 ## After it finishes
 
 The files the wizard generated (your new host's configuration) are copied

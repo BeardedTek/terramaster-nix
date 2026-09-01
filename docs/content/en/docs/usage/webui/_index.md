@@ -22,12 +22,16 @@ comes from).
 - **Log out** from the profile menu (your username, top-right) once
   you're signed in.
 
+![Login page](/images/webui/02-login.png)
+
 ## Dashboard
 
 The home page shows live, current-reading status: storage usage per
 pool/dataset, system load, memory, network interface status, and which
 services are currently reachable. It refreshes on its own every 30
 seconds — no need to reload the page.
+
+![Dashboard, logged in](/images/webui/03-dashboard-loggedin.png)
 
 ## Services
 
@@ -36,10 +40,14 @@ live up/down badge for each. Only shows what's actually turned on for
 this box — see [Available Services](/docs/usage/services/) for what each
 one is and how to use it.
 
+![Services page](/images/webui/04-services.png)
+
 ## System Preferences
 
 Visible only to admin accounts (see [LLDAP](/docs/usage/lldap/)), reached
 from the profile menu once you're logged in.
+
+![System Preferences](/images/webui/05-preferences.png)
 
 ### Updating
 

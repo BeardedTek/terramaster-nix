@@ -225,6 +225,7 @@ let
 
       jq -n --arg generated_at "$(date -Is)" \
             --arg host "${hostName}" \
+            --arg domain "${domain}" \
             --argjson disks "$disks" \
             --argjson load "$load" \
             --argjson memory "$memory" \
@@ -232,7 +233,7 @@ let
             --argjson services "$services" \
             --argjson certIssued "$cert_issued" \
             --argjson ssoEnabled ${if f.sso.authelia.enable then "true" else "false"} \
-            '{generated_at:$generated_at, host:$host, disks:$disks, load:$load, memory:$memory, network:$network, services:$services, certIssued:$certIssued, ssoEnabled:$ssoEnabled}' \
+            '{generated_at:$generated_at, host:$host, domain:$domain, disks:$disks, load:$load, memory:$memory, network:$network, services:$services, certIssued:$certIssued, ssoEnabled:$ssoEnabled}' \
             > "$tmp"
 
       chmod 644 "$tmp"

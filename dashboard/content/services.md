@@ -320,10 +320,10 @@ title: Services
       if (s.name !== "letsencrypt") {
         if (onLocalPath && s.port) {
           card.href = "http://" + host + ":" + s.port + "/";
-        } else if (data.host) {
+        } else if (data.host && data.domain) {
           var target = onNebula
-            ? s.name + "." + data.host + ".nebula.beardedtek.com"
-            : s.name + "." + data.host + ".beardedtek.com";
+            ? s.name + "." + data.host + ".nebula." + data.domain
+            : s.name + "." + data.host + "." + data.domain;
           card.href = "https://" + target + "/";
         }
       }
