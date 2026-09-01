@@ -58,7 +58,10 @@ let
   };
 in
 {
-  imports = [ "${modulesPath}/installer/cd-dvd/installation-cd-minimal.nix" ];
+  imports = [
+    "${modulesPath}/installer/cd-dvd/installation-cd-minimal.nix"
+    ./cage-kiosk.nix
+  ];
 
   networking.hostId = "00000000";
   boot.supportedFilesystems = [ "zfs" ];
