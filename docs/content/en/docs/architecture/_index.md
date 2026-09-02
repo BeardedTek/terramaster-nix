@@ -140,7 +140,7 @@ data already on it. `hosts/terramaster/young/disko.nix` only ever partitions the
 **256GB USB drive** (a single ESP, vfat, mounted `/boot`) — there is no
 disko config for the 4 HDDs at all, on purpose. `rust` is *imported*, never
 created or formatted. If disko ever grows a config block referencing any
-`rust/*` dataset, that's a bug — nixos-anywhere would wipe it on install.
+`rust/*` dataset, that's a bug — an install would wipe it.
 
 ### Root is tmpfs; only `/nix` and `/persist` survive a reboot
 
@@ -179,9 +179,11 @@ Every dataset this config references via `fileSystems.*` — including the
 pool's own top-level `rust` dataset (`fileSystems."/rust"` in
 `hosts/terramaster/young/configuration.nix`), not just its children — must be
 `mountpoint=legacy`. See the [Failure modes](#failure-modes-hit-during-development)
-for the exact failure signatures this produces when missed, and the
-[nixos-anywhere installation guide](/docs/installation/nixos-anywhere/) for the one-time `zfs set`
-commands.
+for the exact failure signatures this produces when missed. The installer
+wizard's "adopt an existing pool" path ([ISO Installation](/docs/installation/iso/))
+runs the equivalent `zfs set mountpoint=legacy` for every dataset it maps
+automatically — this was a manual step only when `young` was first set up,
+by hand, before the wizard existed.
 
 ### ZFS dataset map
 
@@ -332,14 +334,16 @@ automatically — adding a user to the list needs no matching edit anywhere
 else) — sourced from `secrets/initial-passwords.env`, never committed, and
 only readable under impure evaluation. `modules/users.nix` also generates
 one assertion per account (including `root`) that fails the build early
-with a clear message if its hash is empty. See the
-[nixos-anywhere installation guide](/docs/installation/nixos-anywhere/).
+with a clear message if its hash is empty. The installer wizard's Users
+step ([ISO Installation](/docs/installation/iso/)) sets this for you
+directly for a fresh install; it only needs setting by hand like this for
+an already-installed host (see `secrets/initial-passwords.env.example`).
 
-`beardedtek`'s real SSH public key is likewise never committed — delivered
-straight to `/home/beardedtek/.ssh/authorized_keys` via
-`nixos-anywhere --extra-files`, landing on the real `rust/home` dataset
-(not tmpfs), so it persists without needing an `environment.persistence`
-entry.
+`beardedtek`'s real SSH public key is likewise never committed — on a
+fresh install the wizard's Secrets step delivers it straight to
+`/home/beardedtek/.ssh/authorized_keys`, landing on the real `rust/home`
+dataset (not tmpfs), so it persists without needing an
+`environment.persistence` entry.
 
 ### Unix/PAM login against LLDAP
 
@@ -538,7 +542,8 @@ added to a shared `mediagroup` group (`users.groups.mediagroup` in
 set once so that group can read/write them. Since both already hold real,
 existing data (not a fresh service state dir Nix creates itself), that
 one-time ownership fix is a manual operational step, not a NixOS activation
-script — see the [nixos-anywhere installation guide](/docs/installation/nixos-anywhere/).
+script: `chgrp -R mediagroup /rust/media /rust/data && chmod -R g+rwX
+/rust/media /rust/data`.
 
 ### Dashboard
 
@@ -694,9 +699,7 @@ here does — no special-casing needed, unlike Frigate or qBittorrent.
   this file with a random password (same pattern as FileBrowser's
   `admin.env`) whenever MinIO is enabled and a secrets USB didn't already
   provide one — retrieve or rotate the value from the file itself, or
-  from the dashboard's Service Configuration page, after boot. See
-  `secrets/extra-files/persist/etc/minio/minio.env.example` and the
-  [nixos-anywhere installation guide](/docs/installation/nixos-anywhere/)'s secrets section. Missing the file is
+  from the dashboard's Service Configuration page, after boot. Missing the file is
   a clean no-start (nixpkgs' module sets `ConditionPathExists` on it), not
   a crash loop — same posture as Z-Wave without a dongle.
 - **Storage**: a dedicated `rust/minio` dataset (`mountpoint=legacy`,
@@ -724,9 +727,9 @@ here does — no special-casing needed, unlike Frigate or qBittorrent.
     = [ "/rust/minio" ];` covers the (separate, smaller) risk of the
     service starting before that mount is up.
   - Not part of `disko.nix` for `young` (created manually, same as
-    `rust/nix`/`rust/persist` were — see the
-    [nixos-anywhere installation guide](/docs/installation/nixos-anywhere/)); `hosts/terramaster/f4-245/disko.nix`'s
-    `zfs-pool.nix` call includes it for future from-scratch installs.
+    `rust/nix`/`rust/persist` were, before the installer wizard existed);
+    `hosts/terramaster/f4-245/disko.nix`'s `zfs-pool.nix` call includes it
+    for future from-scratch installs.
     The installer wizard's "adopt an existing pool" path doesn't
     currently offer creating this dataset — a known gap, not yet hit
     since MinIO defaults off.
@@ -823,10 +826,12 @@ socket/provider here, dynamic routing is declared directly via
   gets two routers (e.g. `jellyfin-young-nebula` and `jellyfin-young-lan`),
   sharing the same backend service.
 - **Secret**: `LINODE_TOKEN` comes from `/etc/traefik/traefik.env`
-  (`environmentFiles`), an out-of-repo secret delivered the same way as
-  Nebula's config — see the [nixos-anywhere installation guide](/docs/installation/nixos-anywhere/)'s secrets
-  table. Traefik's Linode DNS provider reads it straight from the process
-  environment; no templating needed in the static config.
+  (`environmentFiles`), an out-of-repo secret — the installer wizard's
+  DNS-01 step writes this directly on a fresh install; on an
+  already-installed host it's edited by hand or from the dashboard's
+  System Preferences page. Traefik's Linode DNS provider reads it
+  straight from the process environment; no templating needed in the
+  static config.
 - **Traefik's own admin dashboard port is 8099, not Traefik's default
   8080** — 8080 is qBittorrent's default webUI port, and both would
   otherwise try to bind the same port. 8099 also matches the original
@@ -903,15 +908,21 @@ just more convenient to type an IP than remember a domain.
 
 ## Deploying and updating
 
-Full procedure in the [nixos-anywhere installation guide](/docs/installation/nixos-anywhere/). The short
-version for routine updates once the box is already installed:
+A fresh install goes through the [ISO installer](/docs/installation/iso/) —
+it partitions storage, writes the config, and installs the system on the
+NAS hardware itself, no separate workstation required. The generated
+config gets copied to `/persist/nixos-installer-output/` on the new
+system; committing that into `hosts/<manufacturer>/<instance>/` in this
+repo is what makes the box updatable from a workstation afterward.
+
+Routine updates, once a box is already installed, are a plain
 `nixos-rebuild switch --flake .#young --target-host beardedtek@<ip> --sudo
---impure` from a machine with `secrets/initial-passwords.env` sourced.
-Several non-obvious requirements for that command to work at all are
-documented in the [Failure modes](#failure-modes-hit-during-development)'s "Remote
-deployment" section — trusted-users, sudo's environment stripping, and
-the `--impure`/`--option pure-eval false` split between `nixos-rebuild`
-and `nixos-anywhere`.
+--impure` from a machine with `secrets/initial-passwords.env` sourced (the
+dashboard's own Update panel does the equivalent thing locally on the box —
+see [WebUI](/docs/usage/webui/)). Several non-obvious requirements for the
+remote form of that command to work at all are documented in the
+[Failure modes](#failure-modes-hit-during-development)'s "Remote deployment"
+section — trusted-users and sudo's environment stripping in particular.
 
 ## Failure modes hit during development
 
@@ -945,11 +956,11 @@ rather than just "the parent path everything else lives under."
 
 **Fix:** `zfs set mountpoint=legacy <dataset>` for *every* dataset
 referenced by a `fileSystems.*` entry — including the pool's own top-level
-dataset, not just its children. See the
-[nixos-anywhere installation guide](/docs/installation/nixos-anywhere/)
-for the one-time `zfs set` commands. Legacy-mountpoint datasets are never
+dataset, not just its children. Legacy-mountpoint datasets are never
 auto-mounted by ZFS, only ever mounted explicitly — which is exactly what
-NixOS's systemd-generated units do.
+NixOS's systemd-generated units do. The installer wizard's "adopt an
+existing pool" path runs this automatically for every dataset it maps;
+this was a manual, easy-to-miss step only before the wizard existed.
 
 **Diagnosis tip:** if `mount | grep <path>` shows something mounted but
 `ls`/`stat` on that exact path fail, check `journalctl -b | grep -iE
@@ -990,24 +1001,16 @@ is tmpfs — it's a bridge, not a fix.
 
 #### Instance: Nebula's `config.yaml` empty after install (`/etc/nebula/`)
 
-**Cause:** `nixos-anywhere --extra-files` writes directly onto whatever's
-mounted under `/mnt` *during install*. If the extra-files payload targets
-a path like `etc/nebula/config.yaml` (mirroring the final `/etc/nebula`
-path), it lands on `/mnt/etc/nebula` — which at install time is on the
-ephemeral install-scratch filesystem, not `/mnt/persist`. The impermanence
-bind-mount from the real pool only starts existing at the *installed*
-system's first real boot, and it starts empty — shadowing whatever the
-installer wrote to the now-irrelevant ephemeral copy.
-
-**Fix:** structure `secrets/extra-files/` to mirror where the file
-actually needs to land at install time, not where it ends up after
-boot — i.e. `secrets/extra-files/persist/etc/nebula/config.yaml`, which
-`nixos-anywhere` writes to `/mnt/persist/etc/nebula/config.yaml` (a real,
-already-mounted persistent dataset per the
-[nixos-anywhere installation guide](/docs/installation/nixos-anywhere/)).
-Contrast with the SSH key under `secrets/extra-files/home/...` — that one
-never had this problem, because `/home` is a real ZFS-backed mount during
-install already, not indirected through `/persist`.
+**General shape:** anything written during install to a path backed by
+`environment.persistence."/persist"` (impermanence) has to land on the
+*real*, already-mounted persistent dataset at install time, not on
+whatever ephemeral scratch filesystem happens to be at that path before
+the bind-mount exists. The impermanence bind-mount only starts existing
+at the *installed* system's first real boot, and it starts empty —
+shadowing anything written to the pre-boot, now-irrelevant location. The
+installer wizard's own Nebula step avoids this class of bug entirely by
+writing straight to the final persistent path itself, not through any
+staging/extra-files indirection.
 
 **Live unblock on an already-running box:** the target path (e.g.
 `/etc/nebula/config.yaml`) really is the persistent one once the system
@@ -1171,8 +1174,8 @@ problem.
 ### Remote deployment gotchas (`nixos-rebuild switch --target-host`)
 
 A handful of non-obvious requirements had to be discovered one at a time
-to get routine remote updates working at all, beyond the initial
-`nixos-anywhere` install:
+to get routine remote updates working at all, once a box is already
+installed:
 
 - **`root@` doesn't work as the target-host user.** `PermitRootLogin =
   "no"` (see "Network and firewall model" above) blocks it
@@ -1198,13 +1201,6 @@ to get routine remote updates working at all, beyond the initial
   named `localhost`, which fails with `Connection refused` on any machine
   without its own sshd running. Omit `--build-host` entirely to build
   locally with no SSH involved; only `--target-host` needs SSH.
-- **`--impure` vs `--option pure-eval false`.** Plain `nix build` /
-  `nixos-rebuild switch` accept `--impure` directly. `nixos-anywhere`
-  does not — everything after its own `--` is parsed by its own argument
-  parser, which doesn't recognize `--impure` and just dumps usage text.
-  Use `--option pure-eval false` for `nixos-anywhere` specifically;
-  confirmed it achieves the same effect (and that the config's assertions
-  still correctly fire if the secret env vars aren't set).
 
 ### Stray `_acme-challenge.*` CNAME breaks DNS-01 for that domain
 
@@ -1310,12 +1306,13 @@ and are now fixed:
   mountpoint, only its children are — replaced with an explicit
   deepest-first unmount of everything actually mounted under it.
 
-Budget real RAM for the install step specifically: unlike
-`nixos-anywhere` (builds on your workstation, only copies the result),
-the wizard builds the *entire* target system locally, on whatever
-hardware it's running on. 3GB RAM was not enough in testing — the build
+Budget real RAM for the install step specifically: the wizard builds the
+*entire* target system locally, on whatever hardware it's running on, not
+on a separate workstation. 3GB RAM was not enough in testing — the build
 was OOM-killed partway through compiling Home Assistant's Python
-dependencies; 8GB completed the full build without issue.
+dependencies; 8GB completed the full build without issue. A lighter
+service selection (skip Home Assistant/the media-acquisition group) also
+comfortably fits in 4GB.
 
 Not yet run against real hardware — treat the first real run on new
 hardware as a trial, not a guarantee, and keep a way to reach the console

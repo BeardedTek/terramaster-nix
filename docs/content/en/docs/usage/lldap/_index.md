@@ -19,23 +19,35 @@ the same reverse proxy as everything else — so the directory that
 everything else depends on stays reachable even if something else on the
 box is broken.
 
+![LLDAP admin UI](/terramaster-nix/images/webui/09-lldap-admin.png)
+
 ## User Management
 
-Who exists is controlled from the flake's `variables.nix`
-(`mySystem.users`), not through LLDAP's UI directly — adding or removing
-a user, or changing who's an admin, is a config change made by whoever
-maintains this box, then applied with a rebuild. If you need an account
-added, ask them.
+Day-to-day account management — adding a user, removing one, toggling
+admin (wheel) access, or resetting a password — is handled from the
+dashboard's own [Users page](/docs/usage/webui/#users), not LLDAP's UI
+directly: it keeps the Unix account, LLDAP entry, and Samba password all
+in sync in one action, which editing LLDAP alone can't do. LLDAP's own UI
+above is still there for anything the dashboard doesn't cover (managing
+groups, editing schema), and as the fallback if the dashboard itself is
+unreachable.
 
-- **Admins** — anyone with `wheel = true` in `mySystem.users` is placed
-  in LLDAP's `admins` group automatically. Admin accounts get access to
-  the dashboard's [System Preferences](/docs/usage/webui/#system-preferences)
-  page, including the ability to trigger a system update.
+Every account still ultimately traces back to `mySystem.users` in the
+flake's `variables.nix` — the dashboard's Users page writes to a
+persisted override rather than editing that file directly (see
+[Architecture](/docs/architecture/) if you're curious how), so the two
+stay consistent.
+
+- **Admins** — anyone with `wheel = true` is placed in LLDAP's `admins`
+  group automatically. Admin accounts get access to every admin page
+  covered on the [WebUI](/docs/usage/webui/) page, Users included.
 - **Self-service password changes** — once your account exists, you can
   change your own password at any time through LLDAP's own web UI above
   (log in with your current username/password, then use the profile
   option to set a new one). This is the same password used for the
   dashboard and every other LLDAP-backed login — change it in one place,
   it takes effect everywhere.
-- **Forgot your password?** Only an admin can reset it for you — there's
-  no self-service "forgot password" email flow.
+- **Forgot your password?** An admin can reset it for you from the
+  dashboard's [Users page](/docs/usage/webui/#users) — no config edit or
+  rebuild needed, it takes effect immediately. There's no self-service
+  "forgot password" email flow.

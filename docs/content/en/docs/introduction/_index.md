@@ -30,8 +30,8 @@ that only lives on the one box you set it up on.
 
 ## Where to go next
 
-- **[Installation](/docs/installation/)** — bring up a new box, either with
-  the guided installer ISO or manually via `nixos-anywhere`.
+- **[Installation](/docs/installation/)** — bring up a new box with the
+  guided installer ISO, on-screen or from a remote browser.
 - **[Usage](/docs/usage/)** — once it's running: logging in, the
   dashboard, managing users, and every available service.
 - **[Troubleshooting](/docs/troubleshooting/)** — common problems and what

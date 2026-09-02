@@ -1,5 +1,4 @@
 baseURL: https://beardedtek.github.io/terramaster-nix/
-canonifyURLs: true
 title: Bearded NAS
 
 contentDir: content/en

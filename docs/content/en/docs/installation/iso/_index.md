@@ -2,12 +2,29 @@
 title: ISO Installation
 linkTitle: ISO Installation
 weight: 10
-description: The default, guided way to install Bearded NAS — a bootable ISO with a TUI wizard.
+description: The default, guided way to install Bearded NAS — a bootable ISO that walks through partitioning, users, and services, on the NAS's own screen or from a remote browser.
 ---
 
-The default way to install: a bootable ISO with a TUI wizard that
-partitions disks, collects your users and settings, and installs the
-system itself — no separate workstation required.
+The default way to install: a bootable ISO that partitions disks, collects
+your users and settings, and installs the system itself — no separate
+workstation required.
+
+## How you see it
+
+The ISO auto-detects whether the NAS has a display connected and adapts:
+
+- **Display connected** — boots straight into the installer full-screen
+  on the NAS's own screen (a minimal Wayland kiosk session running just a
+  browser, nothing else) — no other device needed to drive the install.
+- **No display detected** — falls back cleanly to a text-mode (TUI)
+  console wizard instead, no different behavior otherwise.
+
+Either way, the exact same install is *also* always reachable from any
+other device's browser on the LAN, at the IP address the console prints
+on boot — the TUI, the on-screen kiosk, and a remote browser all drive
+the identical wizard and can be used interchangeably. This is genuinely
+useful even with a display attached: continue an install from your phone
+or laptop without walking over to the NAS.
 
 ## Download
 
@@ -50,8 +67,8 @@ downloading the generic release image.
 
 ## What the wizard does
 
-Boots to a TUI (also reachable over SSH if you'd rather drive it
-remotely) that walks through, in order:
+Whichever way you're driving it (on-screen, TUI console, over SSH, or a
+remote browser), it walks through, in order:
 
 1. **Repo freshness** — offers to pull a fresh copy of the config before
    generating anything, in case the ISO is older than the latest release.
@@ -77,40 +94,41 @@ remotely) that walks through, in order:
 
 ## Walkthrough (WebUI)
 
-The TUI and the WebUI ask exactly the same questions — these screenshots are
-from the WebUI, reachable from any other device's browser at the IP address
+The on-screen kiosk, the TUI, and a remote browser all ask exactly the same
+questions — these screenshots are the WebUI, the same thing you'd see on
+the NAS's own screen or from any other device's browser at the IP address
 the console prints on boot.
 
-![Welcome screen](/images/installer/01-welcome.png)
+![Welcome screen](/terramaster-nix/images/installer/01-welcome.png)
 Welcome screen — explains the two storage paths up front.
 
-![LAN interface picker](/images/installer/03-network.png)
+![LAN interface picker](/terramaster-nix/images/installer/03-network.png)
 Pick the LAN interface.
 
-![Storage path choice](/images/installer/09-storage-choice.png)
+![Storage path choice](/terramaster-nix/images/installer/09-storage-choice.png)
 Storage: adopt an existing pool, or create a new one from blank disks.
 
-![Existing-data confirmation](/images/installer/12-confirm-existing-data.png)
+![Existing-data confirmation](/terramaster-nix/images/installer/12-confirm-existing-data.png)
 Any disk flagged with existing data needs its own explicit confirmation
 before it can join a new pool.
 
-![Generated disko.nix preview](/images/installer/15-disko-preview.png)
+![Generated disko.nix preview](/terramaster-nix/images/installer/15-disko-preview.png)
 The exact generated `disko.nix` is shown before anything is written.
 
-![Services checklist](/images/installer/19-services.png)
+![Services checklist](/terramaster-nix/images/installer/19-services.png)
 Services checklist — pick what runs on this box.
 
-![Review screen](/images/installer/25-review.png)
+![Review screen](/terramaster-nix/images/installer/25-review.png)
 Full review of every answer before the destructive confirmation screen.
 
-![Type DESTROY to confirm](/images/installer/26-confirm-destroy.png)
+![Type DESTROY to confirm](/terramaster-nix/images/installer/26-confirm-destroy.png)
 Creating a new pool requires typing `DESTROY` — no accidental data loss.
 
-![Installing progress](/images/installer/27-installing.png)
+![Installing progress](/terramaster-nix/images/installer/27-installing.png)
 Unattended from here — writes the config, partitions storage, and installs
 NixOS, with a live log available the whole way through.
 
-![Install done](/images/installer/28-done.png)
+![Install done](/terramaster-nix/images/installer/28-done.png)
 Done — where the generated config ends up, and what to do with it.
 
 ## After it finishes

@@ -2,13 +2,12 @@
 title: Installation
 linkTitle: Installation
 weight: 20
-description: Two ways to install Bearded NAS — the guided installer ISO, or nixos-anywhere from a workstation.
+description: Boot the guided installer ISO and answer questions — on the NAS's own screen if it has one, or from any other device's browser if it doesn't.
 ---
 
-Both installation paths ask you to make the same one consequential
-decision about storage before anything else happens. Everything past that
-is either fully guided (the installer ISO) or a manual step-by-step
-(`nixos-anywhere`).
+One consequential decision about storage comes right up front, before
+anything else happens — everything past that is fully guided, whether
+you're driving it from the NAS's own screen or a remote browser.
 
 ## Storage: blank drives or an existing ZFS pool
 
@@ -33,12 +32,18 @@ marked to survive a reboot does. See
 [Architecture → Storage design](/docs/architecture/#storage-design) if
 you want the full mechanical explanation of why.
 
-## Choose a path
+## However you reach it, it's the same wizard
 
-- **[ISO Installation](/docs/installation/iso/)** (default) — boot a
-  self-contained installer, answer questions in a TUI wizard, done. No
-  separate workstation required.
-- **[nixos-anywhere](/docs/installation/nixos-anywhere/)** — install
-  remotely from another machine by editing the flake's config files
-  directly first. More manual, but scriptable and repeatable — useful if
-  you're managing this as infrastructure-as-code from day one.
+Boot the [installer ISO](/docs/installation/iso/) and the box figures out
+how to show it to you:
+
+- **A display is connected** — boots straight into the installer
+  full-screen, no separate device needed to drive the install.
+- **No display detected** — falls back cleanly to a text-mode console
+  wizard, and the same install is also always reachable from any other
+  device's browser on the LAN at the IP address the console prints on
+  boot. A remote browser and the local console can drive the exact same
+  install interchangeably.
+
+See [ISO Installation](/docs/installation/iso/) for the full walkthrough,
+screenshots included.

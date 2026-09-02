@@ -9,8 +9,8 @@ Everything you need to install and use Bearded NAS.
 
 - **[Introduction](/docs/introduction/)** — what this project is and what
   it gives you.
-- **[Installation](/docs/installation/)** — installer ISO (default) or
-  `nixos-anywhere` from a workstation.
+- **[Installation](/docs/installation/)** — boot the installer ISO,
+  on-screen or from a remote browser.
 - **[Usage](/docs/usage/)** — logging in, the web dashboard, managing
   users in LLDAP, and every available service.
 - **[Troubleshooting](/docs/troubleshooting/)** — common problems and what
